@@ -1,0 +1,3293 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Swrk — Product Blueprint</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #0a0a0f;
+        --ink2: #1a1a2e;
+        --gold: #f5c842;
+        --gold2: #e8a000;
+        --teal: #00c9a7;
+        --coral: #ff6b6b;
+        --blue: #4f8ef7;
+        --muted: #6b6b8a;
+        --surface: #f7f6f3;
+        --border: #e2e0d8;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "Instrument Sans", sans-serif;
+        background: var(--surface);
+        color: var(--ink);
+        line-height: 1.7;
+      }
+      h1,
+      h2,
+      h3,
+      h4,
+      .display {
+        font-family: "Syne", sans-serif;
+      }
+      code,
+      .mono {
+        font-family: "JetBrains Mono", monospace;
+      }
+
+      /* Sticky sidebar */
+      .sidebar {
+        position: sticky;
+        top: 2rem;
+        height: calc(100vh - 4rem);
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border) transparent;
+      }
+
+      /* Nav links */
+      .nav-link {
+        display: block;
+        padding: 6px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-family: "Syne", sans-serif;
+        font-weight: 500;
+        color: var(--muted);
+        text-decoration: none;
+        transition: all 0.15s;
+        border: 2px solid transparent;
+      }
+      .nav-link:hover {
+        color: var(--ink);
+        background: rgba(0, 0, 0, 0.04);
+        border-color: var(--gold);
+      }
+      .nav-link.active {
+        color: var(--ink);
+        border-color: var(--gold);
+        background: rgba(245, 200, 66, 0.08);
+      }
+      .nav-sub {
+        font-size: 12px;
+        padding: 4px 12px 4px 22px;
+        color: var(--muted);
+        border-left: 2px solid transparent;
+      }
+      .nav-sub:hover {
+        color: var(--ink2);
+        border-color: var(--teal);
+      }
+
+      /* Phase badges */
+      .phase-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-family: "Syne", sans-serif;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        padding: 4px 10px;
+        border-radius: 20px;
+      }
+
+      /* Feature cards */
+      .feature-card {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 20px;
+        transition: box-shadow 0.2s;
+      }
+      .feature-card:hover {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.07);
+      }
+
+      /* Tech pills */
+      .tech-pill {
+        display: inline-flex;
+        align-items: center;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 12px;
+        background: var(--ink);
+        color: var(--gold);
+        padding: 3px 10px;
+        border-radius: 4px;
+        font-weight: 500;
+      }
+
+      /* Section heading accent */
+      .section-title {
+        font-size: 28px;
+        font-weight: 800;
+        margin-bottom: 4px;
+        letter-spacing: -0.02em;
+      }
+      .section-subtitle {
+        color: var(--muted);
+        font-size: 15px;
+        margin-bottom: 32px;
+      }
+
+      /* IP / Moat box */
+      .moat-box {
+        background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
+        border-radius: 16px;
+        padding: 28px 32px;
+        color: white;
+        position: relative;
+        overflow: hidden;
+      }
+      .moat-box::before {
+        content: "";
+        position: absolute;
+        top: -40px;
+        right: -40px;
+        width: 200px;
+        height: 200px;
+        background: radial-gradient(
+          circle,
+          rgba(245, 200, 66, 0.15) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+      }
+
+      /* Step number */
+      .step-num {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: 13px;
+        flex-shrink: 0;
+      }
+
+      /* Timeline connector */
+      .timeline-line {
+        width: 2px;
+        background: var(--border);
+        margin: 0 auto;
+      }
+      .timeline-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        border: 2px solid;
+        background: white;
+      }
+
+      /* Divider */
+      .section-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 48px 0;
+      }
+
+      /* Print / export tweaks */
+      @media print {
+        .sidebar {
+          display: none;
+        }
+        .main-content {
+          margin-left: 0;
+        }
+      }
+
+      /* Smooth scroll */
+      html {
+        scroll-behavior: smooth;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- HERO HEADER -->
+    <header
+      style="background: var(--ink); color: white"
+      class="px-8 py-16 relative overflow-hidden"
+    >
+      <div
+        style="
+          position: absolute;
+          top: -80px;
+          right: -60px;
+          width: 400px;
+          height: 400px;
+          background: radial-gradient(
+            circle,
+            rgba(245, 200, 66, 0.12) 0%,
+            transparent 70%
+          );
+          pointer-events: none;
+        "
+      ></div>
+      <div
+        style="
+          position: absolute;
+          bottom: -60px;
+          left: 200px;
+          width: 300px;
+          height: 300px;
+          background: radial-gradient(
+            circle,
+            rgba(0, 201, 167, 0.08) 0%,
+            transparent 70%
+          );
+          pointer-events: none;
+        "
+      ></div>
+      <div class="max-w-5xl mx-auto">
+        <div class="flex items-center gap-3 mb-6">
+          <span
+            style="
+              background: var(--gold);
+              color: var(--ink);
+              font-family: &quot;Syne&quot;, sans-serif;
+              font-weight: 800;
+              font-size: 11px;
+              letter-spacing: 0.1em;
+              text-transform: uppercase;
+            "
+            class="px-3 py-1 rounded-full"
+            >Confidential — Product Blueprint</span
+          >
+        </div>
+        <h1
+          style="
+            font-size: clamp(42px, 7vw, 80px);
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 1;
+          "
+          class="mb-4"
+        >
+          <span style="color: var(--gold)">SWRK</span>
+        </h1>
+        <p
+          style="
+            font-size: 22px;
+            color: rgba(255, 255, 255, 0.6);
+            max-width: 600px;
+          "
+          class="mb-8 font-medium"
+        >
+          The professional matching platform — LinkedIn intelligence meets
+          Tinder's discovery engine. Full product blueprint, tech stack &amp; IP
+          strategy.
+        </p>
+        <div class="flex flex-wrap gap-3">
+          <span class="tech-pill">v1.0 Blueprint</span>
+          <span
+            class="tech-pill"
+            style="background: #1a1a2e; color: var(--teal)"
+            >Mobile + Web</span
+          >
+          <span
+            class="tech-pill"
+            style="background: #1a1a2e; color: var(--coral)"
+            >B2C + B2B SaaS</span
+          >
+          <span
+            class="tech-pill"
+            style="background: #1a1a2e; color: var(--blue)"
+            >AI-Powered</span
+          >
+        </div>
+      </div>
+    </header>
+
+    <!-- LAYOUT: Sidebar + Content -->
+    <div class="max-w-6xl mx-auto px-4 py-10 flex gap-10">
+      <!-- SIDEBAR NAV -->
+      <aside class="hidden lg:block w-56 flex-shrink-0">
+        <div class="sidebar">
+          <p
+            style="
+              font-family: &quot;Syne&quot;, sans-serif;
+              font-size: 11px;
+              font-weight: 700;
+              letter-spacing: 0.1em;
+              text-transform: uppercase;
+              color: var(--muted);
+            "
+            class="px-3 mb-3"
+          >
+            Contents
+          </p>
+          <nav class="flex flex-col gap-1">
+            <a href="#overview" class="nav-link">Overview</a>
+            <a href="#phases" class="nav-link">Implementation Phases</a>
+            <a href="#phase1" class="nav-sub nav-link">Phase 1 — Core MVP</a>
+            <a href="#phase2" class="nav-sub nav-link"
+              >Phase 2 — Intelligence</a
+            >
+            <a href="#phase3" class="nav-sub nav-link">Phase 3 — Premium</a>
+            <a href="#phase4" class="nav-sub nav-link">Phase 4 — Scale</a>
+            <a href="#features" class="nav-link">All Features</a>
+            <a href="#employer" class="nav-sub nav-link">Employer Features</a>
+            <a href="#employee" class="nav-sub nav-link">Employee Features</a>
+            <a href="#matching" class="nav-sub nav-link">Matching Engine</a>
+            <a href="#messaging" class="nav-sub nav-link">Messaging</a>
+            <a href="#premium" class="nav-sub nav-link">Premium Model</a>
+            <a href="#admin" class="nav-link">Admin Panel</a>
+            <a href="#techstack" class="nav-link">Tech Stack</a>
+            <a href="#ip" class="nav-link">IP &amp; Moat Strategy</a>
+            <a href="#notifications" class="nav-link">Notifications</a>
+            <a href="#launch" class="nav-link">Launch Roadmap</a>
+          </nav>
+        </div>
+      </aside>
+
+      <!-- MAIN CONTENT -->
+      <main class="flex-1 min-w-0" id="main">
+        <!-- OVERVIEW -->
+        <section id="overview" class="mb-16">
+          <h2 class="section-title">What is Swrk?</h2>
+          <p class="section-subtitle">
+            The professional hiring platform built on mutual intent
+          </p>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div
+              class="feature-card border-4"
+              style="border-color: var(--gold)"
+            >
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 16px;
+                "
+                class="mb-2"
+              >
+                The Problem
+              </div>
+              <p style="font-size: 14px; color: var(--muted)">
+                LinkedIn is a résumé database with spam. Candidates apply into
+                black holes. Recruiters blast 500 InMails. No mutual intent
+                signal exists anywhere in the current hiring stack.
+              </p>
+            </div>
+            <div
+              class="feature-card border-4"
+              style="border-color: var(--teal)"
+            >
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 16px;
+                "
+                class="mb-2"
+              >
+                The Solution
+              </div>
+              <p style="font-size: 14px; color: var(--muted)">
+                Swipe-based mutual interest matching for professionals. A match
+                only happens when both sides want it. Dramatically higher
+                conversion from first contact to hire.
+              </p>
+            </div>
+            <div
+              class="feature-card border-4"
+              style="border-color: var(--coral)"
+            >
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 16px;
+                "
+                class="mb-2"
+              >
+                The Market
+              </div>
+              <p style="font-size: 14px; color: var(--muted)">
+                Global recruitment market is $650B+. India alone has 560M
+                working-age people, 50M+ active job seekers. No swipe-based
+                hiring app has achieved mass adoption in India yet.
+              </p>
+            </div>
+          </div>
+
+          <div class="moat-box">
+            <div
+              style="
+                font-family: &quot;Syne&quot;, sans-serif;
+                font-weight: 800;
+                font-size: 18px;
+                color: var(--gold);
+              "
+              class="mb-3"
+            >
+              Core Proposition
+            </div>
+            <p
+              style="
+                color: rgba(255, 255, 255, 0.8);
+                font-size: 15px;
+                max-width: 680px;
+              "
+            >
+              Swrk is not a job board. It is not a social network. It is a
+              <strong style="color: white"
+                >mutual-intent hiring marketplace</strong
+              >
+              — the first platform where both the employer and the candidate
+              must express interest before any conversation begins. This single
+              mechanic eliminates 90% of hiring friction on both sides.
+            </p>
+          </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- IMPLEMENTATION PHASES -->
+        <section id="phases" class="mb-16">
+          <h2 class="section-title">Implementation Phases</h2>
+          <p class="section-subtitle">
+            Step-by-step build plan from MVP to scaled platform
+          </p>
+
+          <!-- PHASE 1 -->
+          <div id="phase1" class="mb-10">
+            <div class="flex items-center gap-3 mb-5">
+              <span
+                class="phase-badge"
+                style="background: rgba(245, 200, 66, 0.15); color: #b8860b"
+                >● Phase 1</span
+              >
+              <h3
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-size: 20px;
+                  font-weight: 700;
+                "
+              >
+                Core MVP — Weeks 1–8
+              </h3>
+            </div>
+
+            <div class="flex flex-col gap-4">
+              <!-- Step 1 -->
+              <div class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div
+                    class="step-num"
+                    style="background: var(--gold); color: var(--ink)"
+                  >
+                    1
+                  </div>
+                  <div
+                    class="timeline-line flex-1 mt-2"
+                    style="min-height: 40px"
+                  ></div>
+                </div>
+                <div class="feature-card flex-1 mb-0">
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 700;
+                      font-size: 16px;
+                    "
+                    class="mb-1"
+                  >
+                    Authentication System
+                  </div>
+                  <p style="font-size: 14px; color: var(--muted)" class="mb-3">
+                    OAuth (Google, LinkedIn) + Email/Password with JWT + Refresh
+                    Token rotation. Existing code can be reused here. Implement
+                    device fingerprinting from day one for fraud prevention.
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="tech-pill">Next-Auth / Passport.js</span>
+                    <span class="tech-pill">JWT + Redis</span>
+                    <span class="tech-pill">Google OAuth 2.0</span>
+                    <span class="tech-pill">LinkedIn OAuth</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 2 -->
+              <div class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div
+                    class="step-num"
+                    style="background: var(--gold); color: var(--ink)"
+                  >
+                    2
+                  </div>
+                  <div
+                    class="timeline-line flex-1 mt-2"
+                    style="min-height: 40px"
+                  ></div>
+                </div>
+                <div class="feature-card flex-1">
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 700;
+                      font-size: 16px;
+                    "
+                    class="mb-1"
+                  >
+                    Onboarding Flow
+                  </div>
+                  <p style="font-size: 14px; color: var(--muted)" class="mb-3">
+                    Multi-step onboarding with LinkedIn profile import via API.
+                    Pull: name, headline, experience, skills, education,
+                    location. Store enriched profile in Postgres with JSONB for
+                    flexible skill tagging. Target: under 3 minutes to first
+                    swipe.
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="tech-pill">LinkedIn API v2</span>
+                    <span class="tech-pill">Postgres + JSONB</span>
+                    <span class="tech-pill">React Hook Form</span>
+                    <span class="tech-pill">Zod validation</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 3 -->
+              <div class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div
+                    class="step-num"
+                    style="background: var(--gold); color: var(--ink)"
+                  >
+                    3
+                  </div>
+                  <div
+                    class="timeline-line flex-1 mt-2"
+                    style="min-height: 40px"
+                  ></div>
+                </div>
+                <div class="feature-card flex-1">
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 700;
+                      font-size: 16px;
+                    "
+                    class="mb-1"
+                  >
+                    Role Selection &amp; Profile Builder
+                  </div>
+                  <p style="font-size: 14px; color: var(--muted)" class="mb-3">
+                    After basic onboarding, user selects: Employer or Employee
+                    (can hold both modes — founders often do). Employer fills:
+                    company, role, CTC range, perks, JD (500 chars). Employee
+                    fills: desired role, expected CTC, skills, preferred
+                    companies. Both profiles stored separately; a single user
+                    account can have both.
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="tech-pill">Postgres multi-profile schema</span>
+                    <span class="tech-pill">S3 (logo/photo)</span>
+                    <span class="tech-pill">Cloudinary</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 4 -->
+              <div class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div
+                    class="step-num"
+                    style="background: var(--gold); color: var(--ink)"
+                  >
+                    4
+                  </div>
+                  <div
+                    class="timeline-line flex-1 mt-2"
+                    style="min-height: 40px"
+                  ></div>
+                </div>
+                <div class="feature-card flex-1">
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 700;
+                      font-size: 16px;
+                    "
+                    class="mb-1"
+                  >
+                    Swipe Deck Engine
+                  </div>
+                  <p style="font-size: 14px; color: var(--muted)" class="mb-3">
+                    Core swiping UI. Cards rendered from a pre-fetched queue
+                    (batch of 20, prefetch next batch at 5 remaining). Swipe
+                    data logged to a swipes table with timestamp, action
+                    (left/right/superswipe), session_id. Card shows: photo,
+                    name, title, 3 skills, exp years, location, CTC range. No CV
+                    shown here — this is intentional and protects the premium
+                    unlock mechanic.
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="tech-pill">React Native Reanimated</span>
+                    <span class="tech-pill">Gesture Handler</span>
+                    <span class="tech-pill">Redis queue</span>
+                    <span class="tech-pill">Postgres swipes table</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 5 -->
+              <div class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div
+                    class="step-num"
+                    style="background: var(--gold); color: var(--ink)"
+                  >
+                    5
+                  </div>
+                  <div
+                    class="timeline-line flex-1 mt-2"
+                    style="min-height: 40px"
+                  ></div>
+                </div>
+                <div class="feature-card flex-1">
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 700;
+                      font-size: 16px;
+                    "
+                    class="mb-1"
+                  >
+                    Match Detection &amp; Mutual Match Flow
+                  </div>
+                  <p style="font-size: 14px; color: var(--muted)" class="mb-3">
+                    When user A right-swipes user B: check if B already
+                    right-swiped A. If yes → create Match record, trigger match
+                    animation, unlock chat. Match table: match_id, user_a,
+                    user_b, created_at, status (active/archived/reported). Run
+                    match check via Redis pub/sub for real-time detection
+                    without polling Postgres on every swipe.
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="tech-pill">Redis Pub/Sub</span>
+                    <span class="tech-pill">Postgres matches</span>
+                    <span class="tech-pill">WebSocket</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Step 6 -->
+              <div class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div
+                    class="step-num"
+                    style="background: var(--gold); color: var(--ink)"
+                  >
+                    6
+                  </div>
+                </div>
+                <div class="feature-card flex-1">
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 700;
+                      font-size: 16px;
+                    "
+                    class="mb-1"
+                  >
+                    Basic Messaging (Chat)
+                  </div>
+                  <p style="font-size: 14px; color: var(--muted)" class="mb-3">
+                    Chat unlocked only on mutual match. Opening screen shows 5
+                    pre-written starter prompts (e.g. "I'd love to know more
+                    about this role", "What's the interview process like?") plus
+                    a free-text input. Share CV button appears in chat tray —
+                    sends CV as a document message. Messages stored with
+                    end-to-end encryption flag. Build on WebSocket for real-time
+                    delivery.
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="tech-pill">Socket.io</span>
+                    <span class="tech-pill">Postgres messages</span>
+                    <span class="tech-pill">AES-256 encryption</span>
+                    <span class="tech-pill">S3 (file share)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PHASE 2 -->
+          <div id="phase2" class="mb-10">
+            <div class="flex items-center gap-3 mb-5">
+              <span
+                class="phase-badge"
+                style="background: rgba(0, 201, 167, 0.12); color: #007a65"
+                >● Phase 2</span
+              >
+              <h3
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-size: 20px;
+                  font-weight: 700;
+                "
+              >
+                Intelligence Layer — Weeks 9–16
+              </h3>
+            </div>
+
+            <div class="flex flex-col gap-4">
+              <div class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div
+                    class="step-num"
+                    style="background: var(--teal); color: white"
+                  >
+                    7
+                  </div>
+                  <div
+                    class="timeline-line flex-1 mt-2"
+                    style="min-height: 40px"
+                  ></div>
+                </div>
+                <div class="feature-card flex-1">
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 700;
+                      font-size: 16px;
+                    "
+                    class="mb-1"
+                  >
+                    Smart Filter Engine
+                  </div>
+                  <p style="font-size: 14px; color: var(--muted)" class="mb-3">
+                    Employer filters: company size, industry, role type
+                    (FT/freelance/contract), CTC offered range, required exp,
+                    skills (multi-select with autocomplete), location
+                    (city/remote/hybrid), qualifications, notice period
+                    tolerance. Employee filters: company type
+                    (startup/MNC/FAANG), WFH preference, CTC expected range,
+                    role, growth stage, team size. Filters stored per-user;
+                    remembered across sessions. Filter quality directly impacts
+                    match quality — this is a core differentiator.
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="tech-pill">Elasticsearch</span>
+                    <span class="tech-pill">Postgres full-text</span>
+                    <span class="tech-pill">Redis filter cache</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div
+                    class="step-num"
+                    style="background: var(--teal); color: white"
+                  >
+                    8
+                  </div>
+                  <div
+                    class="timeline-line flex-1 mt-2"
+                    style="min-height: 40px"
+                  ></div>
+                </div>
+                <div class="feature-card flex-1">
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 700;
+                      font-size: 16px;
+                    "
+                    class="mb-1"
+                  >
+                    AI Compatibility Score (Proprietary)
+                  </div>
+                  <p style="font-size: 14px; color: var(--muted)" class="mb-3">
+                    Hidden backend score (0–100) computed for every
+                    employer-employee pair using: skill overlap, CTC alignment,
+                    location match, industry history, seniority fit, and
+                    behavioural signals (time spent on card, re-views, swipe
+                    speed). This score determines card ordering in the swipe
+                    deck — highest compatibility appears first. Users never see
+                    the raw score; they only experience better matches. This is
+                    core IP.
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="tech-pill">Python ML service</span>
+                    <span class="tech-pill">scikit-learn / XGBoost</span>
+                    <span class="tech-pill">FastAPI</span>
+                    <span class="tech-pill">pgvector (embeddings)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div
+                    class="step-num"
+                    style="background: var(--teal); color: white"
+                  >
+                    9
+                  </div>
+                  <div
+                    class="timeline-line flex-1 mt-2"
+                    style="min-height: 40px"
+                  ></div>
+                </div>
+                <div class="feature-card flex-1">
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 700;
+                      font-size: 16px;
+                    "
+                    class="mb-1"
+                  >
+                    Profile Verification System
+                  </div>
+                  <p style="font-size: 14px; color: var(--muted)" class="mb-3">
+                    LinkedIn badge (OAuth confirmed), Email verification, Phone
+                    OTP. For employers: optional company domain email
+                    verification (hiring@company.com = verified badge). For
+                    employees: optional document upload (offer letter, degree)
+                    for "Verified Experience" badge. Badges displayed on cards —
+                    strong trust signal that improves swipe rates.
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="tech-pill">Twilio OTP</span>
+                    <span class="tech-pill">SendGrid</span>
+                    <span class="tech-pill">AWS Textract (doc verify)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div
+                    class="step-num"
+                    style="background: var(--teal); color: white"
+                  >
+                    10
+                  </div>
+                </div>
+                <div class="feature-card flex-1">
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 700;
+                      font-size: 16px;
+                    "
+                    class="mb-1"
+                  >
+                    Reporting, Blocking &amp; Safety Layer
+                  </div>
+                  <p style="font-size: 14px; color: var(--muted)" class="mb-3">
+                    Report user (fake profile, harassment, misleading info),
+                    Block user (immediate removal from each other's decks), Rate
+                    employer after conversation (1–5 stars, feeds into Employer
+                    Rating shown on card). All reports go to admin queue with
+                    auto-severity tagging via keyword classifiers. Repeated
+                    flags trigger account suspension workflow.
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="tech-pill">OpenAI Moderation API</span>
+                    <span class="tech-pill">Admin queue (Postgres)</span>
+                    <span class="tech-pill">Block list (Redis set)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PHASE 3 -->
+          <div id="phase3" class="mb-10">
+            <div class="flex items-center gap-3 mb-5">
+              <span
+                class="phase-badge"
+                style="background: rgba(79, 142, 247, 0.12); color: #1a4fa0"
+                >● Phase 3</span
+              >
+              <h3
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-size: 20px;
+                  font-weight: 700;
+                "
+              >
+                Premium &amp; Monetisation — Weeks 17–24
+              </h3>
+            </div>
+
+            <div class="flex flex-col gap-4">
+              <div class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div
+                    class="step-num"
+                    style="background: var(--blue); color: white"
+                  >
+                    11
+                  </div>
+                  <div
+                    class="timeline-line flex-1 mt-2"
+                    style="min-height: 40px"
+                  ></div>
+                </div>
+                <div class="feature-card flex-1">
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 700;
+                      font-size: 16px;
+                    "
+                    class="mb-1"
+                  >
+                    Employer Premium — "Recruiter Pro"
+                  </div>
+                  <p style="font-size: 14px; color: var(--muted)" class="mb-3">
+                    Unlimited daily swipes (free: 30/day), See who already
+                    right-swiped on their job post before swiping back (Tinder
+                    Gold equivalent — biggest conversion driver), Super Swipe
+                    (candidate gets push notification: "A company is very
+                    interested"), Featured Company badge (higher card visibility
+                    in candidate decks), ATS integration export (download match
+                    list as CSV/JSON), Analytics dashboard (swipe rate, match
+                    rate, response rate).
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="tech-pill">Stripe Subscriptions</span>
+                    <span class="tech-pill">Razorpay (India)</span>
+                    <span class="tech-pill">Webhook handlers</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div
+                    class="step-num"
+                    style="background: var(--blue); color: white"
+                  >
+                    12
+                  </div>
+                  <div
+                    class="timeline-line flex-1 mt-2"
+                    style="min-height: 40px"
+                  ></div>
+                </div>
+                <div class="feature-card flex-1">
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 700;
+                      font-size: 16px;
+                    "
+                    class="mb-1"
+                  >
+                    Employee Premium — "Career Boost"
+                  </div>
+                  <p style="font-size: 14px; color: var(--muted)" class="mb-3">
+                    Profile Boost (2x appearance in employer decks for 7 days),
+                    Profile Insights (see how many employers viewed and swiped
+                    your card — strong engagement hook), Resume Review by AI
+                    (GPT-powered suggestions to improve profile for more right
+                    swipes), Priority in filter results, "Open to Work" stealth
+                    mode (visible only to employers, hidden from current
+                    employer's domain).
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="tech-pill">Razorpay / Stripe</span>
+                    <span class="tech-pill">GPT-4o API</span>
+                    <span class="tech-pill">Boost queue (Redis)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div
+                    class="step-num"
+                    style="background: var(--blue); color: white"
+                  >
+                    13
+                  </div>
+                </div>
+                <div class="feature-card flex-1">
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 700;
+                      font-size: 16px;
+                    "
+                    class="mb-1"
+                  >
+                    In-App Interview Scheduling
+                  </div>
+                  <p style="font-size: 14px; color: var(--muted)" class="mb-3">
+                    After match, employer can send a "Schedule Interview" card
+                    in chat. Employee picks a time from available slots.
+                    Generates Google Meet / Zoom link automatically. Both get
+                    calendar invites + reminders. Post-interview: employer can
+                    tag outcome (hired, reject, hold). This keeps the full
+                    hiring funnel inside the app — critical for data collection
+                    and retention.
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="tech-pill">Google Calendar API</span>
+                    <span class="tech-pill">Zoom API / Google Meet</span>
+                    <span class="tech-pill">Calendly-style slot picker</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PHASE 4 -->
+          <div id="phase4" class="mb-10">
+            <div class="flex items-center gap-3 mb-5">
+              <span
+                class="phase-badge"
+                style="background: rgba(255, 107, 107, 0.12); color: #9a2020"
+                >● Phase 4</span
+              >
+              <h3
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-size: 20px;
+                  font-weight: 700;
+                "
+              >
+                Scale &amp; Ecosystem — Month 7+
+              </h3>
+            </div>
+
+            <div class="flex flex-col gap-4">
+              <div class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div
+                    class="step-num"
+                    style="background: var(--coral); color: white"
+                  >
+                    14
+                  </div>
+                  <div
+                    class="timeline-line flex-1 mt-2"
+                    style="min-height: 40px"
+                  ></div>
+                </div>
+                <div class="feature-card flex-1">
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 700;
+                      font-size: 16px;
+                    "
+                    class="mb-1"
+                  >
+                    Freelance &amp; Project Mode
+                  </div>
+                  <p style="font-size: 14px; color: var(--muted)" class="mb-3">
+                    Third profile type: "Project". Employer posts a gig
+                    (duration, budget, skills needed). Employees in freelance
+                    mode see project cards in a separate "Projects" tab. Match →
+                    deliverables, milestones, and escrow payment flow built in.
+                    This opens a new revenue stream: 5–8% commission on project
+                    payments processed through the platform.
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="tech-pill">Razorpay Escrow</span>
+                    <span class="tech-pill">Contract templates (PDF)</span>
+                    <span class="tech-pill">Milestone tracker</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div
+                    class="step-num"
+                    style="background: var(--coral); color: white"
+                  >
+                    15
+                  </div>
+                  <div
+                    class="timeline-line flex-1 mt-2"
+                    style="min-height: 40px"
+                  ></div>
+                </div>
+                <div class="feature-card flex-1">
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 700;
+                      font-size: 16px;
+                    "
+                    class="mb-1"
+                  >
+                    Company Pages &amp; Team Profiles
+                  </div>
+                  <p style="font-size: 14px; color: var(--muted)" class="mb-3">
+                    Companies get a verified page (culture photos,
+                    Glassdoor-style rating aggregated from Swrk conversations,
+                    tech stack badge, funding stage). Multiple recruiters from
+                    same company under one account with role-based permissions.
+                    Branded job post cards with company logo and culture snippet
+                    shown to employees during swiping.
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="tech-pill">Multi-tenant schema</span>
+                    <span class="tech-pill">RBAC (roles)</span>
+                    <span class="tech-pill">Media CDN</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="flex gap-4">
+                <div class="flex flex-col items-center">
+                  <div
+                    class="step-num"
+                    style="background: var(--coral); color: white"
+                  >
+                    16
+                  </div>
+                </div>
+                <div class="feature-card flex-1">
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 700;
+                      font-size: 16px;
+                    "
+                    class="mb-1"
+                  >
+                    API &amp; ATS Integration (B2B)
+                  </div>
+                  <p style="font-size: 14px; color: var(--muted)" class="mb-3">
+                    REST API for enterprise clients to push job listings
+                    directly from their ATS (Greenhouse, Lever, Workday) and
+                    pull match data back. Webhook support for match events. This
+                    converts Swrk into infrastructure for the recruiting
+                    industry — high-value B2B revenue alongside B2C.
+                  </p>
+                  <div class="flex flex-wrap gap-2">
+                    <span class="tech-pill">REST API (versioned)</span>
+                    <span class="tech-pill">OAuth 2.0 (API keys)</span>
+                    <span class="tech-pill">Webhooks</span>
+                    <span class="tech-pill">Greenhouse / Lever API</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- ALL FEATURES -->
+        <section id="features" class="mb-16">
+          <h2 class="section-title">Complete Feature Set</h2>
+          <p class="section-subtitle">
+            Every feature the platform will support
+          </p>
+
+          <!-- EMPLOYER FEATURES -->
+          <div id="employer" class="mb-10">
+            <div class="flex items-center gap-2 mb-4">
+              <span
+                style="
+                  width: 8px;
+                  height: 8px;
+                  border-radius: 50%;
+                  background: var(--teal);
+                "
+                class="flex-shrink-0"
+              ></span>
+              <h3
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-size: 18px;
+                  font-weight: 700;
+                "
+              >
+                Employer Features
+              </h3>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Job Post Creation
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Company name, logo, role title, employment type (full-time /
+                  part-time / contract / freelance / internship), CTC range (₹
+                  or $), job location, remote/hybrid toggle, required
+                  experience, qualifications, skills (tag-based), perks (ESOP,
+                  WFH, health insurance, etc.), short JD (500 chars), tech stack
+                  tags.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Multiple Job Posts
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Employers can maintain up to 5 active job posts simultaneously
+                  (free tier). Each post has its own swipe deck, filter
+                  settings, and match list. Premium removes the cap.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Employer Filters (Swipe Deck)
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Filter employee deck by: skills (multi), experience range,
+                  expected CTC range, current location, willing to relocate,
+                  notice period, employment history, education level, language,
+                  availability (immediate / 1 month / 2 months+).
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Candidate Pipeline View
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  All matches visible in a Kanban-style pipeline: Matched →
+                  Messaged → Interview Scheduled → Offer Sent → Hired /
+                  Rejected. Status updated manually or via in-app triggers.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Super Swipe (Premium)
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Sends candidate an immediate push notification: "An employer
+                  is very interested in your profile." 3x match rate vs standard
+                  right swipe. 5 super swipes/week on premium plan.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Who Liked You (Premium)
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  See blurred cards of employees who already right-swiped on the
+                  job post. Swipe right to match instantly — no waiting. Highest
+                  conversion feature, kept behind premium paywall.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Team Hiring (Seat-based)
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Add hiring managers and sourcers under one company account.
+                  Each seat can manage their own job posts. HR admin sees
+                  unified pipeline across all posts. RBAC: Admin, Recruiter,
+                  Viewer roles.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Analytics Dashboard
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Card impressions, right-swipe rate, match rate, response rate,
+                  avg time-to-match, conversion funnel (match → hired). Helps
+                  employers understand if their job card is compelling or needs
+                  editing.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- EMPLOYEE FEATURES -->
+          <div id="employee" class="mb-10">
+            <div class="flex items-center gap-2 mb-4">
+              <span
+                style="
+                  width: 8px;
+                  height: 8px;
+                  border-radius: 50%;
+                  background: var(--coral);
+                "
+                class="flex-shrink-0"
+              ></span>
+              <h3
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-size: 18px;
+                  font-weight: 700;
+                "
+              >
+                Employee Features
+              </h3>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Employee Profile
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Photo, name, current role, current company, total experience,
+                  skills (tag-based), preferred role, expected CTC, preferred
+                  location, availability, education, brief bio (160 chars),
+                  portfolio link, GitHub/Behance, LinkedIn URL.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Employee Filters (Swipe Deck)
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Filter employer/job deck by: company type
+                  (startup/MNC/FAANG/Series-A-B/bootstrapped), industry, CTC
+                  offered range, remote/hybrid/onsite, job location, perks (ESOP
+                  must-have toggle), company rating (Swrk-native + Glassdoor),
+                  growth stage, team size.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Stealth Mode
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Hide profile from employers whose domain matches current
+                  employer's email domain. Allows safe passive job seeking.
+                  Premium feature — high perceived value for employed
+                  candidates.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Profile Boost (Premium)
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Profile appears 2–3x more in employer swipe decks for 7 days.
+                  Shown with a subtle "Highlighted" badge. Can be targeted by
+                  job type or company type for precision boosting. Sold as
+                  one-time purchase or subscription add-on.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Profile Insights (Premium)
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  See: how many employers viewed your card, how many
+                  right-swiped, which industry/company types are interested,
+                  profile completion score with actionable tips. Strong
+                  retention hook — employees log in daily to check numbers.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  AI Profile Coach (Premium)
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  GPT-powered analysis of profile vs. filter criteria of
+                  companies the employee is targeting. Suggests: which skills to
+                  add, how to reword bio, what CTC range is competitive, whether
+                  to add portfolio. Personalized, data-driven advice.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Company Ratings
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  After any conversation or interview, employee can rate the
+                  employer: communication quality, process transparency, offer
+                  fairness, culture impression. Ratings aggregated to company
+                  card — visible to all employees. Authentic data creates a
+                  flywheel: better companies get more swipes.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  CV Builder (Optional)
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Generate a clean, formatted CV from Swrk profile data.
+                  Available in-app as a PDF download or as the "Share CV" action
+                  in chat. Means even users without a polished CV can
+                  participate. CV is never shown during swiping.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- MATCHING ENGINE -->
+          <div id="matching" class="mb-10">
+            <div class="flex items-center gap-2 mb-4">
+              <span
+                style="
+                  width: 8px;
+                  height: 8px;
+                  border-radius: 50%;
+                  background: var(--gold2);
+                "
+                class="flex-shrink-0"
+              ></span>
+              <h3
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-size: 18px;
+                  font-weight: 700;
+                "
+              >
+                Matching Engine (Proprietary)
+              </h3>
+            </div>
+
+            <div class="moat-box mb-4">
+              <p style="color: rgba(255, 255, 255, 0.75); font-size: 14px">
+                The matching engine is the core IP. It determines which profiles
+                appear in whose deck, in what order, and how to improve match
+                quality over time. Never expose the algorithm — it is your
+                primary competitive moat.
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Compatibility Score (0–100)
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Computed server-side per pair. Inputs: skill vector similarity
+                  (cosine), CTC overlap %, location match, experience bracket
+                  match, industry history, behavioural signals. Score determines
+                  stack rank in swipe deck — never shown to user.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Behavioural Signal Learning
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Track: time spent on each card, scroll depth (if profile
+                  expanded), re-views, swipe velocity, message response time.
+                  Feed into compatibility model as implicit signals. Improves
+                  recommendations over time without explicit feedback from
+                  users.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Elo-Style Reputation System
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Each profile has a hidden "desirability score" updated after
+                  every swipe interaction (right swipes increase, left swipes
+                  decrease, weighted by swiper's own desirability). Higher-rated
+                  profiles shown first in decks of users at similar rating tier
+                  — prevents top profiles from being shown to everyone and
+                  burning out.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Freshness &amp; Activity Weighting
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Recently active profiles boosted in deck (logged in within 48h
+                  = +15% deck priority). Job posts marked "urgent" get temporary
+                  boost. Prevents stale profiles from clogging decks and wasting
+                  swipes.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Hard Filter → Soft Rank
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Filters are applied in two stages: hard filters remove
+                  ineligible profiles (e.g. CTC completely out of range), then
+                  soft ranking orders the remainder by compatibility score. This
+                  ensures filter precision while using AI to rank within
+                  results.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Diversity Injection
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  5–10% of deck is "wildcard" profiles slightly outside the main
+                  compatibility range. Prevents filter bubbles and exposes users
+                  to serendipitous matches they wouldn't have sought — increases
+                  session length and discovery.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- MESSAGING -->
+          <div id="messaging" class="mb-10">
+            <div class="flex items-center gap-2 mb-4">
+              <span
+                style="
+                  width: 8px;
+                  height: 8px;
+                  border-radius: 50%;
+                  background: var(--blue);
+                "
+                class="flex-shrink-0"
+              ></span>
+              <h3
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-size: 18px;
+                  font-weight: 700;
+                "
+              >
+                Messaging System
+              </h3>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Starter Prompt Library
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  5 curated openers shown at match screen. Employer starters:
+                  "Tell me about your recent projects", "What's your ideal work
+                  environment?". Employee starters: "What does the interview
+                  process look like?", "Is the CTC range negotiable?". Reduces
+                  cold-start awkwardness — key to first-message conversion.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Share CV Action
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Employee can send CV as an in-chat document at any point.
+                  Employer can send Job Description PDF. Files encrypted at
+                  rest, downloadable for 30 days. This replaces email for
+                  document exchange — keeps conversation complete inside the
+                  app.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Interview Card
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Special message type that renders as a "Schedule Interview"
+                  card with time slot picker. Both parties confirm, calendar
+                  invite auto-generated. Reminders sent 24h and 1h before.
+                  Outcome tagging post-interview.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Read Receipts &amp; Typing Indicators
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Standard messaging UX. Delivered / Read tick marks. Typing
+                  indicator via WebSocket presence event. Message search within
+                  a conversation. Optional: employer can mark conversation as
+                  "high priority" for internal tracking.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Unmatch &amp; Conversation Archive
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Either party can unmatch — removes the conversation but the
+                  match event is preserved in backend for analytics.
+                  Conversations auto-archived after 90 days of inactivity with
+                  option to re-open. Deleted messages logged (not content, just
+                  events) for safety audit trail.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 600;
+                    font-size: 14px;
+                    margin-bottom: 6px;
+                  "
+                >
+                  LinkedIn Exchange Prompt
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  After 5+ messages, app shows a gentle prompt: "Ready to
+                  connect on LinkedIn?" Both users can share LinkedIn URLs
+                  in-app (pre-filled from their profile). This is the natural
+                  exit ramp — but the app has captured the full
+                  match-to-conversation funnel data.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- PREMIUM MODEL -->
+          <div id="premium" class="mb-10">
+            <div class="flex items-center gap-2 mb-4">
+              <span
+                style="
+                  width: 8px;
+                  height: 8px;
+                  border-radius: 50%;
+                  background: #b8860b;
+                "
+                class="flex-shrink-0"
+              ></span>
+              <h3
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-size: 18px;
+                  font-weight: 700;
+                "
+              >
+                Premium &amp; Monetisation Model
+              </h3>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              <div
+                class="feature-card"
+                style="border-top: 3px solid var(--border)"
+              >
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 700;
+                    font-size: 15px;
+                    margin-bottom: 8px;
+                  "
+                >
+                  Free Tier
+                </div>
+                <ul
+                  style="
+                    font-size: 13px;
+                    color: var(--muted);
+                    list-style: none;
+                    padding: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                  "
+                >
+                  <li>✓ 30 swipes/day</li>
+                  <li>✓ Unlimited matches</li>
+                  <li>✓ Full chat on matches</li>
+                  <li>✓ Basic filters</li>
+                  <li>✓ CV share in chat</li>
+                  <li>✓ Profile verified badge</li>
+                </ul>
+              </div>
+              <div
+                class="feature-card"
+                style="border-top: 3px solid var(--gold)"
+              >
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 700;
+                    font-size: 15px;
+                    margin-bottom: 4px;
+                  "
+                >
+                  Recruiter Pro
+                </div>
+                <div
+                  style="
+                    font-size: 12px;
+                    color: var(--muted);
+                    margin-bottom: 8px;
+                  "
+                >
+                  For employers
+                </div>
+                <ul
+                  style="
+                    font-size: 13px;
+                    color: var(--muted);
+                    list-style: none;
+                    padding: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                  "
+                >
+                  <li>✓ Unlimited swipes</li>
+                  <li>✓ Who liked you</li>
+                  <li>✓ 5 Super Swipes/week</li>
+                  <li>✓ Pipeline Kanban</li>
+                  <li>✓ Analytics dashboard</li>
+                  <li>✓ 5 active job posts</li>
+                  <li>✓ ATS export</li>
+                </ul>
+              </div>
+              <div
+                class="feature-card"
+                style="border-top: 3px solid var(--teal)"
+              >
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 700;
+                    font-size: 15px;
+                    margin-bottom: 4px;
+                  "
+                >
+                  Career Boost
+                </div>
+                <div
+                  style="
+                    font-size: 12px;
+                    color: var(--muted);
+                    margin-bottom: 8px;
+                  "
+                >
+                  For employees
+                </div>
+                <ul
+                  style="
+                    font-size: 13px;
+                    color: var(--muted);
+                    list-style: none;
+                    padding: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                  "
+                >
+                  <li>✓ Profile Boost (7 days)</li>
+                  <li>✓ Profile Insights</li>
+                  <li>✓ Stealth mode</li>
+                  <li>✓ AI Profile Coach</li>
+                  <li>✓ Priority in results</li>
+                  <li>✓ Unlimited swipes</li>
+                </ul>
+              </div>
+            </div>
+
+            <div
+              class="feature-card"
+              style="border-left: 4px solid var(--gold2)"
+            >
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 15px;
+                  margin-bottom: 8px;
+                "
+              >
+                Additional Revenue Streams
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 600;
+                      font-size: 13px;
+                      margin-bottom: 4px;
+                    "
+                  >
+                    Freelance Commission
+                  </div>
+                  <p style="font-size: 13px; color: var(--muted)">
+                    5–8% on project payments processed through escrow. Scales
+                    with GMV.
+                  </p>
+                </div>
+                <div>
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 600;
+                      font-size: 13px;
+                      margin-bottom: 4px;
+                    "
+                  >
+                    Enterprise API
+                  </div>
+                  <p style="font-size: 13px; color: var(--muted)">
+                    SaaS API access for staffing firms and ATS companies. Flat
+                    monthly fee per seat.
+                  </p>
+                </div>
+                <div>
+                  <div
+                    style="
+                      font-family: &quot;Syne&quot;, sans-serif;
+                      font-weight: 600;
+                      font-size: 13px;
+                      margin-bottom: 4px;
+                    "
+                  >
+                    Featured Job Spots
+                  </div>
+                  <p style="font-size: 13px; color: var(--muted)">
+                    One-time purchase to pin a job post at the top of relevant
+                    employee decks for 48h.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- ADMIN PANEL -->
+        <section id="admin" class="mb-16">
+          <h2 class="section-title">Admin Panel</h2>
+          <p class="section-subtitle">
+            Full platform control, moderation, and analytics
+          </p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="feature-card">
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 600;
+                  font-size: 14px;
+                  margin-bottom: 6px;
+                "
+              >
+                User Management
+              </div>
+              <p style="font-size: 13px; color: var(--muted)">
+                Search users by email/ID/name, view full profile (both employer
+                and employee modes), see all swipes, matches, messages, reports.
+                Edit profile fields, toggle verified badge, suspend or
+                permanently ban account, merge duplicate accounts, see login
+                history and device list.
+              </p>
+            </div>
+            <div class="feature-card">
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 600;
+                  font-size: 14px;
+                  margin-bottom: 6px;
+                "
+              >
+                Report Queue &amp; Moderation
+              </div>
+              <p style="font-size: 13px; color: var(--muted)">
+                All user reports flow into a prioritized queue. Auto-severity
+                tagging by category (fake profile → medium, harassment → high,
+                scam → critical). Admin resolves with: warn, remove content,
+                suspend 7/30 days, permanent ban. Resolution notes logged per
+                case. Escalation workflow for legal/compliance cases.
+              </p>
+            </div>
+            <div class="feature-card">
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 600;
+                  font-size: 14px;
+                  margin-bottom: 6px;
+                "
+              >
+                Platform Analytics
+              </div>
+              <p style="font-size: 13px; color: var(--muted)">
+                DAU/MAU, new signups by day/week, swipes per session, match
+                rate, message rate, premium conversion rate, churn rate, revenue
+                MRR/ARR, top cities/industries. Filterable by date range and
+                user cohort. Exportable to CSV.
+              </p>
+            </div>
+            <div class="feature-card">
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 600;
+                  font-size: 14px;
+                  margin-bottom: 6px;
+                "
+              >
+                Content Moderation
+              </div>
+              <p style="font-size: 13px; color: var(--muted)">
+                Profile photos scanned via AWS Rekognition for explicit content
+                on upload. Bio text moderated via OpenAI Moderation API. Job
+                descriptions scanned for discriminatory language. All flagged
+                content reviewed before going live (first 1000 users — manual
+                review; post-scale — AI-first with human escalation).
+              </p>
+            </div>
+            <div class="feature-card">
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 600;
+                  font-size: 14px;
+                  margin-bottom: 6px;
+                "
+              >
+                Premium &amp; Billing Admin
+              </div>
+              <p style="font-size: 13px; color: var(--muted)">
+                View all subscriptions, manually grant premium (for
+                partners/press), issue refunds, see failed payment retries, view
+                per-user revenue lifetime value, see coupon code usage. Razorpay
+                and Stripe dashboards linked with webhook sync to internal DB.
+              </p>
+            </div>
+            <div class="feature-card">
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 600;
+                  font-size: 14px;
+                  margin-bottom: 6px;
+                "
+              >
+                Notification Control Centre
+              </div>
+              <p style="font-size: 13px; color: var(--muted)">
+                Trigger broadcast push notifications to all users or segmented
+                cohorts (e.g. all employers in Mumbai). A/B test notification
+                copy. View open rates, CTR per notification. Set system-wide
+                notification throttle (max N push per user per day) to prevent
+                notification fatigue.
+              </p>
+            </div>
+            <div class="feature-card">
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 600;
+                  font-size: 14px;
+                  margin-bottom: 6px;
+                "
+              >
+                Feature Flags
+              </div>
+              <p style="font-size: 13px; color: var(--muted)">
+                Toggle features on/off without deploys. Roll out new features to
+                X% of users for A/B testing. Kill switch for any feature if
+                issues detected. Admin can add individual users to feature flag
+                overrides for testing.
+              </p>
+            </div>
+            <div class="feature-card">
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 600;
+                  font-size: 14px;
+                  margin-bottom: 6px;
+                "
+              >
+                Match Quality Monitoring
+              </div>
+              <p style="font-size: 13px; color: var(--muted)">
+                See distribution of compatibility scores for all matches made
+                this week. Flag decks with very low average compatibility
+                (indicates filter or algorithm issue). Track match → message →
+                interview → hired conversion funnel. Admin can manually trigger
+                a full recompute of compatibility scores for a user.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- TECH STACK -->
+        <section id="techstack" class="mb-16">
+          <h2 class="section-title">Tech Stack</h2>
+          <p class="section-subtitle">
+            Production-grade, scalable, defensible technology choices
+          </p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 15px;
+                  margin-bottom: 12px;
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                "
+              >
+                <span
+                  style="
+                    width: 6px;
+                    height: 6px;
+                    background: var(--gold);
+                    border-radius: 50%;
+                  "
+                ></span>
+                Mobile Apps
+              </div>
+              <div class="feature-card mb-3">
+                <div
+                  style="
+                    font-family: &quot;JetBrains Mono&quot;, monospace;
+                    font-size: 13px;
+                    font-weight: 500;
+                    margin-bottom: 6px;
+                  "
+                >
+                  React Native + Expo
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Single codebase for iOS and Android. Expo EAS for OTA updates
+                  (push fixes without App Store review). React Native Reanimated
+                  3 for butter-smooth swipe animations (runs on UI thread, 60fps
+                  guaranteed). Gesture Handler for swipe detection.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;JetBrains Mono&quot;, monospace;
+                    font-size: 13px;
+                    font-weight: 500;
+                    margin-bottom: 6px;
+                  "
+                >
+                  State: Zustand + React Query
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Zustand for lightweight client state (user session, swipe deck
+                  buffer). React Query for server state with automatic
+                  background refetch, optimistic UI updates on swipes.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 15px;
+                  margin-bottom: 12px;
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                "
+              >
+                <span
+                  style="
+                    width: 6px;
+                    height: 6px;
+                    background: var(--teal);
+                    border-radius: 50%;
+                  "
+                ></span>
+                Web App
+              </div>
+              <div class="feature-card mb-3">
+                <div
+                  style="
+                    font-family: &quot;JetBrains Mono&quot;, monospace;
+                    font-size: 13px;
+                    font-weight: 500;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Next.js 14 (App Router)
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  SSR for SEO on public pages (company pages, job posts).
+                  Client-side rendering for swipe deck (needs JS animation).
+                  Edge runtime for auth middleware. Deployed on Vercel for
+                  automatic scaling.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;JetBrains Mono&quot;, monospace;
+                    font-size: 13px;
+                    font-weight: 500;
+                    margin-bottom: 6px;
+                  "
+                >
+                  TailwindCSS + shadcn/ui
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Fast, consistent UI development. shadcn for accessible
+                  component primitives. Custom design tokens for brand colors.
+                  Framer Motion for web-side swipe animations.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 15px;
+                  margin-bottom: 12px;
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                "
+              >
+                <span
+                  style="
+                    width: 6px;
+                    height: 6px;
+                    background: var(--blue);
+                    border-radius: 50%;
+                  "
+                ></span>
+                Backend API
+              </div>
+              <div class="feature-card mb-3">
+                <div
+                  style="
+                    font-family: &quot;JetBrains Mono&quot;, monospace;
+                    font-size: 13px;
+                    font-weight: 500;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Node.js + Express / Fastify
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  REST API for CRUD operations. Fastify preferred for higher
+                  throughput (benchmarks 2x Express on swipe-heavy endpoints).
+                  tRPC optional for type-safe API between Next.js web and
+                  backend.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;JetBrains Mono&quot;, monospace;
+                    font-size: 13px;
+                    font-weight: 500;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Socket.io (WebSocket layer)
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Real-time chat, typing indicators, match notifications, read
+                  receipts. Redis Adapter for Socket.io to support horizontal
+                  scaling across multiple Node.js instances.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 15px;
+                  margin-bottom: 12px;
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                "
+              >
+                <span
+                  style="
+                    width: 6px;
+                    height: 6px;
+                    background: var(--coral);
+                    border-radius: 50%;
+                  "
+                ></span>
+                AI / ML Service
+              </div>
+              <div class="feature-card mb-3">
+                <div
+                  style="
+                    font-family: &quot;JetBrains Mono&quot;, monospace;
+                    font-size: 13px;
+                    font-weight: 500;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Python + FastAPI
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Separate ML microservice. Handles: compatibility score
+                  computation, Elo rating updates, skill vector embeddings
+                  (using sentence-transformers), AI Profile Coach (GPT-4o),
+                  content moderation. Deployed on AWS Lambda or a small EC2 for
+                  cost efficiency early on.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;JetBrains Mono&quot;, monospace;
+                    font-size: 13px;
+                    font-weight: 500;
+                    margin-bottom: 6px;
+                  "
+                >
+                  pgvector + Postgres
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Store skill embeddings as vectors in Postgres via pgvector
+                  extension. Nearest-neighbour search for skill similarity
+                  without needing a separate vector DB. Simpler architecture,
+                  fewer moving parts at early scale.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 15px;
+                  margin-bottom: 12px;
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                "
+              >
+                <span
+                  style="
+                    width: 6px;
+                    height: 6px;
+                    background: #b8860b;
+                    border-radius: 50%;
+                  "
+                ></span>
+                Database &amp; Storage
+              </div>
+              <div class="feature-card mb-3">
+                <div
+                  style="
+                    font-family: &quot;JetBrains Mono&quot;, monospace;
+                    font-size: 13px;
+                    font-weight: 500;
+                    margin-bottom: 6px;
+                  "
+                >
+                  PostgreSQL (primary)
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Users, profiles, swipes, matches, messages, reports. JSONB for
+                  flexible skill tags and filter preferences. pgvector for
+                  embeddings. Hosted on AWS RDS or Supabase. Connection pooling
+                  via PgBouncer at scale.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;JetBrains Mono&quot;, monospace;
+                    font-size: 13px;
+                    font-weight: 500;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Redis (cache + queues)
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Swipe deck pre-fetching, session storage, real-time match
+                  detection pub/sub, rate limiting (swipes/day counter),
+                  Socket.io adapter, boost queue, block list. AWS ElastiCache or
+                  Upstash (serverless Redis, cheaper at early stage).
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 15px;
+                  margin-bottom: 12px;
+                  display: flex;
+                  align-items: center;
+                  gap: 8px;
+                "
+              >
+                <span
+                  style="
+                    width: 6px;
+                    height: 6px;
+                    background: var(--muted);
+                    border-radius: 50%;
+                  "
+                ></span>
+                Infrastructure &amp; DevOps
+              </div>
+              <div class="feature-card mb-3">
+                <div
+                  style="
+                    font-family: &quot;JetBrains Mono&quot;, monospace;
+                    font-size: 13px;
+                    font-weight: 500;
+                    margin-bottom: 6px;
+                  "
+                >
+                  AWS (primary cloud)
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  EC2 / ECS for API, RDS for Postgres, S3 for media, CloudFront
+                  CDN, SES for emails, SNS + FCM/APNs for push notifications,
+                  Rekognition for image moderation, Textract for document
+                  verification.
+                </p>
+              </div>
+              <div class="feature-card">
+                <div
+                  style="
+                    font-family: &quot;JetBrains Mono&quot;, monospace;
+                    font-size: 13px;
+                    font-weight: 500;
+                    margin-bottom: 6px;
+                  "
+                >
+                  Docker + GitHub Actions CI/CD
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Containerised services. GitHub Actions for automated test +
+                  deploy pipeline. Environment parity: dev / staging / prod.
+                  Sentry for error tracking. DataDog or Grafana for APM and
+                  infrastructure monitoring.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- IP & MOAT STRATEGY -->
+        <section id="ip" class="mb-16">
+          <h2 class="section-title">IP &amp; Competitive Moat Strategy</h2>
+          <p class="section-subtitle">How to make Swrk impossible to copy</p>
+
+          <div class="moat-box mb-6">
+            <div
+              style="
+                font-family: &quot;Syne&quot;, sans-serif;
+                font-weight: 800;
+                font-size: 18px;
+                color: var(--gold);
+                margin-bottom: 12px;
+              "
+            >
+              The core insight: apps are easy to copy. Data and network effects
+              are not.
+            </div>
+            <p
+              style="
+                color: rgba(255, 255, 255, 0.75);
+                font-size: 14px;
+                max-width: 640px;
+              "
+            >
+              Anyone can build a swipe UI. The moat is in the proprietary data —
+              billions of swipe signals, compatibility outcomes, and behavioural
+              patterns — that make the matching engine better than any new
+              entrant can possibly replicate. Build aggressively toward data
+              density from Day 1.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div
+              class="feature-card"
+              style="border-left: 4px solid var(--gold)"
+            >
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 15px;
+                  margin-bottom: 8px;
+                "
+              >
+                1. Proprietary Compatibility Algorithm
+              </div>
+              <p style="font-size: 13px; color: var(--muted)">
+                The scoring model is trained on your swipe + outcome data. Every
+                hire that happens through the platform feeds back into the
+                model. After 100K matches, your algorithm will outperform any
+                competitor starting fresh — and the gap widens exponentially.
+                Keep the model weights and feature engineering completely
+                private. Do not describe it in job listings. Do not publish
+                papers about it.
+              </p>
+            </div>
+
+            <div
+              class="feature-card"
+              style="border-left: 4px solid var(--teal)"
+            >
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 15px;
+                  margin-bottom: 8px;
+                "
+              >
+                2. Network Density as a Moat
+              </div>
+              <p style="font-size: 13px; color: var(--muted)">
+                A matching app with 10K users is useless. With 1M users in a
+                city, it becomes irreplaceable. Go city-deep before going wide.
+                Dominate one geography's hiring ecosystem before expanding. Lock
+                in the top companies first (employer side), then talent follows.
+                This is the LinkedIn playbook — applied with a swipe mechanic.
+              </p>
+            </div>
+
+            <div
+              class="feature-card"
+              style="border-left: 4px solid var(--blue)"
+            >
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 15px;
+                  margin-bottom: 8px;
+                "
+              >
+                3. Employer Ratings (Exclusive Data)
+              </div>
+              <p style="font-size: 13px; color: var(--muted)">
+                Swrk-native employer ratings — collected from actual hiring
+                conversations and interviews — will be more authentic and more
+                recent than Glassdoor data (which is often gamed). This data
+                asset becomes irreplaceable. No competitor can replicate 2 years
+                of verified post-interview ratings without starting from
+                scratch.
+              </p>
+            </div>
+
+            <div
+              class="feature-card"
+              style="border-left: 4px solid var(--coral)"
+            >
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 15px;
+                  margin-bottom: 8px;
+                "
+              >
+                4. Patent the Mutual-Intent Hiring Flow
+              </div>
+              <p style="font-size: 13px; color: var(--muted)">
+                File a provisional patent on the specific combination of: mutual
+                swipe-based intent signalling + professional profile matching +
+                in-app interview scheduling + outcome feedback loop. The
+                individual components aren't patentable — the specific
+                combination and application to professional hiring may be.
+                Consult an IP attorney in India and the US simultaneously.
+              </p>
+            </div>
+
+            <div
+              class="feature-card"
+              style="border-left: 4px solid var(--gold2)"
+            >
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 15px;
+                  margin-bottom: 8px;
+                "
+              >
+                5. Skill Taxonomy (Proprietary Ontology)
+              </div>
+              <p style="font-size: 13px; color: var(--muted)">
+                Build a proprietary skill graph: skills linked to roles, linked
+                to companies, linked to compensation bands. This is your
+                knowledge graph. LinkedIn has one; you need your own. After 500K
+                profiles, your skill-to-salary mapping will be more current and
+                India-specific than any other source. License it to companies as
+                a separate data product.
+              </p>
+            </div>
+
+            <div
+              class="feature-card"
+              style="border-left: 4px solid var(--muted)"
+            >
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 15px;
+                  margin-bottom: 8px;
+                "
+              >
+                6. Contractual Lock-in (Enterprise)
+              </div>
+              <p style="font-size: 13px; color: var(--muted)">
+                When an enterprise client integrates Swrk via API with their
+                ATS, switching costs become high. Their pipeline data lives in
+                Swrk. Their recruiters are trained on it. Annual contracts with
+                data portability terms that favour you legally. Enterprise ATS
+                integration is a moat, not just a revenue line.
+              </p>
+            </div>
+          </div>
+
+          <div
+            class="mt-6 p-4 rounded-xl"
+            style="
+              background: rgba(245, 200, 66, 0.08);
+              border: 1px solid rgba(245, 200, 66, 0.25);
+            "
+          >
+            <div
+              style="
+                font-family: &quot;Syne&quot;, sans-serif;
+                font-weight: 700;
+                font-size: 14px;
+                margin-bottom: 6px;
+              "
+            >
+              What to keep absolutely private
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <span
+                style="
+                  font-size: 12px;
+                  background: var(--ink);
+                  color: var(--gold);
+                  padding: 3px 10px;
+                  border-radius: 4px;
+                  font-family: &quot;JetBrains Mono&quot;, monospace;
+                "
+                >Compatibility scoring weights</span
+              >
+              <span
+                style="
+                  font-size: 12px;
+                  background: var(--ink);
+                  color: var(--gold);
+                  padding: 3px 10px;
+                  border-radius: 4px;
+                  font-family: &quot;JetBrains Mono&quot;, monospace;
+                "
+                >Elo rating formula</span
+              >
+              <span
+                style="
+                  font-size: 12px;
+                  background: var(--ink);
+                  color: var(--gold);
+                  padding: 3px 10px;
+                  border-radius: 4px;
+                  font-family: &quot;JetBrains Mono&quot;, monospace;
+                "
+                >Deck ordering algorithm</span
+              >
+              <span
+                style="
+                  font-size: 12px;
+                  background: var(--ink);
+                  color: var(--gold);
+                  padding: 3px 10px;
+                  border-radius: 4px;
+                  font-family: &quot;JetBrains Mono&quot;, monospace;
+                "
+                >Behavioural signal list</span
+              >
+              <span
+                style="
+                  font-size: 12px;
+                  background: var(--ink);
+                  color: var(--gold);
+                  padding: 3px 10px;
+                  border-radius: 4px;
+                  font-family: &quot;JetBrains Mono&quot;, monospace;
+                "
+                >Skill embedding model</span
+              >
+              <span
+                style="
+                  font-size: 12px;
+                  background: var(--ink);
+                  color: var(--gold);
+                  padding: 3px 10px;
+                  border-radius: 4px;
+                  font-family: &quot;JetBrains Mono&quot;, monospace;
+                "
+                >Boost injection logic</span
+              >
+              <span
+                style="
+                  font-size: 12px;
+                  background: var(--ink);
+                  color: var(--gold);
+                  padding: 3px 10px;
+                  border-radius: 4px;
+                  font-family: &quot;JetBrains Mono&quot;, monospace;
+                "
+                >Fraud detection heuristics</span
+              >
+            </div>
+          </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- NOTIFICATIONS -->
+        <section id="notifications" class="mb-16">
+          <h2 class="section-title">Notification System</h2>
+          <p class="section-subtitle">
+            Push, email, and in-app — designed to drive retention without
+            fatigue
+          </p>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="feature-card">
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 14px;
+                  margin-bottom: 8px;
+                "
+              >
+                Push Notifications
+              </div>
+              <ul
+                style="
+                  font-size: 13px;
+                  color: var(--muted);
+                  list-style: none;
+                  padding: 0;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 5px;
+                "
+              >
+                <li>→ New match</li>
+                <li>→ Unread message</li>
+                <li>→ Super Swipe received</li>
+                <li>→ Interview reminder (24h, 1h)</li>
+                <li>→ Profile view milestone (50, 100, 500)</li>
+                <li>→ Boost expiring soon</li>
+                <li>→ "X companies looked at you today"</li>
+              </ul>
+              <div class="flex flex-wrap gap-1 mt-3">
+                <span class="tech-pill" style="font-size: 11px"
+                  >FCM (Android)</span
+                >
+                <span class="tech-pill" style="font-size: 11px"
+                  >APNs (iOS)</span
+                >
+                <span class="tech-pill" style="font-size: 11px">OneSignal</span>
+              </div>
+            </div>
+            <div class="feature-card">
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 14px;
+                  margin-bottom: 8px;
+                "
+              >
+                Email Notifications
+              </div>
+              <ul
+                style="
+                  font-size: 13px;
+                  color: var(--muted);
+                  list-style: none;
+                  padding: 0;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 5px;
+                "
+              >
+                <li>→ Welcome + profile completion tip</li>
+                <li>→ Weekly match digest</li>
+                <li>→ "You have unread messages"</li>
+                <li>→ Interview confirmation</li>
+                <li>→ Premium trial expiry</li>
+                <li>→ Re-engagement (7-day inactive)</li>
+                <li>→ Hire success celebration</li>
+              </ul>
+              <div class="flex flex-wrap gap-1 mt-3">
+                <span class="tech-pill" style="font-size: 11px">SendGrid</span>
+                <span class="tech-pill" style="font-size: 11px">AWS SES</span>
+                <span class="tech-pill" style="font-size: 11px"
+                  >React Email</span
+                >
+              </div>
+            </div>
+            <div class="feature-card">
+              <div
+                style="
+                  font-family: &quot;Syne&quot;, sans-serif;
+                  font-weight: 700;
+                  font-size: 14px;
+                  margin-bottom: 8px;
+                "
+              >
+                In-App Notifications
+              </div>
+              <ul
+                style="
+                  font-size: 13px;
+                  color: var(--muted);
+                  list-style: none;
+                  padding: 0;
+                  display: flex;
+                  flex-direction: column;
+                  gap: 5px;
+                "
+              >
+                <li>→ Match animation + sound</li>
+                <li>→ Badge count on Messages tab</li>
+                <li>→ Profile insights updates</li>
+                <li>→ Deck refresh (new profiles added)</li>
+                <li>→ Feature announcements</li>
+                <li>→ Admin broadcasts</li>
+              </ul>
+              <div class="flex flex-wrap gap-1 mt-3">
+                <span class="tech-pill" style="font-size: 11px"
+                  >WebSocket events</span
+                >
+                <span class="tech-pill" style="font-size: 11px"
+                  >Notification centre UI</span
+                >
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="feature-card mt-4"
+            style="border-left: 4px solid var(--teal)"
+          >
+            <div
+              style="
+                font-family: &quot;Syne&quot;, sans-serif;
+                font-weight: 700;
+                font-size: 14px;
+                margin-bottom: 6px;
+              "
+            >
+              Anti-Fatigue Rules (critical for retention)
+            </div>
+            <p style="font-size: 13px; color: var(--muted)">
+              Maximum 3 push notifications per user per day. Never send push
+              between 11pm–7am. Email digest max 1 per week unless
+              transactional. Users can set per-category preferences in settings.
+              Users who opt out of marketing email still get transactional
+              (match, interview). A/B test copy continuously — "You have a new
+              match" vs "Someone is interested in working with you" can differ
+              40% in CTR.
+            </p>
+          </div>
+        </section>
+
+        <div class="section-divider"></div>
+
+        <!-- LAUNCH ROADMAP -->
+        <section id="launch" class="mb-16">
+          <h2 class="section-title">Launch Roadmap</h2>
+          <p class="section-subtitle">From MVP to market dominance</p>
+
+          <div class="flex flex-col gap-0">
+            <div class="flex gap-4">
+              <div class="flex flex-col items-center w-32 flex-shrink-0">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: var(--muted);
+                    text-align: right;
+                    width: 100%;
+                    padding-right: 16px;
+                    padding-top: 8px;
+                  "
+                >
+                  Month 1–2
+                </div>
+              </div>
+              <div class="flex flex-col items-center">
+                <div
+                  class="timeline-dot"
+                  style="
+                    border-color: var(--gold);
+                    background: var(--gold);
+                    width: 12px;
+                    height: 12px;
+                    margin-top: 8px;
+                  "
+                ></div>
+                <div
+                  class="timeline-line flex-1"
+                  style="min-height: 60px"
+                ></div>
+              </div>
+              <div class="feature-card flex-1 mb-4">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 700;
+                    font-size: 15px;
+                    margin-bottom: 4px;
+                  "
+                >
+                  Build &amp; Closed Beta
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Build Phase 1 (auth, onboarding, swipe, match, basic chat).
+                  Invite 200–500 beta users: 50% employers, 50% employees.
+                  Target: tech industry in one city (Bangalore or Delhi NCR).
+                  Goal: measure match rate, message rate, time-to-match. Fix UX
+                  issues before public launch.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex gap-4">
+              <div class="flex flex-col items-center w-32 flex-shrink-0">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: var(--muted);
+                    text-align: right;
+                    width: 100%;
+                    padding-right: 16px;
+                    padding-top: 8px;
+                  "
+                >
+                  Month 3–4
+                </div>
+              </div>
+              <div class="flex flex-col items-center">
+                <div
+                  class="timeline-dot"
+                  style="
+                    border-color: var(--teal);
+                    background: var(--teal);
+                    width: 12px;
+                    height: 12px;
+                    margin-top: 8px;
+                  "
+                ></div>
+                <div
+                  class="timeline-line flex-1"
+                  style="min-height: 60px"
+                ></div>
+              </div>
+              <div class="feature-card flex-1 mb-4">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 700;
+                    font-size: 15px;
+                    margin-bottom: 4px;
+                  "
+                >
+                  Public Launch (City 1)
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Launch publicly in target city. PR push: "Tinder for Jobs
+                  launches in Bangalore." Partner with 10 startups as design
+                  partners (free premium in exchange for feedback and public
+                  endorsement). Target 10K users in 60 days. Add filters and
+                  verification in this phase.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex gap-4">
+              <div class="flex flex-col items-center w-32 flex-shrink-0">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: var(--muted);
+                    text-align: right;
+                    width: 100%;
+                    padding-right: 16px;
+                    padding-top: 8px;
+                  "
+                >
+                  Month 5–6
+                </div>
+              </div>
+              <div class="flex flex-col items-center">
+                <div
+                  class="timeline-dot"
+                  style="
+                    border-color: var(--blue);
+                    background: var(--blue);
+                    width: 12px;
+                    height: 12px;
+                    margin-top: 8px;
+                  "
+                ></div>
+                <div
+                  class="timeline-line flex-1"
+                  style="min-height: 60px"
+                ></div>
+              </div>
+              <div class="feature-card flex-1 mb-4">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 700;
+                    font-size: 15px;
+                    margin-bottom: 4px;
+                  "
+                >
+                  Monetisation Launch
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Turn on premium tiers. Target: 3–5% conversion to paid. Launch
+                  Profile Insights to drive employee premium. Launch "Who Liked
+                  You" for employers. Begin collecting employer ratings. Start
+                  building AI compatibility model on accumulated swipe data.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex gap-4">
+              <div class="flex flex-col items-center w-32 flex-shrink-0">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: var(--muted);
+                    text-align: right;
+                    width: 100%;
+                    padding-right: 16px;
+                    padding-top: 8px;
+                  "
+                >
+                  Month 7–12
+                </div>
+              </div>
+              <div class="flex flex-col items-center">
+                <div
+                  class="timeline-dot"
+                  style="
+                    border-color: var(--coral);
+                    background: var(--coral);
+                    width: 12px;
+                    height: 12px;
+                    margin-top: 8px;
+                  "
+                ></div>
+              </div>
+              <div class="feature-card flex-1">
+                <div
+                  style="
+                    font-family: &quot;Syne&quot;, sans-serif;
+                    font-weight: 700;
+                    font-size: 15px;
+                    margin-bottom: 4px;
+                  "
+                >
+                  Geographic &amp; Vertical Expansion
+                </div>
+                <p style="font-size: 13px; color: var(--muted)">
+                  Expand to 3 more cities. Add second vertical (e.g. design,
+                  finance, marketing — don't be only-tech). Launch freelance
+                  mode. Begin enterprise API conversations with staffing firms.
+                  Target: 100K users, ₹10–20L MRR, Series A readiness.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- FOOTER -->
+        <div
+          style="
+            background: var(--ink);
+            color: rgba(255, 255, 255, 0.4);
+            border-radius: 16px;
+            padding: 28px 32px;
+            font-size: 13px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+          "
+        >
+          <span
+            style="
+              font-family: &quot;Syne&quot;, sans-serif;
+              font-weight: 700;
+              font-size: 16px;
+              color: var(--gold);
+            "
+            >Swrk</span
+          >
+          <span
+            >This document is confidential. Prepared for internal use only. Do
+            not distribute.</span
+          >
+          <span
+            style="
+              font-family: &quot;JetBrains Mono&quot;, monospace;
+              font-size: 11px;
+            "
+            >Blueprint v1.0 · 2026</span
+          >
+        </div>
+        <div style="height: 48px"></div>
+      </main>
+    </div>
+
+    <script>
+      // Sidebar active link highlight on scroll
+      const sections = document.querySelectorAll("section[id]")
+      const navLinks = document.querySelectorAll(".nav-link")
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              navLinks.forEach((l) => l.classList.remove("active"))
+              const active = document.querySelector(
+                `.nav-link[href="#${entry.target.id}"]`,
+              )
+              if (active) active.classList.add("active")
+            }
+          })
+        },
+        { rootMargin: "-20% 0px -70% 0px" },
+      )
+      sections.forEach((s) => observer.observe(s))
+    </script>
+  </body>
+</html>
