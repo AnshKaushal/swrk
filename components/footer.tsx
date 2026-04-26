@@ -1,12 +1,11 @@
 "use client"
 
-import React from "react"
 import { motion } from "motion/react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Mail, MapPin, Phone, ArrowRight, Heart, Zap } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Mail, MapPin, ArrowRight, Heart } from "lucide-react"
+import { usePathname } from "next/navigation"
 
 const footerLinks = {
   product: [
@@ -42,6 +41,16 @@ const socialLinks = [
 ]
 
 export default function Footer() {
+  const pathname = usePathname()
+
+  if (
+    pathname === "/signin" ||
+    pathname === "/signup" ||
+    pathname.includes("/onboarding")
+  ) {
+    return null
+  }
+
   return (
     <footer className="relative bg-background border-t border-border/50 overflow-hidden">
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -56,7 +65,10 @@ export default function Footer() {
             <div className="flex items-center gap-3">
               <div className="relative">
                 <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-                  <img src="/swrk.svg" className="w-8 h-8 text-primary-foreground" />
+                  <img
+                    src="/swrk.svg"
+                    className="w-8 h-8 text-primary-foreground"
+                  />
                 </div>
                 <motion.div
                   className="absolute -top-1 -right-1 w-3 h-3 bg-primary/20 rounded-full"
@@ -105,7 +117,7 @@ export default function Footer() {
               ))}
             </div>
           </motion.div>
-          
+
           <div className="lg:col-span-5 grid grid-cols-2 sm:grid-cols-4 gap-8">
             {Object.entries(footerLinks).map(
               ([category, links], categoryIndex) => (
