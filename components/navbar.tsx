@@ -21,9 +21,9 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ModeToggle } from "@/components/theme-toggle"
 import { usePathname } from "next/navigation"
+import { IconDashboard } from "@tabler/icons-react"
 
 const navLinks = [
-  { href: "/", label: "Home" },
   { href: "/#features", label: "Features" },
   { href: "/#how-it-works", label: "How It Works" },
   { href: "/#pricing", label: "Pricing" },
@@ -41,6 +41,32 @@ export default function Navbar() {
     pathname.includes("/onboarding")
   ) {
     return null
+  }
+
+  if (status === "loading") {
+    return (
+      <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/10 backdrop-blur">
+        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="h-10 w-10 rounded-full bg-muted/40" />
+            </div>
+            <div className="hidden md:flex flex-1 justify-center items-center gap-8">
+              {navLinks.map((link) => (
+                <div
+                  key={link.href}
+                  className="h-4 w-16 rounded-full bg-muted/40"
+                />
+              ))}
+            </div>
+            <div className="flex items-center gap-4 flex-shrink-0">
+              <div className="h-9 w-9 rounded-full bg-muted/40" />
+              <div className="h-10 w-10 rounded-full bg-muted/40" />
+            </div>
+          </div>
+        </div>
+      </nav>
+    )
   }
 
   const handleSignOut = () => {
@@ -98,11 +124,8 @@ export default function Navbar() {
             {status === "authenticated" && session?.user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="relative h-10 w-10 rounded-full"
-                  >
-                    <Avatar className="h-10 w-10">
+                  <Button className="relative h-10 w-10 rounded-full">
+                    <Avatar className="h-10 w-10 border">
                       <AvatarImage
                         src={getAvatarUrl()}
                         alt={session.user.name || "User"}
@@ -128,13 +151,19 @@ export default function Navbar() {
                       href={`/${session.user.username || ""}`}
                       className="cursor-pointer"
                     >
-                      <UserCircle className="mr-2 h-4 w-4" />
+                      <UserCircle className="h-4 w-4" />
                       <span>Profile</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
+                    <Link href="/dashboard" className="cursor-pointer">
+                      <IconDashboard className="h-4 w-4" />
+                      <span>Dashboard</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link href="/settings" className="cursor-pointer">
-                      <Settings className="mr-2 h-4 w-4" />
+                      <Settings className="h-4 w-4" />
                       <span>Settings</span>
                     </Link>
                   </DropdownMenuItem>
@@ -143,7 +172,7 @@ export default function Navbar() {
                     onClick={handleSignOut}
                     className="cursor-pointer"
                   >
-                    <LogOut className="mr-2 h-4 w-4" />
+                    <LogOut className="h-4 w-4" />
                     <span>Log out</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -212,7 +241,7 @@ export default function Navbar() {
                             className="justify-start"
                           >
                             <Link href={`/${session.user.username || ""}`}>
-                              <UserCircle className="mr-2 h-4 w-4" />
+                              <UserCircle className="h-4 w-4" />
                               Profile
                             </Link>
                           </Button>
@@ -222,7 +251,7 @@ export default function Navbar() {
                             className="justify-start"
                           >
                             <Link href="/settings">
-                              <Settings className="mr-2 h-4 w-4" />
+                              <Settings className="h-4 w-4" />
                               Settings
                             </Link>
                           </Button>
@@ -231,7 +260,7 @@ export default function Navbar() {
                             onClick={handleSignOut}
                             className="justify-start text-red-600 hover:text-red-700 hover:bg-red-50"
                           >
-                            <LogOut className="mr-2 h-4 w-4" />
+                            <LogOut className="h-4 w-4" />
                             Log out
                           </Button>
                         </div>

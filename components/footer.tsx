@@ -6,49 +6,64 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Mail, MapPin, ArrowRight, Heart } from "lucide-react"
 import { usePathname } from "next/navigation"
+import { useState } from "react"
+import { toast } from "sonner"
 
 const footerLinks = {
   product: [
-    { name: "How It Works", href: "#" },
-    { name: "Features", href: "#" },
-    { name: "Pricing", href: "#" },
-    { name: "API", href: "#" },
+    { name: "Features", href: "/#features" },
+    { name: "How It Works", href: "/#how-it-works" },
+    { name: "Pricing", href: "/#pricing" },
   ],
-  company: [
-    { name: "About", href: "#" },
-    { name: "Careers", href: "#" },
-    { name: "Press", href: "#" },
-    { name: "Blog", href: "#" },
-  ],
+  company: [{ name: "About", href: "/about" }],
   support: [
-    { name: "Help Center", href: "#" },
-    { name: "Contact Us", href: "#" },
-    { name: "Privacy Policy", href: "#" },
-    { name: "Terms of Service", href: "#" },
-  ],
-  resources: [
-    { name: "Community", href: "#" },
-    { name: "Guides", href: "#" },
-    { name: "Webinars", href: "#" },
-    { name: "Success Stories", href: "#" },
+    { name: "Sign In", href: "/signin" },
+    { name: "Sign Up", href: "/signup" },
   ],
 }
 
-const socialLinks = [
-  { name: "Instagram", icon: "/logos/instagram.svg", href: "#" },
-  { name: "LinkedIn", icon: "/logos/linkedin.svg", href: "#" },
-  { name: "GitHub", icon: "/logos/github.svg", href: "#" },
-]
-
 export default function Footer() {
   const pathname = usePathname()
+  const [email, setEmail] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   if (
     pathname === "/signin" ||
     pathname === "/signup" ||
-    pathname.includes("/onboarding")
+    pathname.includes("/onboarding") ||
+    pathname.includes("/dashboard")
   ) {
     return null
+  }
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!email.trim()) {
+      toast.error("Please enter a valid email")
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      const res = await fetch("/api/newsletter/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data?.error || "Failed to subscribe")
+
+      if (data.alreadySubscribed) {
+        toast.success("You're already subscribed")
+      } else {
+        toast.success("Check your inbox to confirm")
+      }
+      setEmail("")
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to subscribe")
+    }
+    setIsSubmitting(false)
   }
 
   return (
@@ -95,30 +110,27 @@ export default function Footer() {
               </div>
             </div>
 
-            <div className="flex gap-4">
-              {socialLinks.map((social, index) => (
-                <motion.a
-                  key={social.name}
-                  href={social.href}
-                  className="w-10 h-10 bg-muted/50 hover:bg-primary/10 rounded-lg flex items-center justify-center transition-colors group"
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+            <div className="flex gap-3">
+              {footerLinks.product.map((link, index) => (
+                <motion.div
+                  key={link.name}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, delay: index * 0.1 }}
                   viewport={{ once: true }}
                 >
-                  <img
-                    src={social.icon}
-                    alt={social.name}
-                    className="w-5 h-5 group-hover:brightness-110 transition-filter"
-                  />
-                </motion.a>
+                  <Link
+                    href={link.href}
+                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    {link.name}
+                  </Link>
+                </motion.div>
               ))}
             </div>
           </motion.div>
 
-          <div className="lg:col-span-5 grid grid-cols-2 sm:grid-cols-4 gap-8">
+          <div className="lg:col-span-5 grid grid-cols-2 sm:grid-cols-3 gap-8">
             {Object.entries(footerLinks).map(
               ([category, links], categoryIndex) => (
                 <motion.div
@@ -150,7 +162,6 @@ export default function Footer() {
             )}
           </div>
 
-          {/* Newsletter Section */}
           <motion.div
             className="lg:col-span-3 space-y-6"
             initial={{ opacity: 0, y: 20 }}
@@ -169,16 +180,20 @@ export default function Footer() {
             </div>
 
             <div className="space-y-3">
-              <div className="flex gap-2">
+              <form className="flex gap-2" onSubmit={handleSubmit}>
                 <Input
                   type="email"
                   placeholder="Enter your email"
                   className="flex-1 bg-muted/50 border-border/50 focus:border-primary/50"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  disabled={isSubmitting}
+                  required
                 />
-                <Button size="sm" className="px-4">
+                <Button size="sm" className="px-4" disabled={isSubmitting}>
                   <ArrowRight className="w-4 h-4" />
                 </Button>
-              </div>
+              </form>
               <p className="text-xs text-muted-foreground">
                 We respect your privacy. Unsubscribe at any time.
               </p>
@@ -186,7 +201,6 @@ export default function Footer() {
           </motion.div>
         </div>
 
-        {/* Bottom Section */}
         <motion.div
           className="mt-16 pt-8 border-t border-border/50"
           initial={{ opacity: 0 }}
@@ -203,29 +217,28 @@ export default function Footer() {
 
             <div className="flex items-center gap-6 text-sm">
               <Link
-                href="#"
+                href="/about"
                 className="text-muted-foreground hover:text-primary transition-colors"
               >
-                Privacy
+                About
               </Link>
               <Link
-                href="#"
+                href="/signin"
                 className="text-muted-foreground hover:text-primary transition-colors"
               >
-                Terms
+                Sign In
               </Link>
               <Link
-                href="#"
+                href="/signup"
                 className="text-muted-foreground hover:text-primary transition-colors"
               >
-                Cookies
+                Sign Up
               </Link>
             </div>
           </div>
         </motion.div>
       </div>
 
-      {/* Animated Background Elements */}
       <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
         <motion.div
           className="absolute top-20 left-10 w-2 h-2 bg-primary/20 rounded-full"

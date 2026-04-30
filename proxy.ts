@@ -1,5 +1,5 @@
-import { auth } from "@/app/api/auth/[...nextauth]/route"
-import { NextResponse } from "next/server"
+import { getToken } from "next-auth/jwt"
+import { NextRequest, NextResponse } from "next/server"
 
 const protectedRoutes = [
   "/dashboard",
@@ -10,13 +10,11 @@ const protectedRoutes = [
 ]
 const authRoutes = ["/signin", "/signup"]
 
-export default auth((req) => {
-  const { nextUrl, auth: token } = req
+export async function proxy(req: NextRequest) {
+  const { nextUrl } = req
   const pathname = nextUrl.pathname
 
-  const isProtectedRoute = protectedRoutes.some((route) =>
-    pathname.startsWith(route),
-  )
+  const isProtectedRoute = protectedRoutes.some((r) => pathname.startsWith(r))
   const isAuthRoute = authRoutes.includes(pathname)
   const isOnboarding = pathname.startsWith("/onboarding")
 
@@ -24,27 +22,30 @@ export default auth((req) => {
     return NextResponse.next()
   }
 
-  if (!token) {
+  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
+  const isLoggedIn = !!token
+  const onboardingCompleted = token?.onboardingCompleted === true
+
+  if (!isLoggedIn) {
     if (isProtectedRoute || isOnboarding) {
       return NextResponse.redirect(new URL("/signin", nextUrl))
     }
     return NextResponse.next()
   }
 
-  const isCompleted = (token as any).onboardingCompleted === true
-
-  if (!isCompleted) {
-    if (!isOnboarding) {
+  if (!onboardingCompleted) {
+    if (isProtectedRoute) {
       return NextResponse.redirect(new URL("/onboarding", nextUrl))
     }
-  } else {
-    if (isAuthRoute || isOnboarding) {
-      return NextResponse.redirect(new URL("/dashboard", nextUrl))
-    }
+    return NextResponse.next()
+  }
+
+  if (isAuthRoute || isOnboarding) {
+    return NextResponse.redirect(new URL("/dashboard", nextUrl))
   }
 
   return NextResponse.next()
-})
+}
 
 export const config = {
   matcher: [

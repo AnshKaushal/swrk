@@ -1,3 +1,5 @@
+"use client"
+
 import CTA from "./sections/CTA"
 import FeatureList from "./sections/FeatureList"
 import Features from "./sections/Features"

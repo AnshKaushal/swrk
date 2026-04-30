@@ -7,7 +7,7 @@ const features = [
   {
     title: "Mutual Intent Matching",
     description:
-      'Conversations only start when both sides say "yes". No more cold outreach, no more black hole applications. Every connection is intentional.',
+      "Conversations start only when both sides say yes, so every connection is intentional.",
     icon: (
       <img
         src="/icons/mutual-intent.svg"
@@ -15,12 +15,11 @@ const features = [
         className="h-6 w-6 text-primary dark:invert"
       />
     ),
-    delay: 0.1,
   },
   {
     title: "AI-Powered Intelligence",
     description:
-      "Our matching engine learns from every interaction. It goes beyond keywords to understand culture fit, growth potential, and career alignment.",
+      "Signals beyond keywords for culture fit, growth potential, and alignment.",
     icon: (
       <img
         src="/icons/ai.svg"
@@ -28,12 +27,11 @@ const features = [
         className="h-6 w-6 text-primary dark:invert"
       />
     ),
-    delay: 0.2,
   },
   {
     title: "Anonymous Direct Messaging",
     description:
-      "Communicate safely without exposing personal information. Control when and how you share contact details.",
+      "Privacy-first chat with control over when you share contact details.",
     icon: (
       <img
         src="/icons/message.svg"
@@ -41,129 +39,114 @@ const features = [
         className="h-6 w-6 text-primary dark:invert"
       />
     ),
-    delay: 0.3,
   },
   {
     title: "Verified Professional Network",
     description:
-      "Every profile is verified and authentic. Build relationships with confidence knowing everyone is who they say they are.",
+      "Every profile is verified so you can build trust with confidence.",
     icon: <ShieldCheck className="h-6 w-6 text-primary" />,
-    delay: 0.4,
   },
   {
     title: "Smart Scheduling",
     description:
-      "Seamlessly coordinate interviews with integrated calendar sync. Never miss an opportunity with automated reminders and intelligent scheduling.",
+      "Calendar sync, reminders, and interview coordination that never miss a beat.",
     icon: <Calendar className="h-6 w-6 text-primary" />,
-    delay: 0.5,
   },
+]
+
+const highlights = [
+  "For job seekers",
+  "For recruiters",
+  "Private by default",
+  "Across mobile and desktop",
 ]
 
 export default function Features() {
   return (
-    <section className="relative isolate overflow-hidden bg-background px-6 py-24 sm:py-32 lg:overflow-visible lg:px-0">
-      <div className="mx-auto grid max-w-4xl grid-cols-1 gap-x-8 gap-y-16 lg:mx-0 lg:max-w-none lg:grid-cols-2 lg:items-start lg:gap-y-10">
-        <div className="lg:col-span-2 lg:col-start-1 lg:row-start-1 lg:mx-auto lg:grid lg:w-full lg:max-w-7xl lg:grid-cols-2 lg:gap-x-8 lg:px-8">
-          <motion.div
-            className="lg:pr-4"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            viewport={{ once: true }}
-          >
-            <div className="lg:max-w-lg">
-              <p className="text-base/7 font-semibold text-primary">
-                Designed for definitive action
-              </p>
-              <h1 className="mt-2 text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-                The Future of Talent Matching
-              </h1>
-              <p className="mt-6 text-xl/8 text-muted-foreground">
-                We cut through the noise. A meticulously crafted ecosystem for
-                employers and professionals who value time over endless
-                browsing.
-              </p>
-            </div>
-          </motion.div>
-        </div>
-
+    <section id="how-it-works" className="relative overflow-hidden bg-background px-6 py-24 sm:py-32 lg:px-0">
+      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:gap-16 lg:px-8">
         <motion.div
-          className="-mt-12 -ml-12 p-12 lg:sticky lg:top-12 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:overflow-hidden"
-          initial={{ opacity: 0, scale: 0.95 }}
-          whileInView={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: 0.2 }}
+          className="space-y-8"
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
           viewport={{ once: true }}
         >
-          <div className="w-3xl max-w-none sm:w-228">
-            <img
-              src="/images/feature-image.png"
-              alt="Dashboard Preview"
-              className="w-full h-auto border-2 rounded-lg sm:rounded-[3.5rem] object-cover"
-            /> 
+          <div className="space-y-4">
+            <p className="text-sm font-semibold uppercase tracking-[0.15em] text-primary/80">
+              Built for decisive hiring
+            </p>
+            <h2 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
+              Match faster. Hire smarter.
+            </h2>
+            <p className="text-base leading-7 text-muted-foreground sm:text-lg">
+              Swrk pairs mutual intent with AI intelligence to eliminate noise
+              at every step of the hiring journey.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {highlights.map((item, index) => (
+              <motion.span
+                key={item}
+                className="rounded-full border border-border/60 bg-muted/30 px-3 py-1 text-xs font-semibold text-foreground/80"
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.35, delay: 0.05 * index }}
+                viewport={{ once: true }}
+              >
+                {item}
+              </motion.span>
+            ))}
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {features.map((feature, index) => (
+              <motion.div
+                key={feature.title}
+                className="group rounded-2xl border border-border/60 bg-background/80 p-5 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.45)] transition"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.4, delay: 0.08 * index }}
+                viewport={{ once: true }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    {feature.title}
+                  </h3>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                  {feature.description}
+                </p>
+              </motion.div>
+            ))}
           </div>
         </motion.div>
 
-        <div className="lg:col-span-2 lg:col-start-1 lg:row-start-2 lg:mx-auto lg:grid lg:w-full lg:max-w-7xl lg:grid-cols-2 lg:gap-x-8 lg:px-8">
+        <motion.div
+          className="relative"
+          initial={{ opacity: 0, scale: 0.96 }}
+          whileInView={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, delay: 0.15 }}
+          viewport={{ once: true }}
+        >
           <motion.div
-            className="lg:pr-4"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-            viewport={{ once: true }}
+            className="relative overflow-hidden rounded-3xl border border-border/60 bg-muted/30 p-2 shadow-[0_30px_80px_-50px_rgba(15,23,42,0.6)]"
+            whileHover={{ scale: 1.02 }}
+            transition={{ duration: 0.4 }}
           >
-            <div className="max-w-xl space-y-6 text-muted-foreground lg:max-w-lg">
-              <p>
-                Swrk™ revolutionizes how talent and opportunity connect. By
-                combining mutual intent matching with AI-powered insights, we
-                eliminate the friction from every stage of the hiring process.
-              </p>
-
-              <ul role="list" className="space-y-6">
-                {features.map((feature, index) => (
-                  <motion.li
-                    key={index}
-                    className="flex gap-x-4"
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.4, delay: feature.delay }}
-                    viewport={{ once: true }}
-                  >
-                    <div className="flex-none">
-                      <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-primary/10">
-                        {feature.icon}
-                      </div>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-foreground">
-                        {feature.title}
-                      </h3>
-                      <p className="mt-2 text-sm">{feature.description}</p>
-                    </div>
-                  </motion.li>
-                ))}
-              </ul>
-
-              <motion.div
-                className="pt-8 border-t border-border/50"
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.6 }}
-                viewport={{ once: true }}
-              >
-                <h3 className="text-lg font-semibold text-foreground">
-                  Designed for Everyone
-                </h3>
-                <p className="mt-4 text-sm">
-                  Whether you're a job seeker looking for your next opportunity
-                  or a recruiter building your ideal team, Swrk provides the
-                  tools you need. Our platform works seamlessly across mobile,
-                  tablet, and desktop, ensuring you stay connected wherever you
-                  are.
-                </p>
-              </motion.div>
-            </div>
+            <img
+              src="/images/feature-image.png"
+              alt="Dashboard Preview"
+              className="h-full w-full rounded-2xl border border-border/60 object-cover"
+            />
+            <div className="pointer-events-none absolute inset-0 rounded-3xl ring-1 ring-inset ring-white/10" />
           </motion.div>
-        </div>
+        </motion.div>
       </div>
     </section>
   )

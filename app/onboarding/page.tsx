@@ -1,172 +1,173 @@
-"use client";
+"use client"
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useState, useEffect, useRef, useCallback } from "react"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Camera, Check, X, Loader2, ArrowRight, ArrowLeft } from "lucide-react";
-import Link from "next/link";
-import { toast } from "sonner";
+} from "@/components/ui/select"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Camera, Check, X, Loader2, ArrowRight, ArrowLeft } from "lucide-react"
+import Link from "next/link"
+import { toast } from "sonner"
 
 function debounce(
   func: (usernameToCheck: string) => Promise<void>,
   wait: number,
 ): (usernameToCheck: string) => void {
-  let timeout: NodeJS.Timeout;
+  let timeout: NodeJS.Timeout
   return (usernameToCheck: string) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(usernameToCheck), wait);
-  };
+    clearTimeout(timeout)
+    timeout = setTimeout(() => func(usernameToCheck), wait)
+  }
 }
 
 export default function OnboardingPage() {
-  const { data: session, status, update } = useSession();
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { data: session, status, update } = useSession()
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(1)
 
   // Form State
-  const [name, setName] = useState("");
-  const [username, setUsername] = useState("");
-  const [avatar, setAvatar] = useState("");
-  const [role, setRole] = useState("");
-  const [phone, setPhone] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
-  const [gender, setGender] = useState("");
+  const [name, setName] = useState("")
+  const [username, setUsername] = useState("")
+  const [avatar, setAvatar] = useState("")
+  const [role, setRole] = useState("")
+  const [phone, setPhone] = useState("")
+  const [dateOfBirth, setDateOfBirth] = useState("")
+  const [gender, setGender] = useState("")
 
   // Username validation
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(
     null,
-  );
-  const [checkingUsername, setCheckingUsername] = useState(false);
+  )
+  const [checkingUsername, setCheckingUsername] = useState(false)
 
   // Hydrate session data
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
-      setStep(session.user.onboardingStep || 1);
-      setName(session.user.name || "");
-      setAvatar(session.user.image || "");
-      setUsername(session.user.username || "");
-      setRole(session.user.role || "");
+      setStep(session.user.onboardingStep || 1)
+      setName(session.user.name || "")
+      setAvatar(session.user.image || "")
+      setUsername(session.user.username || "")
+      setRole(session.user.role || "")
     } else if (status === "unauthenticated") {
-      router.push("/signin");
+      router.push("/signin")
     }
-  }, [session, status, router]);
+  }, [session, status, router])
 
   const checkUsernameAvailability = useCallback(
     debounce(async (usernameToCheck: string) => {
       if (!usernameToCheck || usernameToCheck.length < 3) {
-        setUsernameAvailable(null);
-        return;
+        setUsernameAvailable(null)
+        return
       }
-      setCheckingUsername(true);
+      setCheckingUsername(true)
       try {
         const res = await fetch(
           `/api/auth/check-username?username=${encodeURIComponent(usernameToCheck)}`,
-        );
-        const data = await res.json();
-        setUsernameAvailable(data.available);
+        )
+        const data = await res.json()
+        setUsernameAvailable(data.available)
       } catch (error) {
-        setUsernameAvailable(null);
+        setUsernameAvailable(null)
       }
-      setCheckingUsername(false);
+      setCheckingUsername(false)
     }, 500),
     [],
-  );
+  )
 
   const handleUsernameChange = (value: string) => {
-    const safeValue = value.toLowerCase().replace(/[^a-z0-9_]/g, "");
-    setUsername(safeValue);
-    setUsernameAvailable(null);
-    checkUsernameAvailability(safeValue);
-  };
+    const safeValue = value.toLowerCase().replace(/[^a-z0-9_]/g, "")
+    setUsername(safeValue)
+    setUsernameAvailable(null)
+    checkUsernameAvailability(safeValue)
+  }
 
   const handleAvatarUpload = async (file: File) => {
-    setLoading(true);
+    setLoading(true)
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("folder", "avatars");
+      const formData = new FormData()
+      formData.append("file", file)
+      formData.append("folder", "avatars")
 
       const res = await fetch("/api/upload/avatar", {
         method: "POST",
         body: formData,
-      });
-      if (!res.ok) throw new Error("Upload failed");
+      })
+      if (!res.ok) throw new Error("Upload failed")
 
-      const data = await res.json();
-      setAvatar(data.url);
-      toast.success("Profile picture uploaded successfully!");
+      const data = await res.json()
+      setAvatar(data.url)
+      toast.success("Profile picture uploaded successfully!")
     } catch (err) {
-      toast.error("Failed to upload profile picture");
+      toast.error("Failed to upload profile picture")
     }
-    setLoading(false);
-  };
+    setLoading(false)
+  }
 
   const handleStepSubmit = async (
     targetStep: number,
     payload: any,
     sessionUpdates: any,
   ) => {
-    setLoading(true);
+    setLoading(true)
     try {
       const res = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, step: targetStep }),
-      });
-      if (!res.ok) throw new Error("Update failed");
-
-      await update({ ...sessionUpdates, onboardingStep: targetStep });
+      })
+      if (!res.ok) throw new Error("Update failed")
 
       if (targetStep === 4) {
-        toast.success("Profile completed successfully! Welcome to Swrk!");
-        router.push("/dashboard");
+        toast.success("Profile completed successfully! Welcome to Swrk!")
+        await update({ ...sessionUpdates, onboardingStep: targetStep })
+        await new Promise((resolve) => setTimeout(resolve, 100))
+        router.push("/dashboard")
       } else {
-        setStep(targetStep);
-        toast.success("Saved successfully!");
+        setStep(targetStep)
+        await update({ ...sessionUpdates, onboardingStep: targetStep })
+        toast.success("Saved successfully!")
       }
     } catch (err) {
-      toast.error("Failed to save information");
+      toast.error("Failed to save information")
     }
-    setLoading(false);
-  };
+    setLoading(false)
+  }
 
   const onNextStep1 = () =>
     handleStepSubmit(
       2,
       { name, username, avatar },
       { name, username, image: avatar },
-    );
-  const onNextStep2 = () => handleStepSubmit(3, { role }, { role });
+    )
+  const onNextStep2 = () => handleStepSubmit(3, { role }, { role })
   const onNextStep3 = () =>
     handleStepSubmit(
       4,
       { phone, dateOfBirth, gender },
       { onboardingCompleted: true },
-    );
+    )
 
-  const getAvatarFallback = () => (name ? name.charAt(0).toUpperCase() : "U");
+  const getAvatarFallback = () => (name ? name.charAt(0).toUpperCase() : "U")
 
   if (status === "loading" || !session) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
-    );
+    )
   }
 
   return (
@@ -262,8 +263,8 @@ export default function OnboardingPage() {
                   className="hidden"
                   accept="image/*"
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleAvatarUpload(file);
+                    const file = e.target.files?.[0]
+                    if (file) handleAvatarUpload(file)
                   }}
                 />
                 <p
@@ -476,5 +477,5 @@ export default function OnboardingPage() {
         </div>
       </div>
     </div>
-  );
+  )
 }

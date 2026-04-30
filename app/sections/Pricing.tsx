@@ -68,7 +68,7 @@ function PricingCard({
 
 export default function Pricing() {
   return (
-    <section className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-32">
+    <section id="pricing" className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-32">
       <div className="mx-auto mb-10 max-w-2xl text-center">
         <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-foreground mb-4">
           Simple, Transparent Pricing

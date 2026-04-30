@@ -1,6 +1,6 @@
 "use client"
 
-import { Users, Briefcase } from "lucide-react"
+import { Users } from "lucide-react"
 import Image from "next/image"
 import CountUp from "react-countup"
 

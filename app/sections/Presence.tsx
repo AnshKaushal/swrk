@@ -9,11 +9,11 @@ function CommandCenter({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "relative bg-card rounded-xl sm:rounded-2xl border border-border shadow-2xl overflow-hidden flex flex-col",
+        "relative bg-card rounded-xl sm:rounded-2xl border-8 border-border shadow-2xl overflow-hidden flex flex-col",
         className,
       )}
     >
-      <div className="h-6 sm:h-8 bg-muted/40 border-b border-border flex items-center px-3 sm:px-4 gap-1.5 sm:gap-2">
+      <div className="h-6 sm:h-8 bg-muted/40 border-b border-border flex items-center px-3 sm:px-4 gap-1.5 sm:gap-2 py-1.5">
         <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-muted-foreground/30" />
         <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-muted-foreground/30" />
         <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-muted-foreground/30" />
@@ -22,7 +22,7 @@ function CommandCenter({ className }: { className?: string }) {
         <img
           src="https://plus.unsplash.com/premium_photo-1718732861190-c3edf2912061?w=900&auto=format&fit=crop&q=60"
           alt="Command Center Preview"
-          className="w-full h-auto rounded-lg sm:rounded-2xl object-cover"
+          className="w-full h-auto rounded-b-lg sm:rounded-b-2xl object-cover"
         />
       </div>
     </div>
@@ -33,7 +33,7 @@ function CuratedReview({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "relative bg-card rounded-xl sm:rounded-2xl border-4 border-border shadow-xl overflow-hidden flex flex-col",
+        "relative bg-card rounded-xl sm:rounded-2xl border-10 sm:border-16 border-border shadow-xl overflow-hidden flex flex-col",
         className,
       )}
     >
@@ -41,7 +41,7 @@ function CuratedReview({ className }: { className?: string }) {
         <img
           src="https://plus.unsplash.com/premium_photo-1718732861190-c3edf2912061?w=900&auto=format&fit=crop&q=60"
           alt="Curated Review Preview"
-          className="w-full h-full rounded-lg sm:rounded-2xl object-cover"
+          className="w-full h-full rounded-md object-cover"
         />
       </div>
     </div>
@@ -52,11 +52,11 @@ function ExecutiveBriefing({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "relative bg-card rounded-xl sm:rounded-2xl border border-border shadow-xl overflow-hidden flex flex-col",
+        "relative bg-card rounded-xl sm:rounded-2xl border-8 border-border shadow-xl overflow-hidden flex flex-col",
         className,
       )}
     >
-      <div className="h-5 sm:h-6 bg-muted/40 border-b border-border flex items-center px-3 gap-1.5">
+      <div className="h-5 sm:h-6 bg-muted/40 border-b border-border flex items-center px-3 gap-1.5 py-1">
         <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-muted-foreground/30" />
         <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-muted-foreground/30" />
         <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-muted-foreground/30" />
@@ -65,7 +65,7 @@ function ExecutiveBriefing({ className }: { className?: string }) {
         <img
           src="https://plus.unsplash.com/premium_photo-1718732861190-c3edf2912061?w=900&auto=format&fit=crop&q=60"
           alt="Executive Briefing Preview"
-          className="w-full h-auto rounded-lg sm:rounded-2xl object-cover"
+          className="w-full h-auto rounded-b-lg sm:rounded-b-2xl object-cover"
         />
       </div>
     </div>
@@ -80,7 +80,6 @@ function MobileOnTheGo({ className }: { className?: string }) {
         className,
       )}
     >
-      {/* Notch */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/3 h-4 sm:h-5 bg-muted rounded-b-xl z-10" />
       <div className="h-full">
         <img
@@ -132,7 +131,6 @@ export default function Presence() {
 
         <Backlight blur={5}>
           <div className="relative w-full aspect-[4/5] sm:aspect-[4/3] lg:aspect-[21/9] max-w-7xl mx-auto flex items-center justify-center isolate pointer-events-none">
-            {/* Back Layer: Desktop Command Center */}
             <motion.div
               style={{ y: yBack }}
               className="absolute w-[85%] sm:w-[75%] lg:w-[65%] top-[5%] lg:top-0 right-0 sm:right-[5%] lg:right-[10%] z-0"
@@ -140,7 +138,6 @@ export default function Presence() {
               <CommandCenter className="w-full aspect-[16/10]" />
             </motion.div>
 
-            {/* Middle Layer: Tablet Curated Review */}
             <motion.div
               style={{ y: yMid }}
               className="absolute w-[55%] sm:w-[40%] lg:w-[28%] left-[-5%] sm:left-[2%] lg:left-[5%] top-[15%] sm:top-[20%] lg:top-[12%] z-10"
@@ -148,7 +145,6 @@ export default function Presence() {
               <CuratedReview className="w-full aspect-[3/4]" />
             </motion.div>
 
-            {/* Front Layer Right: Dashboard Executive Briefing */}
             <motion.div
               style={{ y: yFrontRight }}
               className="absolute w-[65%] sm:w-[50%] lg:w-[40%] right-[-5%] sm:right-[2%] lg:right-[5%] bottom-[15%] sm:bottom-[10%] lg:bottom-[-5%] z-20"
@@ -156,7 +152,6 @@ export default function Presence() {
               <ExecutiveBriefing className="w-full aspect-[16/10]" />
             </motion.div>
 
-            {/* Front Layer Left: Mobile On-The-Go */}
             <motion.div
               style={{ y: yFrontLeft }}
               className="absolute w-[35%] sm:w-[25%] lg:w-[18%] left-[10%] sm:left-[15%] lg:left-[18%] bottom-[5%] sm:bottom-[0%] lg:bottom-[-15%] z-30"

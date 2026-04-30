@@ -112,7 +112,7 @@ export default function CTAWithVerticalMarquee() {
   }, [])
 
   return (
-    <div className="bg-background text-foreground flex items-center justify-center py-16 md:py-24 overflow-hidden">
+    <div className="bg-background text-foreground flex items-center justify-center py-12 md:py-16 overflow-hidden">
       <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8  animate-fade-in-up">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-24 items-center">
           <div className="space-y-6 max-w-xl">
