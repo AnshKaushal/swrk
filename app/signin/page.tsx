@@ -43,7 +43,7 @@ export default function SigninPage() {
     <div className="flex min-h-screen">
       <div className="relative hidden overflow-hidden bg-muted lg:flex lg:w-1/2">
         <img
-          src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop"
+          src="https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=2564&auto=format&fit=crop"
           alt="Welcome back"
           className="absolute inset-0 h-full w-full object-cover object-center"
         />
@@ -152,7 +152,7 @@ export default function SigninPage() {
             size="lg"
             className="w-full gap-3 border-muted-foreground/20 hover:bg-muted"
             onClick={handleGoogleSignIn}
-            disabled={loading}
+            disabled={true || loading}
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />

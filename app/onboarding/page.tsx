@@ -51,6 +51,7 @@ export default function OnboardingPage() {
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(
     null,
   )
+  const [usernameError, setUsernameError] = useState<string | null>(null)
   const [checkingUsername, setCheckingUsername] = useState(false)
 
   // Hydrate session data
@@ -70,6 +71,7 @@ export default function OnboardingPage() {
     debounce(async (usernameToCheck: string) => {
       if (!usernameToCheck || usernameToCheck.length < 3) {
         setUsernameAvailable(null)
+        setUsernameError(null)
         return
       }
       setCheckingUsername(true)
@@ -79,8 +81,10 @@ export default function OnboardingPage() {
         )
         const data = await res.json()
         setUsernameAvailable(data.available)
+        setUsernameError(data.error || null)
       } catch (error) {
         setUsernameAvailable(null)
+        setUsernameError(null)
       }
       setCheckingUsername(false)
     }, 500),
@@ -91,6 +95,7 @@ export default function OnboardingPage() {
     const safeValue = value.toLowerCase().replace(/[^a-z0-9_]/g, "")
     setUsername(safeValue)
     setUsernameAvailable(null)
+    setUsernameError(null)
     checkUsernameAvailability(safeValue)
   }
 
@@ -172,10 +177,9 @@ export default function OnboardingPage() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Left Design Banner */}
       <div className="relative hidden w-1/2 lg:flex overflow-hidden bg-black">
         <img
-          src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&auto=format&fit=crop"
+          src="https://images.unsplash.com/photo-1653447538278-f5f7ade70637?q=80&w=3996&auto=format&fit=crop"
           alt="Onboarding Background"
           className="absolute inset-0 h-full w-full object-cover opacity-60"
         />
@@ -247,7 +251,7 @@ export default function OnboardingPage() {
                   className="relative group cursor-pointer"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <Avatar className="h-28 w-28 border-4 border-background shadow-xl">
+                  <Avatar className="h-28 w-28 border-4 shadow-xl">
                     <AvatarImage src={avatar} />
                     <AvatarFallback className="text-3xl">
                       {getAvatarFallback()}
@@ -317,7 +321,7 @@ export default function OnboardingPage() {
                   </div>
                   {usernameAvailable === false && (
                     <p className="text-xs text-destructive font-medium mt-1">
-                      Username is already taken
+                      {usernameError || "Username is already taken"}
                     </p>
                   )}
                 </div>

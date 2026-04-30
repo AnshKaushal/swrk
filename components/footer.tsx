@@ -9,19 +9,6 @@ import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
 
-const footerLinks = {
-  product: [
-    { name: "Features", href: "/#features" },
-    { name: "How It Works", href: "/#how-it-works" },
-    { name: "Pricing", href: "/#pricing" },
-  ],
-  company: [{ name: "About", href: "/about" }],
-  support: [
-    { name: "Sign In", href: "/signin" },
-    { name: "Sign Up", href: "/signup" },
-  ],
-}
-
 export default function Footer() {
   const pathname = usePathname()
   const [email, setEmail] = useState("")
@@ -68,114 +55,85 @@ export default function Footer() {
 
   return (
     <footer className="relative bg-background border-t border-border/50 overflow-hidden">
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 lg:gap-16">
           <motion.div
-            className="lg:col-span-4 space-y-6"
+            className="lg:col-span-1 space-y-6"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             viewport={{ once: true }}
           >
             <div className="flex items-center gap-3">
-              <div className="relative">
-                <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-                  <img
-                    src="/swrk.svg"
-                    className="w-8 h-8 text-primary-foreground"
-                  />
-                </div>
-                <motion.div
-                  className="absolute -top-1 -right-1 w-3 h-3 bg-primary/20 rounded-full"
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
+              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
+                <img
+                  src="/swrk.svg"
+                  className="w-8 h-8 text-primary-foreground"
                 />
               </div>
-              <span className="text-2xl font-bold tracking-tight">Swrk</span>
+              <span className="text-2xl font-bold tracking-tight">Swrk™</span>
             </div>
 
-            <p className="text-muted-foreground leading-relaxed max-w-sm">
+            <p className="text-muted-foreground leading-relaxed text-sm">
               The intelligent job matching platform that connects talent with
               opportunity through mutual intent and AI-powered insights.
             </p>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <MapPin className="w-4 h-4 text-primary" />
-                <span>San Francisco, CA</span>
+                <MapPin className="w-4 h-4 text-primary flex-shrink-0" />
+                <span>New Delhi, IN</span>
               </div>
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <Mail className="w-4 h-4 text-primary" />
-                <span>hello@swrk.com</span>
+                <Mail className="w-4 h-4 text-primary flex-shrink-0" />
+                <span>anshhkaushal@gmail.com</span>
               </div>
-            </div>
-
-            <div className="flex gap-3">
-              {footerLinks.product.map((link, index) => (
-                <motion.div
-                  key={link.name}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.4, delay: index * 0.1 }}
-                  viewport={{ once: true }}
-                >
-                  <Link
-                    href={link.href}
-                    className="text-sm text-muted-foreground hover:text-primary transition-colors"
-                  >
-                    {link.name}
-                  </Link>
-                </motion.div>
-              ))}
             </div>
           </motion.div>
 
-          <div className="lg:col-span-5 grid grid-cols-2 sm:grid-cols-3 gap-8">
-            {Object.entries(footerLinks).map(
-              ([category, links], categoryIndex) => (
-                <motion.div
-                  key={category}
-                  className="space-y-4"
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, delay: categoryIndex * 0.1 }}
-                  viewport={{ once: true }}
-                >
-                  <h3 className="font-semibold text-foreground capitalize">
-                    {category}
-                  </h3>
-                  <ul className="space-y-3">
-                    {links.map((link, linkIndex) => (
-                      <li key={link.name}>
-                        <Link
-                          href={link.href}
-                          className="text-muted-foreground hover:text-primary transition-colors text-sm relative group"
-                        >
-                          {link.name}
-                          <span className="absolute -bottom-0.5 left-0 w-0 h-0.5 bg-primary transition-all duration-200 group-hover:w-full" />
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </motion.div>
-              ),
-            )}
-          </div>
+          <motion.div
+            className="lg:col-span-1 space-y-6"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            viewport={{ once: true }}
+          >
+            <div>
+              <h3 className="font-semibold text-foreground mb-4">
+                Quick Links
+              </h3>
+              <ul className="space-y-3">
+                {[
+                  { name: "Features", href: "/#features" },
+                  { name: "Pricing", href: "/#pricing" },
+                  { name: "About", href: "/about" },
+                ].map((link) => (
+                  <li key={link.name}>
+                    <Link
+                      href={link.href}
+                      className="text-muted-foreground hover:text-primary transition-colors text-sm"
+                    >
+                      {link.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </motion.div>
 
           <motion.div
-            className="lg:col-span-3 space-y-6"
+            className="lg:col-span-1 space-y-6"
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.4 }}
             viewport={{ once: true }}
           >
             <div>
-              <h3 className="font-semibold text-foreground mb-2">
+              <h3 className="font-semibold text-foreground mb-4">
                 Stay Connected
               </h3>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                Get the latest updates on new features, job market insights, and
-                career tips.
+              <p className="text-muted-foreground text-sm leading-relaxed mb-3">
+                Get the latest updates on new features and career tips.
               </p>
             </div>
 
@@ -184,7 +142,7 @@ export default function Footer() {
                 <Input
                   type="email"
                   placeholder="Enter your email"
-                  className="flex-1 bg-muted/50 border-border/50 focus:border-primary/50"
+                  className="flex-1 bg-muted/50 border-border/50 focus:border-primary/50 text-sm"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   disabled={isSubmitting}
@@ -202,35 +160,29 @@ export default function Footer() {
         </div>
 
         <motion.div
-          className="mt-16 pt-8 border-t border-border/50"
+          className="mt-12 pt-8 border-t border-border/50"
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           transition={{ duration: 0.6, delay: 0.6 }}
           viewport={{ once: true }}
         >
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm">
+            <div className="flex items-center gap-2 text-muted-foreground">
               <span>© 2024 Swrk. Made with</span>
               <Heart className="w-4 h-4 text-red-500 fill-current" />
               <span>for better careers.</span>
             </div>
 
-            <div className="flex items-center gap-6 text-sm">
-              <Link
-                href="/about"
-                className="text-muted-foreground hover:text-primary transition-colors"
-              >
-                About
-              </Link>
+            <div className="flex items-center gap-4 text-muted-foreground">
               <Link
                 href="/signin"
-                className="text-muted-foreground hover:text-primary transition-colors"
+                className="hover:text-primary transition-colors"
               >
                 Sign In
               </Link>
               <Link
                 href="/signup"
-                className="text-muted-foreground hover:text-primary transition-colors"
+                className="hover:text-primary transition-colors"
               >
                 Sign Up
               </Link>

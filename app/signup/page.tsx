@@ -140,7 +140,7 @@ export default function SignupPage() {
     <div className="flex min-h-screen">
       <div className="relative hidden overflow-hidden bg-muted lg:flex lg:w-1/2">
         <img
-          src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop"
+          src="https://plus.unsplash.com/premium_photo-1718732861190-c3edf2912061?w=900&auto=format&fit=crop&q=80"
           alt="Welcome to Swrk"
           className="absolute inset-0 h-full w-full object-cover object-center"
         />
@@ -244,7 +244,7 @@ export default function SignupPage() {
                   size="lg"
                   className="w-full gap-3 border-muted-foreground/20 hover:bg-muted"
                   onClick={handleGoogleSignIn}
-                  disabled={loading}
+                  disabled={true || loading}
                 >
                   <svg
                     className="h-5 w-5"
