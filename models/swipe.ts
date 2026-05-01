@@ -41,7 +41,7 @@ const SwipeSchema = new mongoose.Schema(
     createdMatch: { type: Boolean, default: false },
     matchId: { type: mongoose.Schema.Types.ObjectId, ref: "Match" },
   },
-  { timestamps: true }
+  { timestamps: true },
 )
 
 SwipeSchema.index({ swipedBy: 1, swipedOn: 1 }, { unique: true })
@@ -67,11 +67,11 @@ const MatchSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: [
-        "active",        // chat open
-        "archived",      // one side archived
-        "hired",         // marked as hired
-        "rejected",      // one side rejected post-match
-        "expired",       // no activity for 30 days
+        "active", // chat open
+        "archived", // one side archived
+        "hired", // marked as hired
+        "rejected", // one side rejected post-match
+        "expired", // no activity for 30 days
       ],
       default: "active",
     },
@@ -104,12 +104,14 @@ const MatchSchema = new mongoose.Schema(
 
     matchedAt: { type: Date, default: Date.now },
   },
-  { timestamps: true }
+  { timestamps: true },
 )
 
 MatchSchema.index({ employer: 1, employee: 1 }, { unique: true })
 MatchSchema.index({ employer: 1, status: 1, lastMessageAt: -1 })
 MatchSchema.index({ employee: 1, status: 1, lastMessageAt: -1 })
 
-export const Swipe = mongoose.models.Swipe || mongoose.model("Swipe", SwipeSchema)
-export const Match = mongoose.models.Match || mongoose.model("Match", MatchSchema)
+export const Swipe =
+  mongoose.models.Swipe || mongoose.model("Swipe", SwipeSchema)
+export const Match =
+  mongoose.models.Match || mongoose.model("Match", MatchSchema)

@@ -40,7 +40,7 @@ export default function TrustedBy() {
   const row2 = partnerLogos.slice(Math.ceil(partnerLogos.length / 2))
 
   return (
-    <section className="overflow-hidden relative z-10">
+    <section id="trusted-by" className="overflow-hidden relative z-10">
       <div className="py-16 sm:py-32">
         <div className="px-4 sm:px-6 lg:px-8 flex flex-col items-center text-center max-w-2xl mx-auto mb-20 space-y-6">
           <motion.h2

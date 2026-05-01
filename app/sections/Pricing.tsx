@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CheckIcon, SparklesIcon } from "lucide-react"
+import Link from "next/link"
 
 type PricingCardProps = {
   titleBadge: string
@@ -11,6 +12,7 @@ type PricingCardProps = {
   priceSuffix?: string
   features: string[]
   cta?: string
+  ctaText?: string
   className?: string
 }
 
@@ -27,8 +29,9 @@ function PricingCard({
   priceLabel,
   priceSuffix = "/month",
   features,
-  cta = "Subscribe",
+  cta = "/signup",
   className,
+  ctaText = "Subscribe",
 }: PricingCardProps) {
   return (
     <div
@@ -41,7 +44,9 @@ function PricingCard({
       <div className="flex items-center gap-3 p-4">
         <Badge variant="secondary">{titleBadge}</Badge>
         <div className="ml-auto">
-          <Button variant="outline">{cta}</Button>
+          <Button variant="outline" asChild>
+            <Link href={cta}>{ctaText}</Link>
+          </Button>
         </div>
       </div>
 
@@ -68,7 +73,10 @@ function PricingCard({
 
 export default function Pricing() {
   return (
-    <section id="pricing" className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-32">
+    <section
+      id="pricing"
+      className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-32"
+    >
       <div className="mx-auto mb-10 max-w-2xl text-center">
         <h1 className="text-3xl sm:text-5xl font-bold tracking-tight text-foreground mb-4">
           Simple, Transparent Pricing
@@ -141,7 +149,8 @@ export default function Pricing() {
             "Standard profile visibility",
             "Basic messaging with matches",
           ]}
-          cta="Get Started"
+          cta="/signup"
+          ctaText="Get Started"
           className="lg:col-span-3"
         />
 
@@ -156,7 +165,8 @@ export default function Pricing() {
             "Team collaboration tools",
             "Priority support",
           ]}
-          cta="Start Hiring"
+          cta="/signup"
+          ctaText="Start Hiring"
           className="lg:col-span-4"
         />
 
@@ -172,7 +182,8 @@ export default function Pricing() {
             "Advanced reporting and analytics",
             "SLA guarantees",
           ]}
-          cta="Contact Sales"
+          cta="/contact"
+          ctaText="Contact Sales"
           className="lg:col-span-4"
         />
       </div>

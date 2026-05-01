@@ -26,8 +26,9 @@ import { IconDashboard } from "@tabler/icons-react"
 const navLinks = [
   { href: "/#features", label: "Features" },
   { href: "/#how-it-works", label: "How It Works" },
+  { href: "/#trusted-by", label: "Trusted By" },
   { href: "/#pricing", label: "Pricing" },
-  { href: "/about", label: "About" },
+  { href: "/about-us", label: "About Us" },
 ]
 
 export default function Navbar() {
@@ -38,7 +39,8 @@ export default function Navbar() {
   if (
     pathname === "/signin" ||
     pathname === "/signup" ||
-    pathname.includes("/onboarding")
+    pathname.includes("/onboarding") ||
+    pathname.includes("/dashboard")
   ) {
     return null
   }
