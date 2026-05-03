@@ -5,6 +5,7 @@ import {
   FloatingIconsHero,
   type FloatingIconsHeroProps,
 } from "@/components/floating-icons"
+import { useSession } from "next-auth/react"
 
 const IconGoogle = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -228,12 +229,27 @@ const icons: FloatingIconsHeroProps["icons"] = [
 ]
 
 export default function Hero() {
+  const { data: session, status } = useSession()
+
+  if (status === "loading")
+    return (
+      <FloatingIconsHero
+        title="Swipe. Match. Hire."
+        subtitle="Stop hunting, start matching. Swrk™ brings the speed of discovery to the professional world. Swipe, match, and connect with your next opportunity in seconds."
+        ctaText="Loading..."
+        ctaHref="/"
+        ctaText2="Learn More"
+        ctaHref2="#features"
+        icons={icons}
+      />
+    )
+
   return (
     <FloatingIconsHero
       title="Swipe. Match. Hire."
       subtitle="Stop hunting, start matching. Swrk™ brings the speed of discovery to the professional world. Swipe, match, and connect with your next opportunity in seconds."
-      ctaText="Join the Revolution"
-      ctaHref="/signin"
+      ctaText={session ? "Go to Dashboard" : "Join the revolution"}
+      ctaHref={session ? "/dashboard" : "/signup"}
       ctaText2="Learn More"
       ctaHref2="#features"
       icons={icons}

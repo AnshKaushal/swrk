@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData()
     const file = formData.get("file") as File
+    const kind = String(formData.get("kind") || "avatar")
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
@@ -44,13 +45,12 @@ export async function POST(req: NextRequest) {
     const url = await uploadToStorage({
       file: multerFile,
       userId: session.user.id,
-      folder: "avatars",
+      folder: kind === "banner" ? "banners" : "avatars",
       allowedTypes,
     })
 
-    // Update user avatar in database
     await User.findByIdAndUpdate(session.user.id, {
-      avatar: url,
+      [kind === "banner" ? "banner" : "avatar"]: url,
     })
 
     return NextResponse.json({ url })

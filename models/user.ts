@@ -27,12 +27,24 @@ const UserSchema = new mongoose.Schema(
       minlength: 3,
       maxlength: 30,
     },
+    address: {
+      street: String,
+      city: String,
+      state: String,
+      zip: String,
+      country: String,
+    },
     avatar: String,
+    banner: String,
     phone: String,
     dateOfBirth: Date,
     gender: {
       type: String,
       enum: ["male", "female", "non-binary", "prefer-not-to-say"],
+    },
+    activeRole: {
+      type: String,
+      enum: ["employee", "employer"],
     },
 
     role: {
@@ -51,10 +63,30 @@ const UserSchema = new mongoose.Schema(
     linkedinId: String,
     githubUrl: String,
     portfolioUrl: String,
+    professionalLinks: [
+      {
+        label: String,
+        url: String,
+      },
+    ],
+    featuredResumeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Resume",
+      default: null,
+    },
 
     isVerified: { type: Boolean, default: false },
     verificationToken: String,
     verificationTokenExpiry: Date,
+    pendingEmail: {
+      type: String,
+      lowercase: true,
+      trim: true,
+    },
+    pendingEmailChangeToken: String,
+    pendingEmailChangeTokenExpiry: Date,
+    pendingAccountDeletionToken: String,
+    pendingAccountDeletionTokenExpiry: Date,
     passwordResetToken: String,
     passwordResetExpiry: Date,
     isActive: { type: Boolean, default: true },
@@ -92,6 +124,8 @@ const UserSchema = new mongoose.Schema(
     privacy: {
       showLinkedin: { type: Boolean, default: false }, // shown only after match
       showPhone: { type: Boolean, default: false },
+      showEmail: { type: Boolean, default: true },
+      showResumes: { type: Boolean, default: true },
       profileVisibility: {
         type: String,
         enum: ["public", "verified-only", "hidden"],

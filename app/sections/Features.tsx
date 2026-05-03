@@ -11,7 +11,10 @@ import {
 
 export default function Features() {
   return (
-    <section className="py-16 sm:py-24 lg:py-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+    <section
+      id="how-it-works"
+      className="py-16 lg:py-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto"
+    >
       <div className="grid border md:grid-cols-2 rounded-4xl overflow-hidden">
         <div>
           <div className="p-6 sm:p-8 lg:p-10">
@@ -25,7 +28,7 @@ export default function Features() {
             </p>
           </div>
 
-          <div aria-hidden className="relative">
+          <div aria-hidden className="relative px-6 sm:px-8 lg:px-10">
             <div className="absolute inset-0 z-10 m-auto size-fit">
               <div className="rounded-[--radius] bg-background z-[1] dark:bg-muted relative flex size-fit w-fit items-center gap-2 border px-3 py-1 text-xs font-medium shadow-md shadow-black/5">
                 <span className="text-lg">✨</span> 1,000+ matches this month

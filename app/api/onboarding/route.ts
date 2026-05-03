@@ -3,6 +3,14 @@ import { auth } from "@/app/api/auth/[...nextauth]/route"
 import { db } from "@/lib/mongodb"
 import User from "@/models/user"
 
+const normalizeRole = (value: string) => {
+  if (value === "job-seeker") return "employee"
+  if (value === "employee" || value === "employer" || value === "both") {
+    return value
+  }
+  return "employee"
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await auth()
@@ -12,13 +20,18 @@ export async function POST(req: NextRequest) {
 
     const { name, username, role, phone, dateOfBirth, gender, step } =
       await req.json()
+    const normalizedRole = role ? normalizeRole(role) : undefined
 
     await db()
 
-    const updateData: any = {}
+    const updateData: Record<string, unknown> = {}
     if (name) updateData.name = name
     if (username) updateData.username = username
-    if (role) updateData.role = role
+    if (normalizedRole) {
+      updateData.role = normalizedRole
+      updateData.activeRole =
+        normalizedRole === "both" ? "employee" : normalizedRole
+    }
     if (phone) updateData.phone = phone
     if (dateOfBirth) updateData.dateOfBirth = new Date(dateOfBirth)
     if (gender) updateData.gender = gender
@@ -30,7 +43,7 @@ export async function POST(req: NextRequest) {
     await User.findByIdAndUpdate(session.user.id, { $set: updateData })
 
     return NextResponse.json({ success: true })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[onboarding]", err)
     return NextResponse.json({ error: "Update failed" }, { status: 500 })
   }

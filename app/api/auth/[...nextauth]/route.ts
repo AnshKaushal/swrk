@@ -5,47 +5,78 @@ import bcrypt from "bcryptjs"
 import { db } from "@/lib/mongodb"
 import User from "@/models/user"
 
-export const authOptions = {
+const authOptions = {
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     }),
     CredentialsProvider({
       id: "credentials",
       name: "Email & Password",
       credentials: {
-        email: { label: "Email", type: "email" },
+        email: { label: "Email or Username", type: "text" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials: any) {
-        await db()
-        const user = await User.findOne({
-          email: (credentials.email as string).toLowerCase().trim(),
-        })
+        try {
+          await db()
+          const input = (credentials?.email as string)?.toLowerCase()?.trim()
 
-        if (!user) throw new Error("No account found with this email")
-        if (!user.isVerified) throw new Error("Please verify your email first")
-        if (user.isBanned) throw new Error("This account has been suspended")
-        if (!user.password)
-          throw new Error("Please sign in with Google or reset your password")
+          if (!input || !credentials?.password) {
+            console.error("Missing credentials")
+            return null
+          }
 
-        const isValid = await bcrypt.compare(
-          credentials.password as string,
-          user.password,
-        )
-        if (!isValid) throw new Error("Incorrect password")
+          const user = await User.findOne({
+            $or: [{ email: input }, { username: input }],
+          })
 
-        return {
-          id: user._id.toString(),
-          email: user.email,
-          name: user.name,
-          username: user.username,
-          image: user.avatar,
-          role: user.role,
-          onboardingStep: user.onboardingStep,
-          onboardingCompleted: user.onboardingCompleted,
-          isAdmin: user.isAdmin,
+          if (!user) {
+            console.error("User not found:", input)
+            return null
+          }
+
+          if (!user.isVerified) {
+            console.error("User not verified:", user._id)
+            return null
+          }
+
+          if (user.isBanned) {
+            console.error("User banned:", user._id)
+            return null
+          }
+
+          if (!user.password) {
+            console.error("User has no password:", user._id)
+            return null
+          }
+
+          const isValid = await bcrypt.compare(
+            credentials.password as string,
+            user.password,
+          )
+
+          if (!isValid) {
+            console.error("Invalid password for user:", user._id)
+            return null
+          }
+
+          console.log("User authenticated successfully:", user._id)
+          return {
+            id: user._id.toString(),
+            email: user.email,
+            name: user.name,
+            username: user.username,
+            image: user.avatar,
+            role: user.role,
+            onboardingStep: user.onboardingStep,
+            onboardingCompleted: user.onboardingCompleted,
+            isAdmin: user.isAdmin,
+          }
+        } catch (error: any) {
+          console.error("Credentials authorize error:", error)
+          return null
         }
       },
     }),
@@ -58,77 +89,119 @@ export const authOptions = {
         otpToken: { label: "OTP Token", type: "text" },
       },
       async authorize(credentials: any) {
-        await db()
-        const user = await User.findOne({
-          email: (credentials.email as string).toLowerCase().trim(),
-        })
+        try {
+          await db()
+          const user = await User.findOne({
+            email: (credentials?.email as string)?.toLowerCase()?.trim(),
+          })
 
-        if (!user) throw new Error("User not found")
-        if (user.isBanned) throw new Error("This account has been suspended")
+          if (!user) {
+            console.error("User not found for OTP:", credentials?.email)
+            return null
+          }
 
-        if (
-          !user.otpLoginToken ||
-          user.otpLoginToken !== credentials.otpToken ||
-          !user.otpLoginTokenExpiry ||
-          user.otpLoginTokenExpiry < new Date()
-        ) {
-          throw new Error("Invalid or expired login token")
-        }
+          if (user.isBanned) {
+            console.error("User banned:", user._id)
+            return null
+          }
 
-        await User.findByIdAndUpdate(user._id, {
-          $unset: { otpLoginToken: "", otpLoginTokenExpiry: "" },
-        })
+          if (
+            !user.otpLoginToken ||
+            user.otpLoginToken !== credentials?.otpToken ||
+            !user.otpLoginTokenExpiry ||
+            user.otpLoginTokenExpiry < new Date()
+          ) {
+            console.error("Invalid or expired OTP token for user:", user._id)
+            return null
+          }
 
-        return {
-          id: user._id.toString(),
-          email: user.email,
-          name: user.name,
-          username: user.username,
-          image: user.avatar,
-          role: user.role,
-          onboardingStep: user.onboardingStep,
-          onboardingCompleted: user.onboardingCompleted,
-          isAdmin: user.isAdmin,
+          await User.findByIdAndUpdate(user._id, {
+            $unset: { otpLoginToken: "", otpLoginTokenExpiry: "" },
+          })
+
+          console.log("User authenticated via OTP:", user._id)
+          return {
+            id: user._id.toString(),
+            email: user.email,
+            name: user.name,
+            username: user.username,
+            image: user.avatar,
+            role: user.role,
+            onboardingStep: user.onboardingStep,
+            onboardingCompleted: user.onboardingCompleted,
+            isAdmin: user.isAdmin,
+          }
+        } catch (error: any) {
+          console.error("OTP authorize error:", error)
+          return null
         }
       },
     }),
   ],
 
   callbacks: {
-    async signIn({ user, account }: { user: any; account?: any }) {
-      await db()
+    async signIn({
+      user,
+      account,
+      credentials,
+    }: {
+      user: any
+      account?: any
+      credentials?: any
+    }) {
+      try {
+        if (!user || !user.id) {
+          console.error("No user in signIn callback")
+          return false
+        }
 
-      if (account?.provider === "google") {
-        const existingUser = await User.findOneAndUpdate(
-          { email: user.email.toLowerCase() },
-          {
-            $set: {
-              name: user.name,
-              avatar: user.image,
-              authProvider: "google",
-              oauthId: account.providerAccountId,
-              isVerified: true,
-              lastSeen: new Date(),
-            },
-            $setOnInsert: {
-              email: user.email.toLowerCase(),
-              onboardingStep: 1,
-              onboardingCompleted: false,
-              role: null,
-            },
-          },
-          { upsert: true, returnDocument: "after" },
-        )
+        await db()
 
-        user.id = existingUser._id.toString()
-        user.role = existingUser.role
-        user.username = existingUser.username
-        user.onboardingStep = existingUser.onboardingStep
-        user.onboardingCompleted = existingUser.onboardingCompleted
-        user.isAdmin = existingUser.isAdmin
+        if (account?.provider === "google") {
+          const existingUser = await User.findOneAndUpdate(
+            { email: user.email.toLowerCase() },
+            {
+              $set: {
+                name: user.name,
+                avatar: user.image,
+                authProvider: "google",
+                oauthId: account.providerAccountId,
+                isVerified: true,
+                lastSeen: new Date(),
+              },
+              $setOnInsert: {
+                email: user.email.toLowerCase(),
+                onboardingStep: 1,
+                onboardingCompleted: false,
+                role: null,
+              },
+            },
+            { upsert: true, returnDocument: "after" },
+          )
+
+          user.id = existingUser._id.toString()
+          user.role = existingUser.role
+          user.username = existingUser.username
+          user.onboardingStep = existingUser.onboardingStep
+          user.onboardingCompleted = existingUser.onboardingCompleted
+          user.isAdmin = existingUser.isAdmin
+        } else if (credentials) {
+          const loggedInUser = await User.findByIdAndUpdate(
+            user.id,
+            { lastSeen: new Date() },
+            { new: true },
+          )
+          if (!loggedInUser) {
+            console.error("User not found in database:", user.id)
+            return false
+          }
+        }
+
+        return true
+      } catch (error) {
+        console.error("signIn callback error:", error)
+        return false
       }
-
-      return true
     },
 
     async jwt({
@@ -149,6 +222,7 @@ export const authOptions = {
         token.onboardingStep = user.onboardingStep
         token.onboardingCompleted = user.onboardingCompleted
         token.isAdmin = user.isAdmin
+        token.picture = user.image || user.avatar || token.picture
       }
 
       if (trigger === "update" && session) {
@@ -160,6 +234,7 @@ export const authOptions = {
         if (session.name !== undefined) token.name = session.name
         if (session.username !== undefined) token.username = session.username
         if (session.image !== undefined) token.picture = session.image
+        if (session.avatar !== undefined) token.picture = session.avatar
       }
 
       return token
@@ -172,13 +247,14 @@ export const authOptions = {
       session.user.onboardingStep = token.onboardingStep
       session.user.onboardingCompleted = token.onboardingCompleted
       session.user.isAdmin = token.isAdmin
+      session.user.avatar = token.picture || null
       return session
     },
   },
 
   pages: {
-    signIn: "/signup",
-    error: "/signup",
+    signIn: "/signin",
+    error: "/signin",
   },
 
   session: {
@@ -189,6 +265,5 @@ export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
 }
 
-const { auth, handlers } = NextAuth(authOptions)
+export const { handlers, auth } = NextAuth(authOptions)
 export const { GET, POST } = handlers
-export { auth }

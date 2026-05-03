@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CheckIcon, SparklesIcon } from "lucide-react"
 import Link from "next/link"
+import { useState } from "react"
 
 type PricingCardProps = {
   titleBadge: string
@@ -72,6 +73,13 @@ function PricingCard({
 }
 
 export default function Pricing() {
+  const [isYearly, setIsYearly] = useState(false)
+
+  const getPrice = (monthly: number) =>
+    isYearly ? Math.round(monthly * 12 * 0.85) : monthly
+
+  const suffix = isYearly ? "/year" : "/month"
+
   return (
     <section
       id="pricing"
@@ -86,7 +94,33 @@ export default function Pricing() {
           you grow.
         </p>
       </div>
+
+      <div className="my-6 flex items-center justify-center gap-3">
+        <span className={!isYearly ? "font-semibold" : ""}>Monthly</span>
+        <button
+          onClick={() => setIsYearly(!isYearly)}
+          className="relative h-6 w-11 rounded-full bg-muted"
+        >
+          <span
+            className={cn(
+              "absolute top-1 left-1 h-4 w-4 rounded-full bg-white transition",
+              isYearly && "translate-x-5",
+            )}
+          />
+        </button>
+
+        <span
+          className={cn("flex items-center gap-1", isYearly && "font-semibold")}
+        >
+          Yearly
+          <Badge variant="secondary" className="text-xs">
+            Save 15%
+          </Badge>
+        </span>
+      </div>
+
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-8">
+        {/* PRO CARD */}
         <div
           className={cn(
             "bg-background border-foreground/10 relative w-full overflow-hidden rounded-2xl border",
@@ -106,22 +140,27 @@ export default function Pricing() {
               />
             </div>
           </div>
+
           <div className="flex items-center gap-3 p-4">
             <Badge variant="secondary">PROFESSIONAL</Badge>
             <Badge variant="outline" className="hidden lg:flex">
               <SparklesIcon className="me-1 size-3" /> Most Popular
             </Badge>
             <div className="ml-auto">
-              <Button>Get Started</Button>
+              <Button asChild>
+                <Link href="/signup">Get Started</Link>
+              </Button>
             </div>
           </div>
+
           <div className="flex flex-col p-4 lg:flex-row">
             <div className="pb-4 lg:w-[30%]">
               <span className="font-mono text-5xl font-semibold tracking-tight">
-                $29
+                ₹{getPrice(999)}
               </span>
-              <span className="text-muted-foreground text-sm">/month</span>
+              <span className="text-muted-foreground text-sm">{suffix}</span>
             </div>
+
             <ul className="text-muted-foreground grid gap-4 text-sm lg:w-[70%]">
               {[
                 "Unlimited job swipes and matches",
@@ -140,50 +179,53 @@ export default function Pricing() {
           </div>
         </div>
 
+        {/* BASIC */}
         <PricingCard
-          titleBadge="FREE"
-          priceLabel="$0"
+          titleBadge="BASIC"
+          priceLabel={`₹${getPrice(499)}`}
+          priceSuffix={suffix}
           features={[
-            "Basic job search and swiping",
-            "Limited daily matches",
-            "Standard profile visibility",
-            "Basic messaging with matches",
+            "Priority matching algorithm",
+            "Unlimited swipes and matches",
+            "Advanced filtering options",
+            "Profile boost (2 per month)",
+            "Basic analytics dashboard",
           ]}
           cta="/signup"
           ctaText="Get Started"
           className="lg:col-span-3"
         />
 
+        {/* ENTERPRISE */}
         <PricingCard
-          titleBadge="RECRUITER"
-          priceLabel="$99"
+          titleBadge="ENTERPRISE"
+          priceLabel={`₹${getPrice(1999)}`}
+          priceSuffix={suffix}
           features={[
-            "Post unlimited job openings",
-            "Access to premium candidate pool",
-            "Advanced candidate analytics",
-            "Bulk messaging and scheduling",
-            "Team collaboration tools",
+            "Everything in Professional plan",
+            "White-label solution",
+            "Custom integrations",
+            "Dedicated account manager",
+            "Advanced reporting",
             "Priority support",
           ]}
-          cta="/signup"
-          ctaText="Start Hiring"
+          cta="/contact"
+          ctaText="Contact Sales"
           className="lg:col-span-4"
         />
 
         <PricingCard
-          titleBadge="ENTERPRISE"
-          priceLabel="Custom"
-          priceSuffix=""
+          titleBadge="FREE"
+          priceLabel={`₹${getPrice(0)}`}
+          priceSuffix={suffix}
           features={[
-            "Everything in Recruiter plan",
-            "White-label solution",
-            "Custom integrations and API access",
-            "Dedicated account management",
-            "Advanced reporting and analytics",
-            "SLA guarantees",
+            "Basic matching algorithm",
+            "Limited swipes and matches",
+            "Basic profile visibility",
+            "Access to job listings",
           ]}
-          cta="/contact"
-          ctaText="Contact Sales"
+          cta="/signup"
+          ctaText="Get Started"
           className="lg:col-span-4"
         />
       </div>

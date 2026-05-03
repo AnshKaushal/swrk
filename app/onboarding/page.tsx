@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -57,37 +57,44 @@ export default function OnboardingPage() {
   // Hydrate session data
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
-      setStep(session.user.onboardingStep || 1)
-      setName(session.user.name || "")
-      setAvatar(session.user.image || "")
-      setUsername(session.user.username || "")
-      setRole(session.user.role || "")
-    } else if (status === "unauthenticated") {
+      const timeout = window.setTimeout(() => {
+        setStep(session.user.onboardingStep || 1)
+        setName(session.user.name || "")
+        setAvatar(session.user.avatar || "")
+        setUsername(session.user.username || "")
+        setRole(session.user.role || "")
+      }, 0)
+
+      return () => window.clearTimeout(timeout)
+    }
+
+    if (status === "unauthenticated") {
       router.push("/signin")
     }
   }, [session, status, router])
 
-  const checkUsernameAvailability = useCallback(
-    debounce(async (usernameToCheck: string) => {
-      if (!usernameToCheck || usernameToCheck.length < 3) {
-        setUsernameAvailable(null)
-        setUsernameError(null)
-        return
-      }
-      setCheckingUsername(true)
-      try {
-        const res = await fetch(
-          `/api/auth/check-username?username=${encodeURIComponent(usernameToCheck)}`,
-        )
-        const data = await res.json()
-        setUsernameAvailable(data.available)
-        setUsernameError(data.error || null)
-      } catch (error) {
-        setUsernameAvailable(null)
-        setUsernameError(null)
-      }
-      setCheckingUsername(false)
-    }, 500),
+  const checkUsernameAvailability = useMemo(
+    () =>
+      debounce(async (usernameToCheck: string) => {
+        if (!usernameToCheck || usernameToCheck.length < 3) {
+          setUsernameAvailable(null)
+          setUsernameError(null)
+          return
+        }
+        setCheckingUsername(true)
+        try {
+          const res = await fetch(
+            `/api/auth/check-username?username=${encodeURIComponent(usernameToCheck)}`,
+          )
+          const data = await res.json()
+          setUsernameAvailable(data.available)
+          setUsernameError(data.error || null)
+        } catch {
+          setUsernameAvailable(null)
+          setUsernameError(null)
+        }
+        setCheckingUsername(false)
+      }, 500),
     [],
   )
 
@@ -115,7 +122,7 @@ export default function OnboardingPage() {
       const data = await res.json()
       setAvatar(data.url)
       toast.success("Profile picture uploaded successfully!")
-    } catch (err) {
+    } catch {
       toast.error("Failed to upload profile picture")
     }
     setLoading(false)
@@ -123,8 +130,8 @@ export default function OnboardingPage() {
 
   const handleStepSubmit = async (
     targetStep: number,
-    payload: any,
-    sessionUpdates: any,
+    payload: Record<string, unknown>,
+    sessionUpdates: Record<string, unknown>,
   ) => {
     setLoading(true)
     try {
@@ -145,7 +152,7 @@ export default function OnboardingPage() {
         await update({ ...sessionUpdates, onboardingStep: targetStep })
         toast.success("Saved successfully!")
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to save information")
     }
     setLoading(false)
@@ -354,7 +361,7 @@ export default function OnboardingPage() {
               >
                 {[
                   {
-                    id: "job-seeker",
+                    id: "employee",
                     label: "I'm looking for a job",
                     desc: "Find companies and apply to roles",
                   },

@@ -1,21 +1,39 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { signIn } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { toast } from "sonner"
 
-export default function SigninPage() {
+const ERROR_MESSAGES: Record<string, string> = {
+  CredentialsSignin: "Invalid email/username or password",
+  Default: "Something went wrong during sign in",
+}
+
+function SigninForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const error = searchParams.get("error")
+    if (error) {
+      const message = ERROR_MESSAGES[error] || ERROR_MESSAGES.Default
+      toast.error(message)
+    }
+  }, [searchParams])
 
   const handleSignIn = async () => {
+    if (!email || !password) {
+      toast.error("Please enter email/username and password")
+      return
+    }
     setLoading(true)
     try {
       const result = await signIn("credentials", {
@@ -23,13 +41,25 @@ export default function SigninPage() {
         password,
         redirect: false,
       })
-      if (result?.ok) {
+
+      console.log("SignIn result:", result)
+
+      if (result?.error) {
+        const message = ERROR_MESSAGES[result.error] || "Invalid credentials"
+        toast.error(message)
+      } else if (result?.ok && !result?.error) {
         toast.success("Welcome back!")
-        router.push("/dashboard")
+        console.log("Redirecting to dashboard...")
+        // Wait a bit for session to establish
+        setTimeout(() => {
+          router.push("/dashboard")
+          router.refresh() // Force a refresh to ensure session is loaded
+        }, 1000)
       } else {
-        toast.error("Invalid email or password")
+        toast.error("Invalid credentials")
       }
     } catch (err: any) {
+      console.error("Sign in error:", err)
       toast.error("Sign in failed")
     }
     setLoading(false)
@@ -90,11 +120,11 @@ export default function SigninPage() {
           <div className="space-y-5">
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email or Username</Label>
                 <Input
                   id="email"
-                  type="email"
-                  placeholder="john@example.com"
+                  type="text"
+                  placeholder="john@example.com or johndoe"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -152,7 +182,7 @@ export default function SigninPage() {
             size="lg"
             className="w-full gap-3 border-muted-foreground/20 hover:bg-muted"
             onClick={handleGoogleSignIn}
-            disabled={true || loading}
+            disabled={loading}
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -176,5 +206,13 @@ export default function SigninPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SigninPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SigninForm />
+    </Suspense>
   )
 }

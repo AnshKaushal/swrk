@@ -18,7 +18,8 @@ export default function Footer() {
     pathname === "/signin" ||
     pathname === "/signup" ||
     pathname.includes("/onboarding") ||
-    pathname.includes("/dashboard")
+    pathname.includes("/dashboard") ||
+    pathname.includes("/settings")
   ) {
     return null
   }
