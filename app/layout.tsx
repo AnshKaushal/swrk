@@ -20,7 +20,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Swrk - Swipe To Get Hired!",
   description:
-    "Swrk is the new hiring platform that allows users to match with potential employers and vice versa. Made specifically for HRs and Job Seekers, this app connects both of them, making it the perfect place to hire or get hired!",
+    "Swrk is the new hiring platform that helps people open to work and hiring teams match with intent. Built for modern hiring workflows, it makes it easier to hire or get hired.",
 }
 
 export default function RootLayout({

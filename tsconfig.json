@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-, "scripts/seed-yearly-plans.js", "scripts/create-subscription-plans.js", "scripts/seed-plans.js", "models/subscription-plan.ts"  ],
+, "scripts/seed-yearly-plans.js", "scripts/create-subscription-plans.js", "scripts/seed-plans.js", "models/subscription-plan.ts", "scripts/seed-users.js"  ],
   "exclude": ["node_modules"]
 }

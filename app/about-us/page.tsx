@@ -171,9 +171,9 @@ export default function AboutPage() {
             </div>
 
             <p className="text-base leading-7 text-muted-foreground sm:text-lg">
-              The traditional job market is broken. Job seekers spray
-              applications everywhere, recruiters drown in noise, and everyone's
-              time gets wasted on bad fits.
+              The traditional job market is broken. People open to work spray
+              applications everywhere, hiring teams drown in noise, and
+              everyone&apos;s time gets wasted on bad fits.
             </p>
 
             <p className="text-base leading-7 text-muted-foreground sm:text-lg">
@@ -223,7 +223,7 @@ export default function AboutPage() {
                   For everyone
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Job seekers and employers alike
+                  People open to work and hiring teams alike
                 </p>
               </div>
             </div>

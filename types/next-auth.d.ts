@@ -1,8 +1,8 @@
-import NextAuth from "next-auth"
+import type { DefaultSession, DefaultUser } from "next-auth"
 
 declare module "next-auth" {
   interface Session {
-    user: {
+    user: DefaultSession["user"] & {
       id: string
       name?: string | null
       email?: string | null
@@ -12,10 +12,11 @@ declare module "next-auth" {
       onboardingStep?: number
       onboardingCompleted?: boolean
       isAdmin?: boolean
+      isVerified?: boolean
     }
   }
 
-  interface User {
+  interface User extends DefaultUser {
     id: string
     name?: string | null
     email?: string | null
@@ -25,6 +26,7 @@ declare module "next-auth" {
     onboardingStep?: number
     onboardingCompleted?: boolean
     isAdmin?: boolean
+    isVerified?: boolean
   }
 }
 
@@ -39,5 +41,6 @@ declare module "next-auth/jwt" {
     onboardingStep?: number
     onboardingCompleted?: boolean
     isAdmin?: boolean
+    isVerified?: boolean
   }
 }

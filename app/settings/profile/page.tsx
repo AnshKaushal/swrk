@@ -863,7 +863,7 @@ export default function ProfileSettingsPage() {
           <div>
             <h2 className="text-base/7 font-semibold">Professional Profile</h2>
             <p className="mt-1 text-sm/6 text-muted-foreground">
-              Tell employers about your professional background.
+              Tell hiring teams about your professional background.
             </p>
           </div>
           <div className="md:col-span-2 space-y-6">
@@ -903,15 +903,15 @@ export default function ProfileSettingsPage() {
                     <SelectValue placeholder="Switch role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="employee">Job Applier</SelectItem>
-                    <SelectItem value="employer">Job Poster</SelectItem>
+                    <SelectItem value="employee">Open to work</SelectItem>
+                    <SelectItem value="employer">Hiring</SelectItem>
                   </SelectContent>
                 </Select>
               ) : (
                 <Badge variant="secondary" className="w-fit capitalize">
                   {formData.activeRole === "employee"
-                    ? "Job Applier"
-                    : "Job Poster"}
+                    ? "Open to work"
+                    : "Hiring"}
                 </Badge>
               )}
             </div>

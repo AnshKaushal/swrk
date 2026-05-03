@@ -30,11 +30,12 @@ import { ModeToggle } from "@/components/theme-toggle"
 import { usePathname } from "next/navigation"
 import { IconDashboard } from "@tabler/icons-react"
 
+const homeHref = "/home"
 const navLinks = [
-  { href: "/#features", label: "Features" },
-  { href: "/#how-it-works", label: "How It Works" },
-  { href: "/#trusted-by", label: "Trusted By" },
-  { href: "/#pricing", label: "Pricing" },
+  { href: `${homeHref}#features`, label: "Features" },
+  { href: `${homeHref}#how-it-works`, label: "How It Works" },
+  { href: `${homeHref}#trusted-by`, label: "Trusted By" },
+  { href: `${homeHref}#pricing`, label: "Pricing" },
   { href: "/about-us", label: "About Us" },
 ]
 
@@ -119,7 +120,7 @@ export default function Navbar() {
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           <Link
-            href="/"
+            href={homeHref}
             className="flex items-center gap-2 font-bold text-xl flex-shrink-0"
           >
             <img

@@ -1,19 +1,21 @@
 "use client"
 
-import { usePathname } from "next/navigation"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { signOut, useSession } from "next-auth/react"
 import {
-  User,
-  Shield,
-  Bell,
+  LayoutDashboard,
+  Radar,
+  Link2,
   Settings,
-  Crown,
-  Filter,
-  FileText,
-  LogOut,
   UserCircle,
+  Shield,
+  LogOut,
+  Bell,
+  Home,
 } from "lucide-react"
+import React from "react"
+
 import { ModeToggle } from "@/components/theme-toggle"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -25,22 +27,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
-import { IconDashboard } from "@tabler/icons-react"
-import React from "react"
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: IconDashboard },
-  { name: "Profile", href: "/settings/profile", icon: User },
+  { name: "Home", href: "/home", icon: Home },
+  { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Discover", href: "/dashboard#discover", icon: Radar },
+  { name: "Quick Links", href: "/dashboard#links", icon: Link2 },
+  { name: "Profile", href: "/settings/profile", icon: UserCircle },
   { name: "Verification", href: "/settings/verification", icon: Shield },
-  { name: "Filters", href: "/settings/role-filters", icon: Filter },
-  { name: "Resumes", href: "/settings/resume", icon: FileText },
-  { name: "Privacy", href: "/settings/privacy", icon: Shield },
   { name: "Notifications", href: "/settings/notifications", icon: Bell },
-  { name: "Subscription", href: "/settings/subscription", icon: Crown },
   { name: "Account", href: "/settings/account", icon: Settings },
 ]
 
-export function SettingsSidebar({ onClose }: { onClose?: () => void }) {
+export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname()
   const { data: session, status, update } = useSession()
 
@@ -53,8 +52,8 @@ export function SettingsSidebar({ onClose }: { onClose?: () => void }) {
     const handler = () => {
       try {
         update()
-      } catch (err) {
-        console.warn("session update listener failed", err)
+      } catch (error) {
+        console.warn("session update listener failed", error)
       }
     }
     window.addEventListener("swrk:session-updated", handler)
@@ -85,7 +84,7 @@ export function SettingsSidebar({ onClose }: { onClose?: () => void }) {
   return (
     <nav className="flex h-full flex-col">
       <div className="flex items-center justify-between p-4 pt-6">
-        <Link href="/" className="flex items-center gap-3">
+        <Link href="/home" className="flex items-center gap-3">
           <img src="/swrk.svg" alt="Swrk" className="h-8 w-8 object-contain" />
           <span className="font-semibold">Swrk</span>
         </Link>
@@ -95,9 +94,11 @@ export function SettingsSidebar({ onClose }: { onClose?: () => void }) {
         <div className="flex flex-col gap-1">
           {navigation.map((item) => {
             const Icon = item.icon
-            const isActive = pathname === item.href
+            const isActive =
+              pathname === item.href ||
+              (item.href.includes("#") && pathname === "/dashboard")
             return (
-              <Link key={item.href} href={item.href}>
+              <Link key={item.href} href={item.href} onClick={onClose}>
                 <div
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
@@ -105,7 +106,6 @@ export function SettingsSidebar({ onClose }: { onClose?: () => void }) {
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
-                  onClick={onClose}
                 >
                   <Icon className="h-5 w-5 flex-shrink-0" />
                   {item.name}
@@ -164,12 +164,12 @@ export function SettingsSidebar({ onClose }: { onClose?: () => void }) {
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link
-                    href="/dashboard"
+                    href="/settings/profile"
                     className="cursor-pointer"
                     onClick={onClose}
                   >
-                    <IconDashboard className="h-4 w-4" />
-                    <span>Dashboard</span>
+                    <Settings className="h-4 w-4" />
+                    <span>Settings</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

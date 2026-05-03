@@ -48,10 +48,12 @@ interface UserProfile {
     isFeatured: boolean
   }>
   isVerified: boolean
+  profileVerified?: boolean
   privacy: {
     showPhone: boolean
     showLinkedin: boolean
     showEmail: boolean
+    showResumes?: boolean
     profileVisibility: string
   }
 }
@@ -121,6 +123,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [isOwnProfile, setIsOwnProfile] = useState(false)
   const [error, setError] = useState("")
+  const [isProfileVisible, setIsProfileVisible] = useState(true)
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -132,7 +135,21 @@ export default function ProfilePage() {
         setUser(data.user)
         setProfile(data.profile)
 
-        if (session?.user && session.user.username === username) {
+        const visibility = data.user?.privacy?.profileVisibility || "public"
+        const ownsProfile = session?.user?.username === username
+        const viewerIsVerified = Boolean(
+          session?.user?.isVerified || session?.user?.isAdmin,
+        )
+
+        if (visibility === "hidden") {
+          setIsProfileVisible(Boolean(ownsProfile || session?.user?.isAdmin))
+        } else if (visibility === "verified-only") {
+          setIsProfileVisible(Boolean(ownsProfile || viewerIsVerified))
+        } else {
+          setIsProfileVisible(true)
+        }
+
+        if (ownsProfile) {
           setIsOwnProfile(true)
         }
       } catch (err) {
@@ -167,11 +184,28 @@ export default function ProfilePage() {
     )
   }
 
+  if (!isProfileVisible && !isOwnProfile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <h1 className="text-2xl font-bold">Profile Not Visible</h1>
+          <p className="text-muted-foreground">
+            This profile is set to private and is not visible to you.
+          </p>
+          <Button onClick={() => router.push("/")} variant="outline">
+            Go Home
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  const canShowResumes = user.privacy?.showResumes !== false
   const empProfile = profile as EmployeeProfile
 
   return (
-    <div className="min-h-screen bg-background py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="min-h-screen bg-background py-8 sm:py-12">
+      <div className="max-w-7xl mx-auto space-y-8 px-4 sm:px-6 lg:px-8">
         <div className="flex justify-end gap-3">
           {isOwnProfile && (
             <>
@@ -194,369 +228,432 @@ export default function ProfilePage() {
           )}
         </div>
 
-        <Card className="overflow-hidden">
-          {user.banner ? (
-            <img
-              src={user.banner}
-              alt={`${user.name} banner`}
-              className="h-32 w-full object-cover"
-            />
-          ) : (
-            <div className="h-32 bg-gradient-to-r from-primary/20 to-primary/5" />
-          )}
-
-          <CardContent className="pt-0 pb-8">
-            <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 -mt-16 relative z-10">
-              {user.avatar ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-3">
+            <Card className="overflow-hidden shadow-lg pt-0">
+              {user.banner ? (
                 <img
-                  src={user.avatar}
-                  alt={user.name}
-                  className="w-32 h-32 rounded-full border-4 border-background shadow-lg object-cover"
+                  src={user.banner}
+                  alt={`${user.name} banner`}
+                  className="h-40 sm:h-48 w-full object-cover"
                 />
               ) : (
-                <div className="w-32 h-32 rounded-full border-4 border-background bg-muted flex items-center justify-center shadow-lg">
-                  <span className="text-4xl font-bold text-muted-foreground">
-                    {user.name.charAt(0)}
-                  </span>
-                </div>
+                <div className="h-40 sm:h-48 bg-secondary" />
               )}
 
-              <div className="flex-1 pt-4">
-                <div className="flex items-start justify-between gap-4 mb-2">
-                  <div>
-                    <h1 className="text-3xl font-bold">{user.name}</h1>
-                    <p className="text-lg text-muted-foreground">
-                      @{user.username}
-                    </p>
-                  </div>
-                  {user.isVerified && (
-                    <Badge className="bg-green-500">Verified</Badge>
-                  )}
-                </div>
-
-                {empProfile?.headline && (
-                  <p className="text-lg text-foreground mb-3 font-semibold">
-                    {empProfile.headline}
-                  </p>
-                )}
-
-                {empProfile?.tagline && (
-                  <p className="text-sm text-muted-foreground italic mb-4">
-                    &quot;{empProfile.tagline}&quot;
-                  </p>
-                )}
-
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <Badge variant="secondary">{user.role}</Badge>
-                  {user.role === "both" && user.activeRole && (
-                    <Badge variant="outline" className="capitalize">
-                      Active:{" "}
-                      {user.activeRole === "employee"
-                        ? "Job Applier"
-                        : "Job Poster"}
-                    </Badge>
-                  )}
-                  {user.gender && (
-                    <Badge variant="outline" className="capitalize">
-                      {user.gender.replace("-", " ")}
-                    </Badge>
-                  )}
-                  {empProfile?.currentStatus && (
-                    <Badge className="capitalize">
-                      {empProfile.currentStatus.replace("-", " ")}
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                  {empProfile?.currentCity && (
-                    <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4" />
-                      {empProfile.currentCity}
+              <CardContent className="pt-0 pb-8 sm:pb-10">
+                <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 -mt-20 relative z-10 px-4 sm:px-6">
+                  {user.avatar ? (
+                    <img
+                      src={user.avatar}
+                      alt={user.name}
+                      className="w-36 h-36 sm:w-40 sm:h-40 rounded-full border-4 border-secondary shadow-xl object-cover flex-shrink-0"
+                    />
+                  ) : (
+                    <div className="w-36 h-36 sm:w-40 sm:h-40 rounded-full border-4 border-background bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shadow-xl flex-shrink-0">
+                      <span className="text-5xl font-bold text-muted-foreground">
+                        {user.name.charAt(0)}
+                      </span>
                     </div>
                   )}
-                  {user.phone && user.privacy?.showPhone && (
-                    <div className="flex items-center gap-2">
-                      <Phone className="w-4 h-4" />
-                      {user.phone}
-                    </div>
-                  )}
-                  {user.privacy?.showEmail && (
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-4 h-4" />
-                      {user.email}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        {empProfile?.bio && (
-          <Card>
-            <CardHeader>
-              <CardTitle>About</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-foreground whitespace-pre-wrap">
-                {empProfile.bio}
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {empProfile?.primarySkills && empProfile.primarySkills.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Briefcase className="w-5 h-5" />
-                Skills
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {empProfile.primarySkills.map((skill) => (
-                  <Badge key={skill} variant="outline">
-                    {skill}
-                  </Badge>
-                ))}
-              </div>
-              {empProfile.secondarySkills &&
-                empProfile.secondarySkills.length > 0 && (
-                  <div className="mt-4 pt-4 border-t">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      Other Skills
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {empProfile.secondarySkills.map((skill) => (
-                        <Badge key={skill} variant="secondary">
-                          {skill}
+                  <div className="flex-1 pt-2 sm:pt-8">
+                    <div className="flex items-start justify-between gap-4 mb-3">
+                      <div>
+                        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">
+                          {user.name}
+                        </h1>
+                        <p className="text-base sm:text-lg text-muted-foreground font-medium">
+                          @{user.username}
+                        </p>
+                      </div>
+                      {(user.isVerified || user.profileVerified) && (
+                        <Badge className="bg-green-500 text-white">
+                          Verified
                         </Badge>
-                      ))}
+                      )}
                     </div>
-                  </div>
-                )}
-            </CardContent>
-          </Card>
-        )}
 
-        {empProfile?.workHistory && empProfile.workHistory.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Briefcase className="w-5 h-5" />
-                Work Experience
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {empProfile.workHistory.map((exp, idx) => (
-                  <div
-                    key={idx}
-                    className="border-l-2 border-primary pl-4 pb-4"
-                  >
-                    <h3 className="text-lg font-semibold">{exp.role}</h3>
-                    <p className="text-muted-foreground">{exp.company}</p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {new Date(exp.startDate).toLocaleDateString("en-US", {
-                        month: "short",
-                        year: "numeric",
-                      })}{" "}
-                      -{" "}
-                      {exp.isCurrent
-                        ? "Present"
-                        : new Date(exp.endDate!).toLocaleDateString("en-US", {
-                            month: "short",
-                            year: "numeric",
-                          })}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {empProfile?.education && empProfile.education.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5" />
-                Education
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {empProfile.education.map((edu, idx) => (
-                  <div key={idx} className="pb-4 border-b last:border-b-0">
-                    <h3 className="text-lg font-semibold">{edu.degree}</h3>
-                    <p className="text-muted-foreground">{edu.institution}</p>
-                    {edu.field && (
-                      <p className="text-sm text-muted-foreground">
-                        {edu.field}
+                    {empProfile?.headline && (
+                      <p className="text-lg sm:text-xl text-foreground mb-3 font-semibold">
+                        {empProfile.headline}
                       </p>
                     )}
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
-        {empProfile?.certifications && empProfile.certifications.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Award className="w-5 h-5" />
-                Certifications
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {empProfile.certifications.map((cert, idx) => (
-                  <div key={idx} className="flex items-start gap-3">
-                    <Award className="w-4 h-4 mt-1 text-primary" />
-                    <div>
-                      <p className="font-semibold">{cert.name}</p>
-                      {cert.issuedBy && (
-                        <p className="text-sm text-muted-foreground">
-                          {cert.issuedBy}
-                        </p>
+                    {empProfile?.tagline && (
+                      <p className="text-sm sm:text-base text-muted-foreground italic mb-4 max-w-2xl">
+                        &quot;{empProfile.tagline}&quot;
+                      </p>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 mb-5">
+                      <Badge variant="secondary" className="capitalize">
+                        {user.role}
+                      </Badge>
+                      {user.role === "both" && user.activeRole && (
+                        <Badge variant="outline" className="capitalize">
+                          {user.activeRole === "employee"
+                            ? "Open to work"
+                            : "Hiring"}
+                        </Badge>
+                      )}
+                      {user.gender && (
+                        <Badge variant="outline" className="capitalize">
+                          {user.gender.replace("-", " ")}
+                        </Badge>
+                      )}
+                      {empProfile?.currentStatus && (
+                        <Badge className="capitalize bg-blue-500">
+                          {empProfile.currentStatus.replace("-", " ")}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-4 text-sm sm:text-base text-muted-foreground">
+                      {empProfile?.currentCity && (
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-4 h-4 flex-shrink-0" />
+                          <span>{empProfile.currentCity}</span>
+                        </div>
+                      )}
+                      {user.phone && user.privacy?.showPhone && (
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-4 h-4 flex-shrink-0" />
+                          <span>{user.phone}</span>
+                        </div>
+                      )}
+                      {user.privacy?.showEmail && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 flex-shrink-0" />
+                          <span>{user.email}</span>
+                        </div>
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-        {user.resumes && user.resumes.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Resume
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {user.resumes.map((resume) => (
-                  <div
-                    key={resume._id}
-                    className="flex flex-col gap-3 rounded-lg border border-border p-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
+          <div className="lg:col-span-2 space-y-8">
+            {empProfile?.bio && (
+              <Card className="shadow-md">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-xl">About</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-foreground whitespace-pre-wrap leading-relaxed">
+                    {empProfile.bio}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {empProfile?.primarySkills &&
+              empProfile.primarySkills.length > 0 && (
+                <Card className="shadow-md">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-xl flex items-center gap-2">
+                      <Briefcase className="w-5 h-5" />
+                      Skills & Expertise
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
                     <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-semibold">{resume.title}</p>
-                        {resume.isFeatured && (
-                          <Badge variant="secondary">Visible on profile</Badge>
+                      <p className="text-xs font-semibold uppercase text-muted-foreground mb-3">
+                        Primary Skills
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {empProfile.primarySkills.map((skill) => (
+                          <Badge key={skill} variant="default">
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    {empProfile.secondarySkills &&
+                      empProfile.secondarySkills.length > 0 && (
+                        <div className="pt-2 border-t">
+                          <p className="text-xs font-semibold uppercase text-muted-foreground mb-3">
+                            Other Skills
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {empProfile.secondarySkills.map((skill) => (
+                              <Badge key={skill} variant="secondary">
+                                {skill}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                  </CardContent>
+                </Card>
+              )}
+
+            {empProfile?.workHistory && empProfile.workHistory.length > 0 && (
+              <Card className="shadow-md">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-xl flex items-center gap-2">
+                    <Briefcase className="w-5 h-5" />
+                    Work Experience
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    {empProfile.workHistory.map((exp, idx) => (
+                      <div
+                        key={idx}
+                        className="relative pl-6 pb-6 border-l-2 border-primary last:pb-0"
+                      >
+                        <div className="absolute left-0 top-0 w-4 h-4 bg-primary rounded-full -translate-x-[9px]" />
+                        <h3 className="text-lg font-semibold">{exp.role}</h3>
+                        <p className="text-muted-foreground font-medium">
+                          {exp.company}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {new Date(exp.startDate).toLocaleDateString("en-US", {
+                            month: "short",
+                            year: "numeric",
+                          })}{" "}
+                          -{" "}
+                          {exp.isCurrent
+                            ? "Present"
+                            : new Date(exp.endDate!).toLocaleDateString(
+                                "en-US",
+                                {
+                                  month: "short",
+                                  year: "numeric",
+                                },
+                              )}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <div className="lg:col-span-1 space-y-8">
+            {empProfile?.education && empProfile.education.length > 0 && (
+              <Card className="shadow-md">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <BookOpen className="w-5 h-5" />
+                    Education
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {empProfile.education.map((edu, idx) => (
+                      <div
+                        key={idx}
+                        className="pb-4 border-b last:border-b-0 last:pb-0"
+                      >
+                        <h3 className="font-semibold text-sm">{edu.degree}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          {edu.institution}
+                        </p>
+                        {edu.field && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {edu.field}
+                          </p>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {resume.fileName}
-                      </p>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {empProfile?.certifications &&
+              empProfile.certifications.length > 0 && (
+                <Card className="shadow-md">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Award className="w-5 h-5" />
+                      Certifications
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {empProfile.certifications.map((cert, idx) => (
+                        <div key={idx} className="flex items-start gap-2">
+                          <Award className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm">{cert.name}</p>
+                            {cert.issuedBy && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {cert.issuedBy}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <Button asChild variant="outline" size="sm">
-                      <a href={resume.url} target="_blank" rel="noreferrer">
-                        Open Resume
+                  </CardContent>
+                </Card>
+              )}
+
+            {canShowResumes && user.resumes && user.resumes.length > 0 && (
+              <Card className="shadow-md">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Resume
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {user.resumes.map((resume) => (
+                      <div
+                        key={resume._id}
+                        className="flex flex-col gap-3 rounded-lg border border-border p-3 hover:border-primary/50 transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-semibold text-sm truncate">
+                              {resume.title}
+                            </p>
+                            {resume.isFeatured && (
+                              <Badge
+                                variant="secondary"
+                                className="text-xs flex-shrink-0"
+                              >
+                                Featured
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 truncate">
+                            {resume.fileName}
+                          </p>
+                        </div>
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                        >
+                          <a href={resume.url} target="_blank" rel="noreferrer">
+                            Open Resume
+                          </a>
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className="shadow-md">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Connect</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col gap-2">
+                  {(user.linkedinUrl ||
+                    empProfile?.socialLinks?.some(
+                      (l) => l.platform === "linkedin",
+                    )) &&
+                    user.privacy?.showLinkedin && (
+                      <Button
+                        asChild
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 justify-start"
+                      >
+                        <a
+                          href={
+                            user.linkedinUrl ||
+                            empProfile?.socialLinks?.find(
+                              (l) => l.platform === "linkedin",
+                            )?.url
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Share2 className="w-4 h-4" />
+                          LinkedIn
+                          <ExternalLink className="w-3 h-3 ml-auto" />
+                        </a>
+                      </Button>
+                    )}
+                  {(user.githubUrl ||
+                    empProfile?.socialLinks?.some(
+                      (l) => l.platform === "github",
+                    )) && (
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 justify-start"
+                    >
+                      <a
+                        href={
+                          user.githubUrl ||
+                          empProfile?.socialLinks?.find(
+                            (l) => l.platform === "github",
+                          )?.url
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Code2 className="w-4 h-4" />
+                        GitHub
+                        <ExternalLink className="w-3 h-3 ml-auto" />
                       </a>
                     </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Connect</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-3">
-              {(user.linkedinUrl ||
-                empProfile?.socialLinks?.some(
-                  (l) => l.platform === "linkedin",
-                )) && (
-                <Button asChild variant="outline" size="sm" className="gap-2">
-                  <a
-                    href={
-                      user.linkedinUrl ||
-                      empProfile?.socialLinks?.find(
-                        (l) => l.platform === "linkedin",
-                      )?.url
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    LinkedIn
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </Button>
-              )}
-              {(user.githubUrl ||
-                empProfile?.socialLinks?.some(
-                  (l) => l.platform === "github",
-                )) && (
-                <Button asChild variant="outline" size="sm" className="gap-2">
-                  <a
-                    href={
-                      user.githubUrl ||
-                      empProfile?.socialLinks?.find(
-                        (l) => l.platform === "github",
-                      )?.url
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Code2 className="w-4 h-4" />
-                    GitHub
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </Button>
-              )}
-              {(user.portfolioUrl ||
-                empProfile?.socialLinks?.some(
-                  (l) => l.platform === "website",
-                )) && (
-                <Button asChild variant="outline" size="sm" className="gap-2">
-                  <a
-                    href={
-                      user.portfolioUrl ||
-                      empProfile?.socialLinks?.find(
-                        (l) => l.platform === "website",
-                      )?.url
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Globe className="w-4 h-4" />
-                    Portfolio
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </Button>
-              )}
-              {user.professionalLinks?.map((link) => (
-                <Button
-                  key={`${link.label}-${link.url}`}
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                >
-                  <a href={link.url} target="_blank" rel="noopener noreferrer">
-                    <Globe className="w-4 h-4" />
-                    {link.label}
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                  )}
+                  {(user.portfolioUrl ||
+                    empProfile?.socialLinks?.some(
+                      (l) => l.platform === "website",
+                    )) && (
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 justify-start"
+                    >
+                      <a
+                        href={
+                          user.portfolioUrl ||
+                          empProfile?.socialLinks?.find(
+                            (l) => l.platform === "website",
+                          )?.url
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Globe className="w-4 h-4" />
+                        Portfolio
+                        <ExternalLink className="w-3 h-3 ml-auto" />
+                      </a>
+                    </Button>
+                  )}
+                  {user.professionalLinks?.map((link) => (
+                    <Button
+                      key={`${link.label}-${link.url}`}
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 justify-start"
+                    >
+                      <a
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Globe className="w-4 h-4" />
+                        <span className="truncate">{link.label}</span>
+                        <ExternalLink className="w-3 h-3 ml-auto flex-shrink-0" />
+                      </a>
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   )

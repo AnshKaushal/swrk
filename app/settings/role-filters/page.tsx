@@ -534,7 +534,7 @@ export default function RoleFiltersPage() {
                   }))
                 }
               >
-                Job Applier
+                Open to work
               </Button>
               <Button
                 type="button"
@@ -548,7 +548,7 @@ export default function RoleFiltersPage() {
                   }))
                 }
               >
-                Job Poster
+                Hiring
               </Button>
             </div>
           </div>
@@ -559,12 +559,12 @@ export default function RoleFiltersPage() {
         <div>
           <h2 className="text-base/7 font-semibold">
             {formData.activeRole === "employee"
-              ? "Job Applier Filters"
-              : "Job Poster Filters"}
+              ? "Open to work Filters"
+              : "Hiring Filters"}
           </h2>
           <p className="mt-1 text-sm/6 text-muted-foreground">
             {formData.activeRole === "employee"
-              ? "Set your job search preferences"
+              ? "Set your opportunity preferences"
               : "Target candidates for your openings"}
           </p>
         </div>

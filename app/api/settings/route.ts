@@ -44,6 +44,7 @@ export async function GET() {
         showLinkedin: user.privacy?.showLinkedin || false,
         showPhone: user.privacy?.showPhone || false,
         showEmail: user.privacy?.showEmail ?? true,
+        showResumes: user.privacy?.showResumes ?? true,
         profileVisibility: user.privacy?.profileVisibility || "public",
       },
       notifications: {
@@ -82,6 +83,7 @@ export async function PUT(req: NextRequest) {
 
     const updates = await req.json()
     await db()
+    const currentUser = await User.findById(session.user.id).select("privacy")
 
     // Validate username uniqueness if being updated
     if (updates.username) {
@@ -121,7 +123,9 @@ export async function PUT(req: NextRequest) {
     // Privacy settings
     if (updates.privacy) {
       updateData.privacy = {
-        ...updateData.privacy,
+        ...(currentUser?.privacy?.toObject
+          ? currentUser.privacy.toObject()
+          : currentUser?.privacy || {}),
         ...updates.privacy,
       }
     }

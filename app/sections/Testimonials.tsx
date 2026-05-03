@@ -63,7 +63,7 @@ const testimonials = [
   },
   {
     content:
-      "I've tried every job platform out there, but Swrk is the only one that truly understands what both job seekers and employers need. It's a game changer.",
+      "I've tried every job platform out there, but Swrk is the only one that truly understands what both people open to work and hiring teams need. It's a game changer.",
     name: "Tom Anderson",
     handle: "@tom_productmgr",
     avatar: "https://i.pravatar.cc/150?u=a04258a2462d8267123",

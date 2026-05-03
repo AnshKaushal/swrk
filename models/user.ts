@@ -154,6 +154,7 @@ const UserSchema = new mongoose.Schema(
         },
       },
     ],
+    profileVerified: { type: Boolean, default: false },
   },
   {
     timestamps: true,

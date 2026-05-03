@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -18,6 +18,64 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Camera, Check, X, Loader2, ArrowRight, ArrowLeft } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
+import Cropper, { Area } from "react-easy-crop"
+
+type CroppedImageResult = {
+  file: File
+  url: string
+}
+
+function createImage(url: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image()
+    image.addEventListener("load", () => resolve(image))
+    image.addEventListener("error", (error) => reject(error))
+    image.setAttribute("crossOrigin", "anonymous")
+    image.src = url
+  })
+}
+
+async function getCroppedImage(
+  imageSrc: string,
+  pixelCrop: Area,
+  fileName: string,
+): Promise<CroppedImageResult> {
+  const image = await createImage(imageSrc)
+  const canvas = document.createElement("canvas")
+  const ctx = canvas.getContext("2d")
+
+  if (!ctx) {
+    throw new Error("Failed to get canvas context")
+  }
+
+  canvas.width = pixelCrop.width
+  canvas.height = pixelCrop.height
+
+  ctx.drawImage(
+    image,
+    pixelCrop.x,
+    pixelCrop.y,
+    pixelCrop.width,
+    pixelCrop.height,
+    0,
+    0,
+    pixelCrop.width,
+    pixelCrop.height,
+  )
+
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob((result) => resolve(result), "image/jpeg", 0.95)
+  })
+
+  if (!blob) {
+    throw new Error("Failed to crop image")
+  }
+
+  return {
+    file: new File([blob], fileName, { type: "image/jpeg" }),
+    url: URL.createObjectURL(blob),
+  }
+}
 
 function debounce(
   func: (usernameToCheck: string) => Promise<void>,
@@ -35,6 +93,7 @@ export default function OnboardingPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cropPreviewUrlRef = useRef<string | null>(null)
 
   const [step, setStep] = useState(1)
 
@@ -46,6 +105,11 @@ export default function OnboardingPage() {
   const [phone, setPhone] = useState("")
   const [dateOfBirth, setDateOfBirth] = useState("")
   const [gender, setGender] = useState("")
+  const [cropOpen, setCropOpen] = useState(false)
+  const [cropImage, setCropImage] = useState("")
+  const [crop, setCrop] = useState({ x: 0, y: 0 })
+  const [zoom, setZoom] = useState(1)
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
 
   // Username validation
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(
@@ -120,11 +184,66 @@ export default function OnboardingPage() {
 
       const data = await res.json()
       setAvatar(data.url)
-      toast.success("Profile picture uploaded successfully!")
     } catch {
       toast.error("Failed to upload profile picture")
     }
     setLoading(false)
+  }
+
+  const onCropComplete = useCallback(
+    (_croppedArea: Area, croppedPixels: Area) => {
+      setCroppedAreaPixels(croppedPixels)
+    },
+    [],
+  )
+
+  const handleAvatarFileSelection = (file: File) => {
+    if (cropPreviewUrlRef.current) {
+      URL.revokeObjectURL(cropPreviewUrlRef.current)
+      cropPreviewUrlRef.current = null
+    }
+
+    const previewUrl = URL.createObjectURL(file)
+    cropPreviewUrlRef.current = previewUrl
+    setCropImage(previewUrl)
+    setCrop({ x: 0, y: 0 })
+    setZoom(1)
+    setCropOpen(true)
+  }
+
+  const handleCropCancel = () => {
+    if (cropPreviewUrlRef.current) {
+      URL.revokeObjectURL(cropPreviewUrlRef.current)
+      cropPreviewUrlRef.current = null
+    }
+
+    setCropOpen(false)
+    setCropImage("")
+    setCroppedAreaPixels(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""
+    }
+  }
+
+  const handleCropSave = async () => {
+    if (!cropImage || !croppedAreaPixels) {
+      toast.error("Adjust the crop before saving")
+      return
+    }
+
+    try {
+      const cropped = await getCroppedImage(
+        cropImage,
+        croppedAreaPixels,
+        "avatar.jpg",
+      )
+      await handleAvatarUpload(cropped.file)
+      toast.success("Profile picture cropped and uploaded successfully!")
+    } catch {
+      toast.error("Failed to crop profile picture")
+    } finally {
+      handleCropCancel()
+    }
   }
 
   const handleStepSubmit = async (
@@ -200,8 +319,8 @@ export default function OnboardingPage() {
               Starts Here.
             </h1>
             <p className="text-xl text-white/80 max-w-md">
-              Join Swrk and connect with top employers and talent seamlessly
-              through a profile that truly represents you.
+              Join Swrk and connect with hiring teams and people open to work
+              seamlessly through a profile that truly represents you.
             </p>
           </div>
           <div className="flex items-center gap-8">
@@ -272,7 +391,7 @@ export default function OnboardingPage() {
                   accept="image/*"
                   onChange={(e) => {
                     const file = e.target.files?.[0]
-                    if (file) handleAvatarUpload(file)
+                    if (file) handleAvatarFileSelection(file)
                   }}
                 />
                 <p
@@ -358,18 +477,18 @@ export default function OnboardingPage() {
                 {[
                   {
                     id: "employee",
-                    label: "I'm looking for a job",
-                    desc: "Find companies and apply to roles",
+                    label: "Open to work",
+                    desc: "Discover opportunities and apply to roles",
                   },
                   {
                     id: "employer",
-                    label: "I'm hiring",
-                    desc: "Post jobs and find top talent",
+                    label: "Hiring",
+                    desc: "Post openings and find top talent",
                   },
                   {
                     id: "both",
                     label: "Both",
-                    desc: "Open to opportunities and also hiring",
+                    desc: "Open to work and hiring",
                   },
                 ].map((r) => (
                   <div key={r.id}>
@@ -477,6 +596,64 @@ export default function OnboardingPage() {
                   )}
                   {!loading && <Check className="h-5 w-5" />}
                 </Button>
+              </div>
+            </div>
+          )}
+
+          {cropOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+              <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-background shadow-2xl">
+                <div className="border-b border-border px-5 py-4">
+                  <h3 className="text-lg font-semibold tracking-tight">
+                    Crop profile picture
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Drag to reposition and zoom to frame your avatar.
+                  </p>
+                </div>
+
+                <div className="relative h-[420px] w-full bg-black">
+                  {cropImage && (
+                    <Cropper
+                      image={cropImage}
+                      crop={crop}
+                      zoom={zoom}
+                      aspect={1}
+                      cropShape="round"
+                      showGrid={false}
+                      onCropChange={setCrop}
+                      onZoomChange={setZoom}
+                      onCropComplete={onCropComplete}
+                    />
+                  )}
+                </div>
+
+                <div className="space-y-4 border-t border-border px-5 py-4">
+                  <div className="space-y-2">
+                    <Label>Zoom</Label>
+                    <Input
+                      type="range"
+                      min="1"
+                      max="3"
+                      step="0.01"
+                      value={zoom}
+                      onChange={(e) => setZoom(Number(e.target.value))}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-3">
+                    <Button variant="outline" onClick={handleCropCancel}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleCropSave} disabled={loading}>
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        "Save crop"
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

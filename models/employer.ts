@@ -1,53 +1,75 @@
 import mongoose from "mongoose"
 
-const JobOpeningSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  description: { type: String, maxlength: 2000 },
-  department: String,
-  location: String,
-  locationType: { type: String, enum: ["remote", "onsite", "hybrid"] },
-  employmentType: {
-    type: String,
-    enum: ["full-time", "part-time", "freelance", "contract", "internship"],
-  },
+const JobOpeningSchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true },
+    description: { type: String, maxlength: 2000 },
+    department: String,
+    location: String,
+    locationType: { type: String, enum: ["remote", "onsite", "hybrid"] },
+    employmentType: {
+      type: String,
+      enum: ["full-time", "part-time", "freelance", "contract", "internship"],
+    },
 
-  // Compensation
-  ctcMin: Number,
-  ctcMax: Number,
-  currency: { type: String, default: "INR" },
-  ctcPeriod: { type: String, enum: ["annual", "monthly"], default: "annual" },
-  equityOffered: { type: Boolean, default: false },
-  equityPercent: String, // "0.1% - 0.5%"
+    // Compensation
+    ctcMin: Number,
+    ctcMax: Number,
+    currency: { type: String, default: "INR" },
+    ctcPeriod: { type: String, enum: ["annual", "monthly"], default: "annual" },
+    equityOffered: { type: Boolean, default: false },
+    equityPercent: String, // "0.1% - 0.5%"
 
-  // Requirements
-  requiredSkills: [String],
-  preferredSkills: [String],
-  experienceMin: Number, // years
-  experienceMax: Number,
-  experienceLevel: {
-    type: String,
-    enum: ["fresher", "junior", "mid", "senior", "lead", "principal", "executive"],
-  },
-  qualification: {
-    type: String,
-    enum: ["any", "high-school", "diploma", "bachelors", "masters", "phd"],
-    default: "any",
-  },
+    // Requirements
+    requiredSkills: [String],
+    preferredSkills: [String],
+    experienceMin: Number, // years
+    experienceMax: Number,
+    experienceLevel: {
+      type: String,
+      enum: [
+        "fresher",
+        "junior",
+        "mid",
+        "senior",
+        "lead",
+        "principal",
+        "executive",
+      ],
+    },
+    qualification: {
+      type: String,
+      enum: ["any", "high-school", "diploma", "bachelors", "masters", "phd"],
+      default: "any",
+    },
 
-  // Perks
-  perks: [{
-    type: String,
-    enum: [
-      "health-insurance", "esop", "flexible-hours", "wfh",
-      "paid-leaves", "learning-budget", "gym", "food",
-      "cab", "bonus", "pension", "childcare"
+    // Perks
+    perks: [
+      {
+        type: String,
+        enum: [
+          "health-insurance",
+          "esop",
+          "flexible-hours",
+          "wfh",
+          "paid-leaves",
+          "learning-budget",
+          "gym",
+          "food",
+          "cab",
+          "bonus",
+          "pension",
+          "childcare",
+        ],
+      },
     ],
-  }],
 
-  isActive: { type: Boolean, default: true },
-  openedAt: { type: Date, default: Date.now },
-  closingAt: Date,
-}, { _id: true, timestamps: true })
+    isActive: { type: Boolean, default: true },
+    openedAt: { type: Date, default: Date.now },
+    closingAt: Date,
+  },
+  { _id: true, timestamps: true },
+)
 
 const EmployerProfileSchema = new mongoose.Schema(
   {
@@ -63,7 +85,7 @@ const EmployerProfileSchema = new mongoose.Schema(
     recruiterBio: { type: String, maxlength: 300 },
 
     companyName: { type: String, required: true },
-    companyLogo: String,       // URL
+    companyLogo: String, // URL
     companyWebsite: String,
     companyLinkedin: String,
     companyDescription: { type: String, maxlength: 1000 },
@@ -72,7 +94,16 @@ const EmployerProfileSchema = new mongoose.Schema(
     industry: [String], // ["Fintech", "SaaS"]
     companyType: {
       type: String,
-      enum: ["startup", "mid-size", "enterprise", "mnc", "product", "service", "ngo", "government"],
+      enum: [
+        "startup",
+        "mid-size",
+        "enterprise",
+        "mnc",
+        "product",
+        "service",
+        "ngo",
+        "government",
+      ],
     },
     companySize: {
       type: String,
@@ -84,20 +115,40 @@ const EmployerProfileSchema = new mongoose.Schema(
 
     fundingStage: {
       type: String,
-      enum: ["bootstrapped", "pre-seed", "seed", "series-a", "series-b", "series-c+", "public", "na"],
+      enum: [
+        "bootstrapped",
+        "pre-seed",
+        "seed",
+        "series-a",
+        "series-b",
+        "series-c+",
+        "public",
+        "na",
+      ],
       default: "na",
     },
     totalFunding: String, // "$5M", "₹20Cr"
 
-    culture: [String],   // ["fast-paced", "collaborative", "data-driven"]
-    perks: [{
-      type: String,
-      enum: [
-        "health-insurance", "esop", "flexible-hours", "wfh",
-        "paid-leaves", "learning-budget", "gym", "food",
-        "cab", "bonus", "pension", "childcare"
-      ],
-    }],
+    culture: [String], // ["fast-paced", "collaborative", "data-driven"]
+    perks: [
+      {
+        type: String,
+        enum: [
+          "health-insurance",
+          "esop",
+          "flexible-hours",
+          "wfh",
+          "paid-leaves",
+          "learning-budget",
+          "gym",
+          "food",
+          "cab",
+          "bonus",
+          "pension",
+          "childcare",
+        ],
+      },
+    ],
     workStyle: {
       type: String,
       enum: ["remote-first", "hybrid", "onsite-only", "flexible"],
@@ -108,12 +159,22 @@ const EmployerProfileSchema = new mongoose.Schema(
     activeOpenings: [JobOpeningSchema],
 
     filters: {
-      roles: [String],               // looking for these job titles
-      skills: [String],              // must-have skills
-      experienceLevels: [{
-        type: String,
-        enum: ["fresher", "junior", "mid", "senior", "lead", "principal", "executive"],
-      }],
+      roles: [String], // looking for these job titles
+      skills: [String], // must-have skills
+      experienceLevels: [
+        {
+          type: String,
+          enum: [
+            "fresher",
+            "junior",
+            "mid",
+            "senior",
+            "lead",
+            "principal",
+            "executive",
+          ],
+        },
+      ],
       experienceMin: Number,
       experienceMax: Number,
       qualification: {
@@ -122,21 +183,33 @@ const EmployerProfileSchema = new mongoose.Schema(
         default: "any",
       },
       locations: [String],
-      workPreference: [{
-        type: String,
-        enum: ["remote", "onsite", "hybrid", "any"],
-      }],
+      workPreference: [
+        {
+          type: String,
+          enum: ["remote", "onsite", "hybrid", "any"],
+        },
+      ],
       ctcBudgetMin: Number,
       ctcBudgetMax: Number,
       currency: { type: String, default: "INR" },
-      employmentTypes: [{
-        type: String,
-        enum: ["full-time", "part-time", "freelance", "contract", "internship"],
-      }],
-      candidateStatus: [{
-        type: String,
-        enum: ["actively-looking", "open-to-offers", "not-looking"],
-      }],
+      employmentTypes: [
+        {
+          type: String,
+          enum: [
+            "full-time",
+            "part-time",
+            "freelance",
+            "contract",
+            "internship",
+          ],
+        },
+      ],
+      candidateStatus: [
+        {
+          type: String,
+          enum: ["actively-looking", "open-to-offers", "not-looking"],
+        },
+      ],
     },
 
     isVerifiedCompany: { type: Boolean, default: false }, // blue tick
@@ -152,10 +225,9 @@ const EmployerProfileSchema = new mongoose.Schema(
       averageResponseTime: Number, // in minutes
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 )
 
-EmployerProfileSchema.index({ user: 1 })
 EmployerProfileSchema.index({ isVisible: 1, isVerifiedCompany: 1 })
 EmployerProfileSchema.index({ companyType: 1 })
 EmployerProfileSchema.index({ "filters.roles": 1 })

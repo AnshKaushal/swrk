@@ -103,29 +103,42 @@ export async function PUT(req: NextRequest) {
       userData.activeRole || data.activeRole || user.activeRole,
     )
 
-    const userUpdateData = {
-      name: userData.name,
-      phone: userData.phone,
-      address: userData.address,
-      gender: userData.gender,
-      linkedinUrl: userData.linkedinUrl,
-      githubUrl: userData.githubUrl,
-      portfolioUrl: userData.portfolioUrl,
-      professionalLinks: userData.professionalLinks || [],
-      privacy: userData.visibility || user.privacy,
-      activeRole: resolvedActiveRole,
+    const userUpdateData: Record<string, unknown> = {}
+
+    if (userData.name !== undefined) userUpdateData.name = userData.name
+    if (userData.phone !== undefined) userUpdateData.phone = userData.phone
+    if (userData.address !== undefined)
+      userUpdateData.address = userData.address
+    if (userData.gender !== undefined) userUpdateData.gender = userData.gender
+    if (userData.avatar !== undefined) userUpdateData.avatar = userData.avatar
+    if (userData.banner !== undefined) userUpdateData.banner = userData.banner
+    if (userData.linkedinUrl !== undefined)
+      userUpdateData.linkedinUrl = userData.linkedinUrl
+    if (userData.githubUrl !== undefined)
+      userUpdateData.githubUrl = userData.githubUrl
+    if (userData.portfolioUrl !== undefined)
+      userUpdateData.portfolioUrl = userData.portfolioUrl
+    if (userData.professionalLinks !== undefined)
+      userUpdateData.professionalLinks = userData.professionalLinks
+    if (resolvedActiveRole !== undefined)
+      userUpdateData.activeRole = resolvedActiveRole
+
+    if (userData.visibility) {
+      const currentPrivacy = user.privacy?.toObject
+        ? user.privacy.toObject()
+        : user.privacy || {}
+      userUpdateData.privacy = {
+        ...currentPrivacy,
+        ...userData.visibility,
+      }
     }
 
     await User.updateOne({ _id: user._id }, { $set: userUpdateData })
 
     if (normalizedRole === "employee" || normalizedRole === "both") {
-      let employeeProfile = await EmployeeProfile.findOne({ user: user._id })
-
-      if (!employeeProfile) {
-        employeeProfile = new EmployeeProfile({
-          user: user._id,
-        })
-      }
+      const existingEmployeeProfile = await EmployeeProfile.findOne({
+        user: user._id,
+      })
 
       const profileUpdateData = {
         headline: employeeData.headline,
@@ -150,32 +163,39 @@ export async function PUT(req: NextRequest) {
         employmentType: employeeData.employmentType || [],
         totalExperienceYears: employeeData.totalExperienceYears,
         experienceLevel: employeeData.experienceLevel,
-        workHistory: employeeData.workHistory || employeeProfile.workHistory,
-        education: employeeData.education || employeeProfile.education,
+        workHistory:
+          employeeData.workHistory || existingEmployeeProfile?.workHistory,
+        education: employeeData.education || existingEmployeeProfile?.education,
         highestQualification: employeeData.highestQualification,
         certifications:
-          employeeData.certifications || employeeProfile.certifications,
-        projects: employeeData.projects || employeeProfile.projects,
-        socialLinks: employeeData.socialLinks || employeeProfile.socialLinks,
+          employeeData.certifications ||
+          existingEmployeeProfile?.certifications,
+        projects: employeeData.projects || existingEmployeeProfile?.projects,
+        socialLinks:
+          employeeData.socialLinks || existingEmployeeProfile?.socialLinks,
         companyRatingMin: employeeData.companyRatingMin,
         avoidCompanies: employeeData.avoidCompanies || [],
         preferredBenefits: employeeData.preferredBenefits || [],
       }
 
-      await EmployeeProfile.updateOne(
-        { _id: employeeProfile._id },
-        { $set: profileUpdateData },
+      await EmployeeProfile.findOneAndUpdate(
+        { user: user._id },
+        {
+          $set: profileUpdateData,
+          $setOnInsert: { user: user._id },
+        },
+        {
+          upsert: true,
+          new: true,
+          runValidators: true,
+        },
       )
     }
 
     if (normalizedRole === "employer" || normalizedRole === "both") {
-      let employerProfile = await EmployerProfile.findOne({ user: user._id })
-
-      if (!employerProfile) {
-        employerProfile = new EmployerProfile({
-          user: user._id,
-        })
-      }
+      const existingEmployerProfile = await EmployerProfile.findOne({
+        user: user._id,
+      })
 
       const employerUpdateData = {
         recruiterName: employerData.recruiterName,
@@ -200,12 +220,20 @@ export async function PUT(req: NextRequest) {
         workStyle: employerData.workStyle,
         glassdoorRating: employerData.glassdoorRating,
         glassdoorUrl: employerData.glassdoorUrl,
-        filters: employerData.filters || employerProfile.filters,
+        filters: employerData.filters || existingEmployerProfile?.filters,
       }
 
-      await EmployerProfile.updateOne(
-        { _id: employerProfile._id },
-        { $set: employerUpdateData },
+      await EmployerProfile.findOneAndUpdate(
+        { user: user._id },
+        {
+          $set: employerUpdateData,
+          $setOnInsert: { user: user._id },
+        },
+        {
+          upsert: true,
+          new: true,
+          runValidators: true,
+        },
       )
     }
 

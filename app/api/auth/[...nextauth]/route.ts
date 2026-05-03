@@ -73,6 +73,7 @@ const authOptions = {
             onboardingStep: user.onboardingStep,
             onboardingCompleted: user.onboardingCompleted,
             isAdmin: user.isAdmin,
+            isVerified: user.isVerified,
           }
         } catch (error: any) {
           console.error("Credentials authorize error:", error)
@@ -130,6 +131,7 @@ const authOptions = {
             onboardingStep: user.onboardingStep,
             onboardingCompleted: user.onboardingCompleted,
             isAdmin: user.isAdmin,
+            isVerified: user.isVerified,
           }
         } catch (error: any) {
           console.error("OTP authorize error:", error)
@@ -185,6 +187,7 @@ const authOptions = {
           user.onboardingStep = existingUser.onboardingStep
           user.onboardingCompleted = existingUser.onboardingCompleted
           user.isAdmin = existingUser.isAdmin
+          user.isVerified = existingUser.isVerified
         } else if (credentials) {
           const loggedInUser = await User.findByIdAndUpdate(
             user.id,
@@ -195,6 +198,7 @@ const authOptions = {
             console.error("User not found in database:", user.id)
             return false
           }
+          user.isVerified = loggedInUser.isVerified
         }
 
         return true
@@ -222,6 +226,7 @@ const authOptions = {
         token.onboardingStep = user.onboardingStep
         token.onboardingCompleted = user.onboardingCompleted
         token.isAdmin = user.isAdmin
+        token.isVerified = user.isVerified
         token.picture = user.image || user.avatar || token.picture
       }
 
@@ -235,6 +240,8 @@ const authOptions = {
         if (session.username !== undefined) token.username = session.username
         if (session.image !== undefined) token.picture = session.image
         if (session.avatar !== undefined) token.picture = session.avatar
+        if (session.isVerified !== undefined)
+          token.isVerified = session.isVerified
       }
 
       return token
@@ -247,6 +254,7 @@ const authOptions = {
       session.user.onboardingStep = token.onboardingStep
       session.user.onboardingCompleted = token.onboardingCompleted
       session.user.isAdmin = token.isAdmin
+      session.user.isVerified = token.isVerified
       session.user.avatar = token.picture || null
       return session
     },
