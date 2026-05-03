@@ -452,7 +452,7 @@ export default function SubscriptionPage() {
                           /{plan.interval === "month" ? "mo" : "yr"}
                         </span>
                         {plan.interval === "year" && (
-                          <span className="ml-2 text-xs font-semibold text-green-600">
+                          <span className="text-xs font-semibold text-green-600">
                             15% off
                           </span>
                         )}
@@ -561,7 +561,7 @@ export default function SubscriptionPage() {
                           size="sm"
                         >
                           {subscribing === plan._id ? (
-                            <Loader2 className="h-3 sm:h-4 w-3 sm:w-4 animate-spin mr-2" />
+                            <Loader2 className="h-3 sm:h-4 w-3 sm:w-4 animate-spin" />
                           ) : null}
                           <span className="hidden sm:inline">
                             {`Subscribe to ${plan.displayName}`}
@@ -844,7 +844,7 @@ export default function SubscriptionPage() {
               size="sm"
             >
               {subscribing ? (
-                <Loader2 className="h-3 sm:h-4 w-3 sm:w-4 animate-spin mr-2" />
+                <Loader2 className="h-3 sm:h-4 w-3 sm:w-4 animate-spin" />
               ) : null}
               Confirm Switch
             </Button>

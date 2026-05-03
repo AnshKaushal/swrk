@@ -233,7 +233,7 @@ export default function AccountSettingsPage() {
             <Button type="submit" disabled={emailChangeSaving}>
               {emailChangeSaving ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Sending...
                 </>
               ) : (
@@ -337,7 +337,7 @@ export default function AccountSettingsPage() {
           >
             {passwordSaving ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
                 Updating...
               </>
             ) : (
@@ -389,7 +389,7 @@ export default function AccountSettingsPage() {
                   >
                     {deleteRequestSaving ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                         Sending...
                       </>
                     ) : (
@@ -419,7 +419,7 @@ export default function AccountSettingsPage() {
                   >
                     {deleteConfirmSaving ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 animate-spin" />
                         Deleting...
                       </>
                     ) : (

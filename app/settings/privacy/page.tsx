@@ -183,7 +183,7 @@ export default function PrivacySettingsPage() {
       <div className="sticky bottom-0 z-10 mt-auto border-t border-border bg-background px-4 py-5 sm:px-6 lg:px-8">
         <div className="flex justify-start">
           <Button onClick={handleSave} disabled={saving}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             Save Changes
           </Button>
         </div>

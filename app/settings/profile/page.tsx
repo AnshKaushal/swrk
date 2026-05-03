@@ -931,7 +931,7 @@ export default function ProfileSettingsPage() {
                   onClick={addProfessionalLink}
                   disabled={formData.professionalLinks.length >= 5}
                 >
-                  <Plus className="mr-2 h-4 w-4" />
+                  <Plus className="h-4 w-4" />
                   Add Link
                 </Button>
               </div>
@@ -1159,7 +1159,7 @@ export default function ProfileSettingsPage() {
               onClick={addEducationItem}
               className="w-full"
             >
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="h-4 w-4" />
               Add Education
             </Button>
           </div>
@@ -1214,7 +1214,7 @@ export default function ProfileSettingsPage() {
 
         <div className="px-4 py-5 sm:px-6 lg:px-8">
           <Button type="submit" disabled={saving}>
-            {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
             Save Changes
           </Button>
         </div>
@@ -1328,7 +1328,7 @@ export default function ProfileSettingsPage() {
                 disabled={profileAssetUploading}
               >
                 {profileAssetUploading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                 ) : null}
                 {profileAssetUploading ? "Uploading..." : "Save crop"}
               </Button>

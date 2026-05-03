@@ -60,7 +60,9 @@ export default function SubscriptionSettingsPage() {
       })
 
       if (response.ok) {
-        toast.success("Subscription will be canceled at the end of the billing period")
+        toast.success(
+          "Subscription will be canceled at the end of the billing period",
+        )
         fetchSubscription()
       } else {
         const error = await response.json()
@@ -127,7 +129,13 @@ export default function SubscriptionSettingsPage() {
                       {subscription.plan.displayName}
                     </h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      <Badge variant={subscription.status === "active" ? "default" : "secondary"}>
+                      <Badge
+                        variant={
+                          subscription.status === "active"
+                            ? "default"
+                            : "secondary"
+                        }
+                      >
                         {subscription.status}
                       </Badge>
                     </p>
@@ -142,7 +150,9 @@ export default function SubscriptionSettingsPage() {
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Next billing:{" "}
-                    {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                    {new Date(
+                      subscription.currentPeriodEnd,
+                    ).toLocaleDateString()}
                   </p>
                 </div>
               </div>
@@ -180,7 +190,10 @@ export default function SubscriptionSettingsPage() {
               {subscription.credit > 0 && (
                 <div className="rounded-lg bg-green-50 dark:bg-green-950 p-3">
                   <p className="text-sm text-green-800 dark:text-green-200">
-                    Account credit: <span className="font-semibold">₹{subscription.credit}</span>
+                    Account credit:{" "}
+                    <span className="font-semibold">
+                      ₹{subscription.credit}
+                    </span>
                   </p>
                 </div>
               )}
@@ -188,7 +201,10 @@ export default function SubscriptionSettingsPage() {
               {subscription.balanceDue > 0 && (
                 <div className="rounded-lg bg-amber-50 dark:bg-amber-950 p-3">
                   <p className="text-sm text-amber-800 dark:text-amber-200">
-                    Amount due: <span className="font-semibold">₹{subscription.balanceDue}</span>
+                    Amount due:{" "}
+                    <span className="font-semibold">
+                      ₹{subscription.balanceDue}
+                    </span>
                   </p>
                 </div>
               )}
@@ -196,7 +212,7 @@ export default function SubscriptionSettingsPage() {
               <div className="flex gap-2 pt-2">
                 {subscription.cancelAtPeriodEnd ? (
                   <Button onClick={handleReactivate} disabled={saving}>
-                    {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                     Reactivate Subscription
                   </Button>
                 ) : (
@@ -205,7 +221,7 @@ export default function SubscriptionSettingsPage() {
                     variant="outline"
                     disabled={saving}
                   >
-                    {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                     Cancel Subscription
                   </Button>
                 )}
@@ -226,7 +242,9 @@ export default function SubscriptionSettingsPage() {
           </div>
           <div className="md:col-span-2 text-center py-8">
             <Crown className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-base font-semibold mb-2">No Active Subscription</h3>
+            <h3 className="text-base font-semibold mb-2">
+              No Active Subscription
+            </h3>
             <p className="text-sm text-muted-foreground mb-6">
               Upgrade to premium to unlock all features and benefits.
             </p>

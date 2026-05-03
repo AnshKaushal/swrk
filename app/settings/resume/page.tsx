@@ -215,12 +215,12 @@ export default function ResumeSettingsPage() {
                 >
                   {uploading ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
                       Uploading...
                     </>
                   ) : (
                     <>
-                      <Plus className="mr-2 h-4 w-4" />
+                      <Plus className="h-4 w-4" />
                       Add Resume
                     </>
                   )}
@@ -356,7 +356,7 @@ export default function ResumeSettingsPage() {
             onClick={handleSave}
             disabled={saving || resumes.length === 0}
           >
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
             Save Changes
           </Button>
         </div>

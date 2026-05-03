@@ -54,7 +54,6 @@ export default function OnboardingPage() {
   const [usernameError, setUsernameError] = useState<string | null>(null)
   const [checkingUsername, setCheckingUsername] = useState(false)
 
-  // Hydrate session data
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
       const timeout = window.setTimeout(() => {
@@ -224,7 +223,6 @@ export default function OnboardingPage() {
         </div>
       </div>
 
-      {/* Right Form Area */}
       <div className="flex w-full lg:w-1/2 items-center justify-center p-8 bg-background">
         <div className="w-full max-w-md space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="space-y-2">
@@ -250,7 +248,6 @@ export default function OnboardingPage() {
             ))}
           </div>
 
-          {/* STEP 1 */}
           {step === 1 && (
             <div className="space-y-6">
               <div className="flex flex-col items-center justify-center space-y-4">
@@ -346,12 +343,11 @@ export default function OnboardingPage() {
                 ) : (
                   "Continue to Next Step"
                 )}
-                {!loading && <ArrowRight className="ml-2 h-4 w-4" />}
+                {!loading && <ArrowRight className="h-4 w-4" />}
               </Button>
             </div>
           )}
 
-          {/* STEP 2 */}
           {step === 2 && (
             <div className="space-y-6">
               <RadioGroup
@@ -414,13 +410,12 @@ export default function OnboardingPage() {
                   ) : (
                     "Continue to Final Step"
                   )}
-                  {!loading && <ArrowRight className="ml-2 h-4 w-4" />}
+                  {!loading && <ArrowRight className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
           )}
 
-          {/* STEP 3 */}
           {step === 3 && (
             <div className="space-y-6">
               <div className="space-y-4">
@@ -480,7 +475,7 @@ export default function OnboardingPage() {
                   ) : (
                     "Complete Profile"
                   )}
-                  {!loading && <Check className="ml-2 h-5 w-5" />}
+                  {!loading && <Check className="h-5 w-5" />}
                 </Button>
               </div>
             </div>

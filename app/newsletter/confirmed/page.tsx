@@ -61,7 +61,7 @@ export default function ConfirmedPage() {
             <Link href="/">
               <Button className="w-full group">
                 Back to Home
-                <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
           </motion.div>

@@ -120,7 +120,6 @@ export default function Pricing() {
       </div>
 
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2 lg:grid-cols-8">
-        {/* PRO CARD */}
         <div
           className={cn(
             "bg-background border-foreground/10 relative w-full overflow-hidden rounded-2xl border",
@@ -179,7 +178,6 @@ export default function Pricing() {
           </div>
         </div>
 
-        {/* BASIC */}
         <PricingCard
           titleBadge="BASIC"
           priceLabel={`₹${getPrice(499)}`}
@@ -196,7 +194,6 @@ export default function Pricing() {
           className="lg:col-span-3"
         />
 
-        {/* ENTERPRISE */}
         <PricingCard
           titleBadge="ENTERPRISE"
           priceLabel={`₹${getPrice(1999)}`}
