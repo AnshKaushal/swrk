@@ -20,9 +20,10 @@ import {
   Calendar,
   CheckCircle2,
   TrendingUp,
+  Users,
+  Star,
+  Eye,
   Zap,
-  Settings,
-  Bell,
 } from "lucide-react"
 
 interface MatchData {
@@ -39,20 +40,15 @@ interface StatsData {
   recentMatches: MatchData[]
 }
 
-const chartData = [
-  { day: "MON", value: 40 },
-  { day: "TUE", value: 65 },
-  { day: "WED", value: 50 },
-  { day: "THU", value: 90 },
-  { day: "FRI", value: 75 },
-  { day: "SAT", value: 30 },
-  { day: "SUN", value: 20 },
-]
+type ActivityPoint = { day: string; value: number }
 
 export function RecruiterDashboard({ name }: { name: string }) {
   const router = useRouter()
   const [stats, setStats] = useState<StatsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [chartData, setChartData] = useState<ActivityPoint[]>([])
+  const [activityLoading, setActivityLoading] = useState(false)
+  const [range, setRange] = useState<number>(7)
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -72,34 +68,66 @@ export function RecruiterDashboard({ name }: { name: string }) {
     fetchStats()
   }, [])
 
+  useEffect(() => {
+    let mounted = true
+    const fetchActivity = async () => {
+      setActivityLoading(true)
+      try {
+        const res = await fetch(
+          `/api/swipe/activity?range=${range}&type=received`,
+        )
+        if (!res.ok) return
+        const json = await res.json()
+        if (!mounted) return
+        const mapped: ActivityPoint[] = json.data.map((p: any) => {
+          const d = new Date(p.day)
+          const label = d
+            .toLocaleDateString(undefined, { weekday: "short" })
+            .toUpperCase()
+          return { day: label, value: p.value }
+        })
+        setChartData(mapped)
+      } catch (err) {
+        console.error("Failed to fetch activity:", err)
+      } finally {
+        setActivityLoading(false)
+      }
+    }
+
+    fetchActivity()
+    return () => {
+      mounted = false
+    }
+  }, [range])
+
   const metrics = [
     {
-      label: "Total Matches",
-      value: stats?.matchesCount || 0,
-      trend: "+12%",
-      icon: Briefcase,
-      color: "bg-primary/10 text-primary",
-    },
-    {
-      label: "Active Conversations",
-      value: Math.floor((stats?.matchesCount || 0) * 0.3),
-      trend: "+5%",
-      icon: MessageCircle,
+      label: "Candidates Reviewed",
+      value: stats?.likesGiven || 0,
+      trend: "+14%",
+      icon: Users,
       color: "bg-blue-100 text-blue-700",
     },
     {
-      label: "Interviews",
-      value: Math.floor((stats?.matchesCount || 0) * 0.15),
-      trend: "Busy",
-      icon: Calendar,
+      label: "Applications",
+      value: stats?.likesReceived || 0,
+      trend: "+8%",
+      icon: Briefcase,
       color: "bg-purple-100 text-purple-700",
     },
     {
-      label: "Hired",
-      value: Math.floor((stats?.matchesCount || 0) * 0.08),
-      trend: "Goal",
+      label: "Active Matches",
+      value: stats?.matchesCount || 0,
+      trend: "+5%",
       icon: CheckCircle2,
       color: "bg-green-100 text-green-700",
+    },
+    {
+      label: "Profile Views",
+      value: Math.floor((stats?.likesReceived || 0) * 3.2),
+      trend: "+22%",
+      icon: Eye,
+      color: "bg-orange-100 text-orange-700",
     },
   ]
 
@@ -108,10 +136,10 @@ export function RecruiterDashboard({ name }: { name: string }) {
       <main className="max-w-[1600px]">
         <section className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-            Recruiter Overview
+            Welcome back, {name}
           </h1>
           <p className="text-muted-foreground mt-2">
-            Welcome back, {name}. Here&apos;s your velocity for today.
+            Here&apos;s your hiring overview for today.
           </p>
         </section>
 
@@ -154,10 +182,14 @@ export function RecruiterDashboard({ name }: { name: string }) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <Card className="lg:col-span-2 border border-border/50">
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle>Matching Activity</CardTitle>
-              <select className="text-sm border border-border rounded-md bg-background px-3 py-1">
-                <option>Last 7 Days</option>
-                <option>Last 30 Days</option>
+              <CardTitle>Application Activity</CardTitle>
+              <select
+                value={range}
+                onChange={(e) => setRange(parseInt(e.target.value, 10))}
+                className="text-sm border border-border rounded-md bg-background px-3 py-1"
+              >
+                <option value={7}>Last 7 Days</option>
+                <option value={30}>Last 30 Days</option>
               </select>
             </CardHeader>
             <CardContent>

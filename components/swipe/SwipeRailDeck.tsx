@@ -670,8 +670,8 @@ export default function SwipeRailDeck() {
                     <Heart className="h-4 w-4 fill-white" />
                   </span>
                 ) : null}
-                <Sparkles className="mr-2 h-4 w-4" />
-                Super Like
+                <Sparkles className="h-4 w-4" />
+                Super Like ({superQuota?.remaining ?? 0} / {superQuota?.limit ?? 0})
               </Button>
               <Button
                 type="button"
@@ -688,7 +688,7 @@ export default function SwipeRailDeck() {
                     <Heart className="h-4 w-4 fill-white" />
                   </span>
                 ) : null}
-                <Heart className="mr-2 h-4 w-4 fill-white transition-transform group-hover:scale-110" />
+                <Heart className="h-4 w-4 fill-white transition-transform group-hover:scale-110" />
                 Like
               </Button>
             </div>

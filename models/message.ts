@@ -22,10 +22,11 @@ const MessageSchema = new mongoose.Schema(
       type: String,
       enum: [
         "text",
-        "starter",    // pre-built starter phrase (first message templates)
-        "cv-share",   // system message: employee shared CV
-        "linkedin",   // system message: shared LinkedIn
-        "system",     // generic system messages (match created, etc.)
+        "starter", // pre-built starter phrase (first message templates)
+        "cv-share", // system message: employee shared CV
+        "linkedin", // system message: shared LinkedIn
+        "interview", // system message: interview scheduled
+        "system", // generic system messages (match created, etc.)
       ],
       default: "text",
     },
@@ -37,6 +38,12 @@ const MessageSchema = new mongoose.Schema(
     attachmentType: { type: String, enum: ["cv", "portfolio", "other"] },
     attachmentName: String,
 
+    // For interview messages
+    interviewId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Interview",
+    },
+
     // Read receipts
     isRead: { type: Boolean, default: false },
     readAt: Date,
@@ -45,10 +52,11 @@ const MessageSchema = new mongoose.Schema(
     isDeletedBySender: { type: Boolean, default: false },
     isDeletedByReceiver: { type: Boolean, default: false },
   },
-  { timestamps: true }
+  { timestamps: true },
 )
 
 MessageSchema.index({ match: 1, createdAt: 1 })
 MessageSchema.index({ sender: 1 })
 
-export default mongoose.models.Message || mongoose.model("Message", MessageSchema)
+export default mongoose.models.Message ||
+  mongoose.model("Message", MessageSchema)

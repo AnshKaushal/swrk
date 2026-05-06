@@ -37,6 +37,8 @@ import {
   CheckCheck,
 } from "lucide-react"
 import { toast } from "sonner"
+import { InterviewMessageComponent } from "@/components/interview-message"
+import { ScheduleInterviewModal } from "@/components/schedule-interview-modal"
 
 type Person = {
   _id: string
@@ -65,8 +67,9 @@ type MessageRecord = {
   match: string
   sender: Person
   senderRole: "employer" | "employee"
-  type: "text" | "starter" | "cv-share" | "linkedin" | "system"
+  type: "text" | "starter" | "cv-share" | "linkedin" | "interview" | "system"
   content?: string
+  interviewId?: string
   createdAt: string
   isRead?: boolean
 }
@@ -673,9 +676,17 @@ function MessagesPageContent() {
                     <Button variant="ghost" size="icon" type="button">
                       <Phone className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" type="button">
-                      <Video className="h-4 w-4" />
-                    </Button>
+                    {currentUserId === activeMatch?.employer._id && (
+                      <ScheduleInterviewModal
+                        matchId={activeMatchId}
+                        employeeName={otherParticipant.name || "Candidate"}
+                        onInterviewScheduled={() => {
+                          if (activeMatchId) {
+                            void fetchConversation(activeMatchId)
+                          }
+                        }}
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -711,6 +722,46 @@ function MessagesPageContent() {
                             <div key={entry.id} className="flex justify-center">
                               <div className="rounded-full border border-border bg-muted/70 px-4 py-2 text-sm text-muted-foreground">
                                 {message.content || "Match update"}
+                              </div>
+                            </div>
+                          )
+                        }
+
+                        if (
+                          message.type === "interview" &&
+                          message.interviewId
+                        ) {
+                          return (
+                            <div
+                              key={entry.id}
+                              className="flex max-w-full justify-center mb-4"
+                            >
+                              <div className="w-full max-w-2xl">
+                                <InterviewMessageComponent
+                                  interview={{
+                                    _id: message.interviewId,
+                                    title: message.content || "Interview",
+                                    description: "",
+                                    scheduledFor: new Date().toISOString(),
+                                    timezone: "UTC",
+                                    duration: 60,
+                                    status: "scheduled",
+                                    interviewLink: "",
+                                    createdBy: message.sender._id,
+                                    employer: {
+                                      _id: activeMatch?.employer._id || "",
+                                      name: activeMatch?.employer.name || "",
+                                      companyName:
+                                        activeMatch?.employer.username,
+                                    },
+                                    employee: {
+                                      _id: activeMatch?.employee._id || "",
+                                      name: activeMatch?.employee.name || "",
+                                      headline: activeMatch?.employee.username,
+                                    },
+                                  }}
+                                  currentUserId={currentUserId || ""}
+                                />
                               </div>
                             </div>
                           )

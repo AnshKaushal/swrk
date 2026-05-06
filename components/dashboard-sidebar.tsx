@@ -15,6 +15,7 @@ import {
   UserCircle,
   Zap,
   MessageSquare,
+  Calendar,
 } from "lucide-react"
 import { ModeToggle } from "@/components/theme-toggle"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -34,6 +35,7 @@ import React from "react"
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: IconDashboard },
   { name: "Messages", href: "/dashboard/messages", icon: MessageSquare },
+  { name: "Interviews", href: "/dashboard/interviews", icon: Calendar },
   { name: "Swipe", href: "/dashboard/swipe", icon: Zap },
   { name: "Profile", href: "/settings/profile", icon: User },
   { name: "Verification", href: "/settings/verification", icon: Shield },

@@ -1662,9 +1662,9 @@ export default function ProfileSettingsPage() {
               }}
             >
               {boostLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Rocket className="h-4 w-4 mr-2" />
+                <Rocket className="h-4 w-4" />
               )}
               Boost
             </Button>

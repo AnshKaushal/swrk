@@ -22,6 +22,7 @@ import {
   Zap,
   Building2,
   Calendar,
+  Briefcase,
 } from "lucide-react"
 
 interface MatchData {
@@ -98,6 +99,13 @@ export function CandidateDashboard({ name }: { name: string }) {
 
   const metrics = [
     {
+      label: "Applications Sent",
+      value: stats?.likesGiven || 0,
+      trend: "+16%",
+      icon: Briefcase,
+      color: "bg-blue-100 text-blue-700",
+    },
+    {
       label: "Likes Received",
       value: stats?.likesReceived || 0,
       trend: "+18%",
@@ -109,21 +117,14 @@ export function CandidateDashboard({ name }: { name: string }) {
       value: Math.floor((stats?.likesReceived || 0) * 2.5),
       trend: "+24%",
       icon: Eye,
-      color: "bg-blue-100 text-blue-700",
+      color: "bg-orange-100 text-orange-700",
     },
     {
-      label: "Matches",
+      label: "Active Matches",
       value: stats?.matchesCount || 0,
       trend: "+9%",
       icon: MessageCircle,
       color: "bg-green-100 text-green-700",
-    },
-    {
-      label: "Conversations",
-      value: Math.floor((stats?.matchesCount || 0) * 0.6),
-      trend: "Active",
-      icon: CheckCircle2,
-      color: "bg-purple-100 text-purple-700",
     },
   ]
 

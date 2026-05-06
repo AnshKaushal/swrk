@@ -94,6 +94,43 @@ const parseYear = (value?: string | null) => {
   return Number.isFinite(year) ? year : null
 }
 
+const isValidPhone = (v?: string) => {
+  if (!v) return false
+  return /^\+?[0-9\-()\s]{7,20}$/.test(v)
+}
+
+const isValidDateISO = (v?: string) => {
+  if (!v) return false
+  const d = new Date(v)
+  return !Number.isNaN(d.getTime())
+}
+
+const isValidYear = (v?: string) => {
+  if (!v) return false
+  const y = Number.parseInt(v, 10)
+  return Number.isFinite(y) && y > 1900 && y < 3000
+}
+
+const isPositiveNumberString = (v?: string) => {
+  if (!v) return false
+  const n = Number(v)
+  return Number.isFinite(n) && n >= 0
+}
+
+const isValidUrl = (v?: string) => {
+  if (!v) return false
+  try {
+    new URL(v)
+    return true
+  } catch {
+    return false
+  }
+}
+
+const getAvatarFallback = (fullName?: string) => {
+  return fullName ? fullName.charAt(0).toUpperCase() : "U"
+}
+
 export default function OnboardingPage() {
   const { data: session, status, update } = useSession()
   const router = useRouter()
@@ -102,7 +139,7 @@ export default function OnboardingPage() {
   const cropPreviewUrlRef = useRef<string | null>(null)
   const hasHydratedRef = useRef(false)
 
-  const TOTAL_STEPS = 6
+  const TOTAL_STEPS = 7
   const [step, setStep] = useState(1)
 
   const [name, setName] = useState("")
@@ -122,6 +159,9 @@ export default function OnboardingPage() {
       isCurrent: false,
       description: "",
     },
+  ])
+  const [projects, setProjects] = useState([
+    { title: "", description: "", link: "" },
   ])
   const [desiredRoles, setDesiredRoles] = useState<string[]>([])
   const [desiredIndustries, setDesiredIndustries] = useState<string[]>([])
@@ -367,69 +407,178 @@ export default function OnboardingPage() {
   }
   const onNextStep2 = () => {
     // Professional Profile: only headline and bio in this step
-    const profilePayload: Record<string, unknown> = {}
-    if (headline) profilePayload.employeeProfile = { headline }
-    if (bio) {
-      if (!profilePayload.employeeProfile) profilePayload.employeeProfile = {}
-      ;(profilePayload.employeeProfile as Record<string, unknown>).bio = bio
+    if (!headline && !bio) {
+      toast.error(
+        "Please provide a professional headline or a short bio to continue",
+      )
+      return
     }
+
+    const employeeProfile: Record<string, unknown> = {}
+    if (headline) employeeProfile.headline = headline.trim()
+    if (bio) employeeProfile.bio = bio.trim()
+
+    const profilePayload: Record<string, unknown> = { employeeProfile }
+
     return handleStepSubmit(3, {}, {}, profilePayload)
   }
 
   const onNextStep3 = () => {
     // Education step
-    const profilePayload: Record<string, unknown> = {}
-    const normalizedEducation = education
-      .filter((e) => e.school || e.degree)
-      .map((e) => ({
-        institution: e.school,
-        degree: e.degree,
-        field: e.field,
-        startYear: e.year,
-        endYear: e.endYear,
-      }))
-    if (normalizedEducation.length > 0) {
-      profilePayload.employeeProfile = { education: normalizedEducation }
+    const entries = education.filter((e) => e.school || e.degree)
+    if (entries.length === 0) {
+      toast.error("Please add at least one education entry or skip to continue")
+      return
+    }
+
+    const normalizedEducation = [] as Array<Record<string, unknown>>
+    for (const e of entries) {
+      const inst = e.school?.trim()
+      if (!inst) {
+        toast.error("Each education entry requires an institution name")
+        return
+      }
+      const startYear = e.year ? parseYear(e.year) : null
+      const endYear = e.endYear ? parseYear(e.endYear) : null
+      if (e.year && !isValidYear(e.year)) {
+        toast.error("Please provide a valid start year for education entries")
+        return
+      }
+      if (
+        e.endYear &&
+        !isValidYear(e.endYear) &&
+        e.endYear.toLowerCase() !== "present"
+      ) {
+        toast.error("Please provide a valid end year for education entries")
+        return
+      }
+      if (startYear && endYear && startYear > endYear) {
+        toast.error("Education start year cannot be after end year")
+        return
+      }
+
+      normalizedEducation.push({
+        institution: inst,
+        degree: e.degree?.trim() || undefined,
+        field: e.field?.trim() || undefined,
+        startYear: startYear ?? undefined,
+        endYear:
+          endYear ??
+          (e.endYear?.toLowerCase() === "present" ? "present" : undefined),
+      })
+    }
+
+    const profilePayload: Record<string, unknown> = {
+      employeeProfile: { education: normalizedEducation },
     }
     return handleStepSubmit(4, {}, {}, profilePayload)
   }
 
   const onNextStep4 = () => {
-    // Work experience step
-    const profilePayload: Record<string, unknown> = {}
-    const normalizedWorkHistory = workHistory
-      .filter((w) => w.company || w.position)
-      .map((w) => ({
-        company: w.company,
-        role: w.position,
-        startDate: (() => {
-          const startYear = parseYear(w.duration)
-          return startYear ? new Date(startYear, 0, 1).toISOString() : undefined
-        })(),
+    // Work experience step - optional
+    const entries = workHistory.filter((w) => w.company || w.position)
+
+    const normalizedWorkHistory: Array<Record<string, unknown>> = []
+    for (const w of entries) {
+      if (!w.company?.trim() || !w.position?.trim()) {
+        continue
+      }
+      const startYear = w.duration ? parseYear(w.duration) : null
+      const endYear =
+        w.endYear && w.endYear.toLowerCase() !== "present"
+          ? parseYear(w.endYear)
+          : null
+      if (w.duration && !isValidYear(w.duration)) {
+        toast.error("Please provide a valid start year for work entries")
+        return
+      }
+      if (
+        w.endYear &&
+        w.endYear.toLowerCase() !== "present" &&
+        !isValidYear(w.endYear)
+      ) {
+        toast.error("Please provide a valid end year for work entries")
+        return
+      }
+      if (startYear && endYear && startYear > endYear) {
+        toast.error("Work start year cannot be after end year")
+        return
+      }
+
+      normalizedWorkHistory.push({
+        company: w.company.trim(),
+        role: w.position.trim(),
+        startDate: startYear
+          ? new Date(startYear, 0, 1).toISOString()
+          : undefined,
         endDate:
-          !w.isCurrent && w.endYear && w.endYear.toLowerCase() !== "present"
-            ? (() => {
-                const endYear = parseYear(w.endYear)
-                return endYear
-                  ? new Date(endYear, 11, 31).toISOString()
-                  : undefined
-              })()
+          !w.isCurrent && endYear
+            ? new Date(endYear, 11, 31).toISOString()
             : undefined,
         isCurrent: Boolean(w.isCurrent),
-        description: w.description,
-      }))
+        description: w.description?.trim() || undefined,
+      })
+    }
+
+    const profilePayload: Record<string, unknown> = {}
     if (normalizedWorkHistory.length > 0) {
       profilePayload.employeeProfile = { workHistory: normalizedWorkHistory }
     }
     return handleStepSubmit(5, {}, {}, profilePayload)
   }
+
   const onNextStep5 = () => {
+    // Projects step - required for employees/both
+    const projectEntries = projects.filter(
+      (p) => p.title || p.description || p.link,
+    )
+    if (projectEntries.length === 0) {
+      toast.error("Please add at least one project to continue")
+      return
+    }
+
+    const normalizedProjects: Array<Record<string, unknown>> = []
+    for (const p of projectEntries) {
+      const title = p.title?.trim()
+      if (!title) {
+        toast.error("Each project requires a title")
+        return
+      }
+      if (p.link && !isValidUrl(p.link)) {
+        toast.error("Please provide a valid project URL")
+        return
+      }
+
+      normalizedProjects.push({
+        title,
+        description: p.description?.trim() || undefined,
+        link: p.link?.trim() || undefined,
+      })
+    }
+
+    const profilePayload: Record<string, unknown> = {
+      employeeProfile: { projects: normalizedProjects },
+    }
+    return handleStepSubmit(6, {}, {}, profilePayload)
+  }
+
+  const onNextStep6 = () => {
     const profilePayload: Record<string, unknown> = {}
     const filters: Record<string, unknown> = {}
     if (desiredRoles.length > 0) filters.desiredRoles = desiredRoles
     if (desiredIndustries.length > 0)
       filters.desiredIndustries = desiredIndustries
     if (preferredLocations) filters.preferredLocations = [preferredLocations]
+
+    if (expectedCTCMin && !isPositiveNumberString(expectedCTCMin)) {
+      toast.error("Please enter a valid minimum expected CTC")
+      return
+    }
+    if (expectedCTCMax && !isPositiveNumberString(expectedCTCMax)) {
+      toast.error("Please enter a valid maximum expected CTC")
+      return
+    }
+
     if (expectedCTCMin || expectedCTCMax) {
       filters.expectedCTC = {}
       if (expectedCTCMin)
@@ -438,26 +587,49 @@ export default function OnboardingPage() {
       if (expectedCTCMax)
         (filters.expectedCTC as Record<string, unknown>).max =
           parseInt(expectedCTCMax)
+      if (
+        filters.expectedCTC &&
+        (filters.expectedCTC as Record<string, number>).min !== undefined &&
+        (filters.expectedCTC as Record<string, number>).max !== undefined &&
+        (filters.expectedCTC as Record<string, number>).min >
+          (filters.expectedCTC as Record<string, number>).max
+      ) {
+        toast.error("Minimum expected CTC cannot be greater than maximum")
+        return
+      }
     }
+
     if (Object.keys(filters).length > 0) {
       profilePayload.employeeProfile = filters
     }
-    return handleStepSubmit(6, {}, {}, profilePayload)
+    return handleStepSubmit(7, {}, {}, profilePayload)
   }
-  const onNextStep6 = () =>
-    handleStepSubmit(
+
+  const onNextStep7 = () => {
+    if (!role) {
+      toast.error("Please select a role to continue")
+      return
+    }
+    if (
+      (role === "employee" || role === "both") &&
+      projects.filter((p) => p.title).length === 0
+    ) {
+      toast.error("Please add at least one project to apply for jobs")
+      return
+    }
+    if (phone && !isValidPhone(phone)) {
+      toast.error("Please provide a valid phone number (include country code)")
+      return
+    }
+    if (dateOfBirth && !isValidDateISO(dateOfBirth)) {
+      toast.error("Please provide a valid date of birth")
+      return
+    }
+
+    return handleStepSubmit(
       TOTAL_STEPS + 1,
       { role, phone, dateOfBirth, gender },
       { role, onboardingCompleted: true },
-    )
-
-  const getAvatarFallback = () => (name ? name.charAt(0).toUpperCase() : "U")
-
-  if (status === "loading" || !session) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
     )
   }
 
@@ -513,17 +685,21 @@ export default function OnboardingPage() {
               {step === 2 && "Professional Profile"}
               {step === 3 && "Education"}
               {step === 4 && "Work Experience"}
-              {step === 5 && "Your Preferences"}
-              {step === 6 && "Choose Your Role"}
+              {step === 5 && "Projects"}
+              {step === 6 && "Your Preferences"}
+              {step === 7 && "Choose Your Role"}
             </h2>
             <p className="text-muted-foreground">
               {step === 1 && "Let's start with the basics to identify you."}
               {step === 2 && "Tell us about your professional background."}
               {step === 3 &&
                 "Add your education history so teams know your background."}
-              {step === 4 && "Add your work experience to showcase your roles."}
-              {step === 5 && "Help us find the best matches for you."}
-              {step === 6 && "How will you be using Swrk?"}
+              {step === 4 &&
+                "Add your work experience (optional if you're a fresher)."}
+              {step === 5 &&
+                "Showcase your projects to stand out to employers."}
+              {step === 6 && "Help us find the best matches for you."}
+              {step === 7 && "How will you be using Swrk?"}
             </p>
           </div>
 
@@ -536,6 +712,10 @@ export default function OnboardingPage() {
             ))}
           </div>
 
+          <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Step {step} of {TOTAL_STEPS}
+          </div>
+
           {step === 1 && (
             <div className="space-y-6">
               <div className="flex flex-col items-center justify-center space-y-4">
@@ -546,7 +726,7 @@ export default function OnboardingPage() {
                   <Avatar className="h-28 w-28 border-4 shadow-xl">
                     <AvatarImage src={avatar} />
                     <AvatarFallback className="text-3xl">
-                      {getAvatarFallback()}
+                      {getAvatarFallback(name)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -799,7 +979,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {step === 6 && (
+          {step === 4 && (
             <div className="space-y-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -956,6 +1136,103 @@ export default function OnboardingPage() {
           {step === 5 && (
             <div className="space-y-6">
               <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold">Projects</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setProjects([
+                        ...projects,
+                        { title: "", description: "", link: "" },
+                      ])
+                    }
+                  >
+                    + Add
+                  </Button>
+                </div>
+                {projects.map((proj, idx) => (
+                  <div
+                    key={idx}
+                    className="space-y-3 rounded-lg border border-border p-4"
+                  >
+                    <div className="flex items-start justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          setProjects((prev) =>
+                            prev.filter((_, i) => i !== idx),
+                          )
+                        }
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                    <Input
+                      value={proj.title}
+                      onChange={(e) => {
+                        const updated = [...projects]
+                        updated[idx].title = e.target.value
+                        setProjects(updated)
+                      }}
+                      placeholder="Project title"
+                      className="h-10 bg-muted/50 border-none text-sm"
+                    />
+                    <textarea
+                      value={proj.description}
+                      onChange={(e) => {
+                        const updated = [...projects]
+                        updated[idx].description = e.target.value
+                        setProjects(updated)
+                      }}
+                      placeholder="What does this project do?"
+                      className="h-20 w-full rounded-lg bg-muted/50 border-none px-3 py-2 font-sans text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                    <Input
+                      value={proj.link}
+                      onChange={(e) => {
+                        const updated = [...projects]
+                        updated[idx].link = e.target.value
+                        setProjects(updated)
+                      }}
+                      placeholder="https://github.com/your-project"
+                      className="h-10 bg-muted/50 border-none text-sm"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setStep(4)}
+                  className="h-12 w-12 p-0 shrink-0"
+                  disabled={loading}
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <Button
+                  onClick={onNextStep5}
+                  className="h-12 flex-1 text-base font-bold"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    "Continue"
+                  )}
+                  {!loading && <ArrowRight className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 6 && (
+            <div className="space-y-6">
+              <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Desired Roles</Label>
                   <div className="flex flex-wrap gap-2">
@@ -1054,14 +1331,14 @@ export default function OnboardingPage() {
               <div className="flex gap-4">
                 <Button
                   variant="outline"
-                  onClick={() => setStep(4)}
+                  onClick={() => setStep(5)}
                   className="h-12 w-12 p-0 shrink-0"
                   disabled={loading}
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <Button
-                  onClick={onNextStep5}
+                  onClick={onNextStep6}
                   className="h-12 flex-1 text-base font-bold"
                   disabled={loading}
                 >
@@ -1076,7 +1353,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {step === 4 && (
+          {step === 7 && (
             <div className="space-y-6">
               <RadioGroup
                 value={role}
@@ -1160,14 +1437,14 @@ export default function OnboardingPage() {
               <div className="flex gap-4">
                 <Button
                   variant="outline"
-                  onClick={() => setStep(5)}
+                  onClick={() => setStep(6)}
                   className="h-12 w-12 p-0 shrink-0"
                   disabled={loading}
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <Button
-                  onClick={onNextStep6}
+                  onClick={onNextStep7}
                   className="h-12 flex-1 text-base font-bold"
                   disabled={loading || !role}
                 >

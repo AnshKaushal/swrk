@@ -253,9 +253,69 @@ export default function ProfilePage() {
   const isPremium =
     subscription && ["active", "created"].includes(subscription.status)
 
+  const calculateCompletionPercentage = () => {
+    let completed = 0
+    let total = 10
+
+    if (user.name) completed++
+    if (user.avatar) completed++
+    if (empProfile?.headline) completed++
+    if (empProfile?.bio) completed++
+    if (empProfile?.education && empProfile.education.length > 0) completed++
+    if (empProfile?.workHistory && empProfile.workHistory.length > 0)
+      completed++
+    if (user.phone) completed++
+    if (user.dateOfBirth) completed++
+    if (user.gender) completed++
+    if (empProfile?.primarySkills && empProfile.primarySkills.length > 0)
+      completed++
+
+    return Math.round((completed / total) * 100)
+  }
+
+  const completionPercentage = calculateCompletionPercentage()
+  const isProfileIncomplete = completionPercentage < 100
+
   return (
     <div className="min-h-screen py-8 sm:py-12">
       <div className="max-w-7xl mx-auto space-y-8 px-4 sm:px-6 lg:px-8">
+        {isOwnProfile && isProfileIncomplete && (
+          <div className="rounded-lg border border-amber-200 bg-gradient-to-r from-amber-50 to-amber-50/50 p-4 sm:p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="space-y-2 flex-1">
+                <h3 className="font-semibold text-amber-900">
+                  Complete Your Profile
+                </h3>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-amber-800">Profile Completion</span>
+                    <span className="font-semibold text-amber-900">
+                      {completionPercentage}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-amber-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-amber-400 to-amber-500 transition-all duration-300"
+                      style={{ width: `${completionPercentage}%` }}
+                    />
+                  </div>
+                </div>
+                <p className="text-sm text-amber-800">
+                  Add more details to make your profile stand out to hiring
+                  teams.
+                </p>
+              </div>
+              <Button
+                onClick={() => router.push(`/settings/profile`)}
+                size="sm"
+                className="bg-amber-500 hover:bg-amber-600 text-white"
+              >
+                Complete Profile
+              </Button>
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-end gap-3">
           {isOwnProfile && (
             <>
