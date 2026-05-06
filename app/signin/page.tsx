@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, Suspense } from "react"
+import { getSession } from "next-auth/react"
 import { signIn } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -49,12 +50,26 @@ function SigninForm() {
         toast.error(message)
       } else if (result?.ok && !result?.error) {
         toast.success("Welcome back!")
-        console.log("Redirecting to dashboard...")
-        // Wait a bit for session to establish
-        setTimeout(() => {
+
+        // Poll getSession briefly to ensure NextAuth session is established
+        let sess: any = null
+        for (let i = 0; i < 6; i++) {
+          // eslint-disable-next-line no-await-in-loop
+          sess = await getSession()
+          if (sess?.user) break
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise((r) => setTimeout(r, 500))
+        }
+
+        const onboardingCompleted = Boolean(sess?.user?.onboardingCompleted)
+
+        if (!onboardingCompleted) {
+          router.push("/onboarding")
+        } else {
           router.push("/dashboard")
-          router.refresh() // Force a refresh to ensure session is loaded
-        }, 1000)
+        }
+
+        router.refresh()
       } else {
         toast.error("Invalid credentials")
       }

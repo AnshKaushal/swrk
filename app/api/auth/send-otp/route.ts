@@ -46,6 +46,14 @@ export async function POST(req: NextRequest) {
       { upsert: true, returnDocument: "after" },
     )
 
+    // If the user already exists and is verified, don't send an OTP for signup flow.
+    if (user && user.isVerified) {
+      return NextResponse.json(
+        { error: "Account already exists. Please sign in instead." },
+        { status: 400 },
+      )
+    }
+
     const { subject, html, text } = otpEmailTemplate({
       otp,
       name: user.name || "there",

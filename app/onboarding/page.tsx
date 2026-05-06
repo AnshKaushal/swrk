@@ -102,6 +102,7 @@ export default function OnboardingPage() {
   const cropPreviewUrlRef = useRef<string | null>(null)
   const hasHydratedRef = useRef(false)
 
+  const TOTAL_STEPS = 6
   const [step, setStep] = useState(1)
 
   const [name, setName] = useState("")
@@ -177,7 +178,7 @@ export default function OnboardingPage() {
     }
 
     const storageKey = `swrk:onboarding-step:${session.user.id || session.user.username || "guest"}`
-    if (step >= 1 && step <= 4) {
+    if (step >= 1 && step <= TOTAL_STEPS) {
       window.localStorage.setItem(storageKey, String(step))
     }
   }, [session?.user, status, step])
@@ -316,17 +317,28 @@ export default function OnboardingPage() {
         if (!profileRes.ok) throw new Error("Profile update failed")
       }
 
-      if (targetStep === 5) {
+      // If targetStep is beyond the UI steps, finalize onboarding
+      if (targetStep === TOTAL_STEPS + 1) {
         toast.success("Profile completed successfully! Welcome to Swrk!")
         const storageKey = `swrk:onboarding-step:${session?.user?.id || session?.user?.username || "guest"}`
         window.localStorage.removeItem(storageKey)
         await update({
           ...sessionUpdates,
-          onboardingStep: 4,
+          onboardingStep: TOTAL_STEPS,
           onboardingCompleted: true,
         })
         router.push("/dashboard")
       } else {
+        // Update client session so fields like `username` appear immediately
+        try {
+          await update({
+            ...sessionUpdates,
+            onboardingStep: Math.min(targetStep - 1, TOTAL_STEPS),
+          })
+        } catch {
+          // ignore session update failures
+        }
+
         setStep(targetStep)
         toast.success("Saved successfully!")
       }
@@ -354,12 +366,19 @@ export default function OnboardingPage() {
     )
   }
   const onNextStep2 = () => {
+    // Professional Profile: only headline and bio in this step
     const profilePayload: Record<string, unknown> = {}
     if (headline) profilePayload.employeeProfile = { headline }
     if (bio) {
       if (!profilePayload.employeeProfile) profilePayload.employeeProfile = {}
       ;(profilePayload.employeeProfile as Record<string, unknown>).bio = bio
     }
+    return handleStepSubmit(3, {}, {}, profilePayload)
+  }
+
+  const onNextStep3 = () => {
+    // Education step
+    const profilePayload: Record<string, unknown> = {}
     const normalizedEducation = education
       .filter((e) => e.school || e.degree)
       .map((e) => ({
@@ -370,10 +389,14 @@ export default function OnboardingPage() {
         endYear: e.endYear,
       }))
     if (normalizedEducation.length > 0) {
-      if (!profilePayload.employeeProfile) profilePayload.employeeProfile = {}
-      ;(profilePayload.employeeProfile as Record<string, unknown>).education =
-        normalizedEducation
+      profilePayload.employeeProfile = { education: normalizedEducation }
     }
+    return handleStepSubmit(4, {}, {}, profilePayload)
+  }
+
+  const onNextStep4 = () => {
+    // Work experience step
+    const profilePayload: Record<string, unknown> = {}
     const normalizedWorkHistory = workHistory
       .filter((w) => w.company || w.position)
       .map((w) => ({
@@ -396,13 +419,11 @@ export default function OnboardingPage() {
         description: w.description,
       }))
     if (normalizedWorkHistory.length > 0) {
-      if (!profilePayload.employeeProfile) profilePayload.employeeProfile = {}
-      ;(profilePayload.employeeProfile as Record<string, unknown>).workHistory =
-        normalizedWorkHistory
+      profilePayload.employeeProfile = { workHistory: normalizedWorkHistory }
     }
-    return handleStepSubmit(3, {}, {}, profilePayload)
+    return handleStepSubmit(5, {}, {}, profilePayload)
   }
-  const onNextStep3 = () => {
+  const onNextStep5 = () => {
     const profilePayload: Record<string, unknown> = {}
     const filters: Record<string, unknown> = {}
     if (desiredRoles.length > 0) filters.desiredRoles = desiredRoles
@@ -421,11 +442,11 @@ export default function OnboardingPage() {
     if (Object.keys(filters).length > 0) {
       profilePayload.employeeProfile = filters
     }
-    return handleStepSubmit(4, {}, {}, profilePayload)
+    return handleStepSubmit(6, {}, {}, profilePayload)
   }
-  const onNextStep4 = () =>
+  const onNextStep6 = () =>
     handleStepSubmit(
-      5,
+      TOTAL_STEPS + 1,
       { role, phone, dateOfBirth, gender },
       { role, onboardingCompleted: true },
     )
@@ -465,7 +486,9 @@ export default function OnboardingPage() {
           </div>
           <div className="flex items-center gap-8">
             <div>
-              <div className="text-3xl font-bold">{step}/4</div>
+              <div className="text-3xl font-bold">
+                {step}/{TOTAL_STEPS}
+              </div>
               <div className="text-sm font-medium text-white/60 tracking-wider uppercase">
                 Steps
               </div>
@@ -488,19 +511,24 @@ export default function OnboardingPage() {
             <h2 className="text-3xl font-bold tracking-tight">
               {step === 1 && "Personal Info"}
               {step === 2 && "Professional Profile"}
-              {step === 3 && "Your Preferences"}
-              {step === 4 && "Choose Your Role"}
+              {step === 3 && "Education"}
+              {step === 4 && "Work Experience"}
+              {step === 5 && "Your Preferences"}
+              {step === 6 && "Choose Your Role"}
             </h2>
             <p className="text-muted-foreground">
               {step === 1 && "Let's start with the basics to identify you."}
               {step === 2 && "Tell us about your professional background."}
-              {step === 3 && "Help us find the best matches for you."}
-              {step === 4 && "How will you be using Swrk?"}
+              {step === 3 &&
+                "Add your education history so teams know your background."}
+              {step === 4 && "Add your work experience to showcase your roles."}
+              {step === 5 && "Help us find the best matches for you."}
+              {step === 6 && "How will you be using Swrk?"}
             </p>
           </div>
 
           <div className="flex gap-2">
-            {[1, 2, 3, 4].map((i) => (
+            {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((i) => (
               <div
                 key={i}
                 className={`h-1.5 flex-1 rounded-full transition-all ${step >= i ? "bg-primary" : "bg-muted"}`}
@@ -631,6 +659,33 @@ export default function OnboardingPage() {
                 </div>
               </div>
 
+              <div className="flex gap-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setStep(1)}
+                  className="h-12 w-12 p-0 shrink-0"
+                  disabled={loading}
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <Button
+                  onClick={onNextStep2}
+                  className="h-12 flex-1 text-base font-bold"
+                  disabled={loading || !headline}
+                >
+                  {loading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    "Continue"
+                  )}
+                  {!loading && <ArrowRight className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label className="text-base font-semibold">Education</Label>
@@ -719,6 +774,33 @@ export default function OnboardingPage() {
                 ))}
               </div>
 
+              <div className="flex gap-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setStep(2)}
+                  className="h-12 w-12 p-0 shrink-0"
+                  disabled={loading}
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <Button
+                  onClick={onNextStep3}
+                  className="h-12 flex-1 text-base font-bold"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    "Continue"
+                  )}
+                  {!loading && <ArrowRight className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 6 && (
+            <div className="space-y-6">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label className="text-base font-semibold">
@@ -849,16 +931,16 @@ export default function OnboardingPage() {
               <div className="flex gap-4">
                 <Button
                   variant="outline"
-                  onClick={() => setStep(1)}
+                  onClick={() => setStep(3)}
                   className="h-12 w-12 p-0 shrink-0"
                   disabled={loading}
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <Button
-                  onClick={onNextStep2}
+                  onClick={onNextStep4}
                   className="h-12 flex-1 text-base font-bold"
-                  disabled={loading || !headline}
+                  disabled={loading}
                 >
                   {loading ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -871,7 +953,7 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {step === 3 && (
+          {step === 5 && (
             <div className="space-y-6">
               <div className="space-y-4">
                 <div className="space-y-2">
@@ -972,14 +1054,14 @@ export default function OnboardingPage() {
               <div className="flex gap-4">
                 <Button
                   variant="outline"
-                  onClick={() => setStep(2)}
+                  onClick={() => setStep(4)}
                   className="h-12 w-12 p-0 shrink-0"
                   disabled={loading}
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <Button
-                  onClick={onNextStep3}
+                  onClick={onNextStep5}
                   className="h-12 flex-1 text-base font-bold"
                   disabled={loading}
                 >
@@ -1078,14 +1160,14 @@ export default function OnboardingPage() {
               <div className="flex gap-4">
                 <Button
                   variant="outline"
-                  onClick={() => setStep(3)}
+                  onClick={() => setStep(5)}
                   className="h-12 w-12 p-0 shrink-0"
                   disabled={loading}
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <Button
-                  onClick={onNextStep4}
+                  onClick={onNextStep6}
                   className="h-12 flex-1 text-base font-bold"
                   disabled={loading || !role}
                 >

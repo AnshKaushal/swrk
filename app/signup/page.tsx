@@ -56,7 +56,8 @@ export default function SignupPage() {
       setOtpToken(data.otpLoginToken)
       if (data.hasPassword) {
         try {
-          await signIn("otp", {
+          // trigger NextAuth redirect to ensure session is established server-side
+          signIn("otp", {
             email,
             otpToken: data.otpLoginToken,
             callbackUrl: "/onboarding",
@@ -84,7 +85,8 @@ export default function SignupPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       try {
-        await signIn("credentials", {
+        // trigger NextAuth redirect to ensure session is established server-side
+        signIn("credentials", {
           email,
           password,
           callbackUrl: "/onboarding",
@@ -217,7 +219,7 @@ export default function SignupPage() {
                   className="w-full"
                   disabled={loading}
                 >
-                  {loading ? "Sending Otp..." : "Continue"}
+                  {loading ? "Loading..." : "Continue"}
                 </Button>
 
                 <div className="relative">

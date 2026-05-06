@@ -622,97 +622,102 @@ export default function ProfilePage() {
               </Card>
             )}
 
-            <Card className="shadow-md">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-lg">Connect</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {session ? (
-                  <div className="flex items-center gap-4">
-                    {user.linkedinUrl && user.privacy?.showLinkedin && (
-                      <a
-                        href={user.linkedinUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <img
-                          src="/logos/linkedin.svg"
-                          alt="LinkedIn"
-                          className="w-5 md:w-10 h-5 md:h-10 hover:-translate-y-2 transition-transform"
-                        />
-                      </a>
-                    )}
-                    {user.githubUrl && (
-                      <a
-                        href={user.githubUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <img
-                          src="/logos/github.svg"
-                          alt="GitHub"
-                          className="w-4 md:w-8 h-4 md:h-8 hover:-translate-y-2 transition-transform"
-                        />
-                      </a>
-                    )}
-                    {user.portfolioUrl && (
-                      <a
-                        href={user.portfolioUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <img
-                          src="/logos/portfolio.svg"
-                          alt="Portfolio"
-                          className="w-4 md:w-8 h-4 md:h-8 hover:-translate-y-2 transition-transform"
-                        />
-                      </a>
-                    )}
-                    {user.professionalLinks?.map((link) => {
-                      const isNotStandardLink = ![
-                        user.linkedinUrl,
-                        user.githubUrl,
-                        user.portfolioUrl,
-                      ].includes(link.url)
-                      return (
-                        isNotStandardLink && (
-                          <Button
-                            key={`${link.label}-${link.url}`}
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="gap-2 justify-start"
+            {user.linkedinUrl &&
+              user.privacy?.showLinkedin &&
+              user.githubUrl &&
+              user.portfolioUrl && (
+                <Card className="shadow-md">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">Connect</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {session ? (
+                      <div className="flex items-center gap-4">
+                        {user.linkedinUrl && user.privacy?.showLinkedin && (
+                          <a
+                            href={user.linkedinUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
                           >
-                            <a
-                              href={link.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              <Globe className="w-4 h-4" />
-                              <span className="truncate">{link.label}</span>
-                              <ExternalLink className="w-3 h-3 ml-auto flex-shrink-0" />
-                            </a>
-                          </Button>
-                        )
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Sign in to view social links
-                    </p>
-                    <Button
-                      onClick={() => router.push("/signin")}
-                      variant="outline"
-                      size="sm"
-                    >
-                      Sign In
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                            <img
+                              src="/logos/linkedin.svg"
+                              alt="LinkedIn"
+                              className="w-5 md:w-10 h-5 md:h-10 hover:-translate-y-2 transition-transform"
+                            />
+                          </a>
+                        )}
+                        {user.githubUrl && (
+                          <a
+                            href={user.githubUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <img
+                              src="/logos/github.svg"
+                              alt="GitHub"
+                              className="w-4 md:w-8 h-4 md:h-8 hover:-translate-y-2 transition-transform"
+                            />
+                          </a>
+                        )}
+                        {user.portfolioUrl && (
+                          <a
+                            href={user.portfolioUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <img
+                              src="/logos/portfolio.svg"
+                              alt="Portfolio"
+                              className="w-4 md:w-8 h-4 md:h-8 hover:-translate-y-2 transition-transform"
+                            />
+                          </a>
+                        )}
+                        {user.professionalLinks?.map((link) => {
+                          const isNotStandardLink = ![
+                            user.linkedinUrl,
+                            user.githubUrl,
+                            user.portfolioUrl,
+                          ].includes(link.url)
+                          return (
+                            isNotStandardLink && (
+                              <Button
+                                key={`${link.label}-${link.url}`}
+                                asChild
+                                variant="outline"
+                                size="sm"
+                                className="gap-2 justify-start"
+                              >
+                                <a
+                                  href={link.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                >
+                                  <Globe className="w-4 h-4" />
+                                  <span className="truncate">{link.label}</span>
+                                  <ExternalLink className="w-3 h-3 ml-auto flex-shrink-0" />
+                                </a>
+                              </Button>
+                            )
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Sign in to view social links
+                        </p>
+                        <Button
+                          onClick={() => router.push("/signin")}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Sign In
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
           </div>
         </div>
       </div>
