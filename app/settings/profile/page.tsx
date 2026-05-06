@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Loader2, Plus, X } from "lucide-react"
+import { Loader2, Plus, X, Rocket } from "lucide-react"
 import Cropper from "react-easy-crop"
 import { toast } from "sonner"
 
@@ -34,6 +34,15 @@ type EducationItem = {
   startYear: string
   endYear: string
   grade: string
+}
+
+type WorkHistoryItem = {
+  company: string
+  role: string
+  startDate: string
+  endDate: string
+  isCurrent: boolean
+  description: string
 }
 
 type AddressFields = {
@@ -84,6 +93,7 @@ type ProfileApiResponse = {
     currentStatus?: string
     availableFrom?: string
     currentCity?: string
+    currentState?: string
     currentCountry?: string
     workPreference?: string
     primarySkills?: unknown[]
@@ -106,6 +116,7 @@ type ProfileApiResponse = {
     employmentType?: unknown[]
     totalExperienceYears?: number
     experienceLevel?: string
+    workHistory?: unknown[]
     education?: unknown[]
     highestQualification?: string
     certifications?: unknown[]
@@ -151,6 +162,15 @@ const emptyEducationItem = (): EducationItem => ({
   grade: "",
 })
 
+const emptyWorkHistoryItem = (): WorkHistoryItem => ({
+  company: "",
+  role: "",
+  startDate: "",
+  endDate: "",
+  isCurrent: false,
+  description: "",
+})
+
 const normalizeEducation = (
   education: unknown[] | undefined,
 ): EducationItem[] => {
@@ -161,18 +181,61 @@ const normalizeEducation = (
       institution: (source.institution as string) || "",
       degree: (source.degree as string) || "",
       field: (source.field as string) || "",
-      startYear: source.startYear ? String(source.startYear) : "",
+      startYear: source.startYear
+        ? String(source.startYear)
+        : source.year
+          ? String(source.year)
+          : "",
       endYear: source.endYear ? String(source.endYear) : "",
       grade: (source.grade as string) || "",
     }
   })
 }
 
+const formatDateInput = (value?: string | Date | null) => {
+  if (!value) return ""
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10)
+}
+
+const normalizeWorkHistory = (
+  workHistory: unknown[] | undefined,
+): WorkHistoryItem[] => {
+  if (!Array.isArray(workHistory)) return []
+
+  return workHistory.map((item) => {
+    const source = item as Record<string, unknown>
+    return {
+      company: (source.company as string) || "",
+      role: ((source.role as string) ||
+        (source.position as string) ||
+        "") as string,
+      startDate: formatDateInput(
+        (source.startDate as string) || (source.duration as string) || null,
+      ),
+      endDate: source.isCurrent
+        ? ""
+        : formatDateInput((source.endDate as string) || null),
+      isCurrent: Boolean(source.isCurrent),
+      description: (source.description as string) || "",
+    }
+  })
+}
+
+const normalizeStringList = (items: unknown[] | undefined) => {
+  if (!Array.isArray(items)) return []
+  return items
+    .map((item) => (typeof item === "string" ? item : String(item || "")))
+    .filter(Boolean)
+}
+
 const normalizeAddress = (address: AddressFields | undefined) => ({
   street: address?.street || "",
   city: address?.city || "",
   state: address?.state || "",
-  postalCode: address?.postalCode || "",
+  postalCode: (address as Record<string, unknown>)?.zip
+    ? String((address as Record<string, unknown>).zip)
+    : address?.postalCode || "",
 })
 
 const getRadianAngle = (degreeValue: number) => (degreeValue * Math.PI) / 180
@@ -219,6 +282,10 @@ export default function ProfileSettingsPage() {
     null,
   )
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [locationSuggestions, setLocationSuggestions] = useState<
+    Array<{ type: "city" | "state" | "country"; name: string }>
+  >([])
+  const [showLocationSuggestions, setShowLocationSuggestions] = useState(false)
 
   const [formData, setFormData] = useState({
     name: "",
@@ -230,6 +297,9 @@ export default function ProfileSettingsPage() {
     avatar: "",
     banner: "",
     address: { street: "", city: "", state: "", postalCode: "" },
+    currentCity: "",
+    currentState: "",
+    currentCountry: "India",
     primarySkills: [] as string[],
     secondarySkills: [] as string[],
     linkedinUrl: "",
@@ -241,10 +311,19 @@ export default function ProfileSettingsPage() {
       { label: "Portfolio", url: "" },
     ] as ProfessionalLink[],
     education: [] as EducationItem[],
+    workHistory: [] as WorkHistoryItem[],
     role: "employee",
     activeRole: "employee",
     visibility: { showEmail: true, showPhone: false, showResumes: true },
   })
+  const [boostQuota, setBoostQuota] = useState<null | {
+    remaining: number
+    limit: number
+  }>(null)
+  const [boostLoading, setBoostLoading] = useState(false)
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [boostBannerVisible, setBoostBannerVisible] = useState(false)
+  const boostBannerTimer = useRef<number | null>(null)
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -285,7 +364,14 @@ export default function ProfileSettingsPage() {
           professionalLinks,
           role: normalizedRole,
           activeRole: activeRole === "employer" ? "employer" : "employee",
+          primarySkills: normalizeStringList(
+            data.employeeProfile?.primarySkills,
+          ),
+          secondarySkills: normalizeStringList(
+            data.employeeProfile?.secondarySkills,
+          ),
           education: normalizeEducation(data.employeeProfile?.education),
+          workHistory: normalizeWorkHistory(data.employeeProfile?.workHistory),
           visibility: {
             showEmail: privacy.showEmail ?? prev.visibility.showEmail,
             showPhone: privacy.showPhone ?? prev.visibility.showPhone,
@@ -293,7 +379,20 @@ export default function ProfileSettingsPage() {
           },
           headline: data.employeeProfile?.headline || "",
           bio: data.employeeProfile?.bio || "",
+          currentCity: data.employeeProfile?.currentCity || "",
+          currentState: data.employeeProfile?.currentState || "",
+          currentCountry: data.employeeProfile?.currentCountry || "India",
         }))
+        // fetch boost quota after profile data
+        try {
+          const b = await fetch("/api/boost/use", { cache: "no-store" })
+          if (b.ok) {
+            const bj = await b.json()
+            setBoostQuota(bj.quota ?? null)
+          }
+        } catch (e) {
+          // ignore
+        }
       }
     } catch (err) {
       console.error("Failed to fetch profile:", err)
@@ -310,9 +409,19 @@ export default function ProfileSettingsPage() {
 
     if (status === "authenticated") {
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      void fetchProfile()
+      void (async () => {
+        await fetchProfile()
+      })()
     }
   }, [status, router, fetchProfile])
+
+  useEffect(() => {
+    return () => {
+      if (boostBannerTimer.current) {
+        window.clearTimeout(boostBannerTimer.current)
+      }
+    }
+  }, [])
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -329,6 +438,43 @@ export default function ProfileSettingsPage() {
       ...prev,
       address: { ...prev.address, [field]: value },
     }))
+  }
+
+  const handleLocationSearch = async (
+    query: string,
+    type: "city" | "state" | "country",
+  ) => {
+    if (!query.trim()) {
+      setLocationSuggestions([])
+      return
+    }
+    try {
+      const response = await fetch(
+        `/api/locations/search?q=${encodeURIComponent(query)}&type=${type}`,
+      )
+      if (response.ok) {
+        const data = await response.json()
+        setLocationSuggestions(data.results || [])
+      }
+    } catch (error) {
+      console.error("Location search error:", error)
+    }
+  }
+
+  const handleSelectLocation = (location: {
+    type: "city" | "state" | "country"
+    name: string
+  }) => {
+    setFormData((prev) => ({
+      ...prev,
+      [location.type === "city"
+        ? "currentCity"
+        : location.type === "state"
+          ? "currentState"
+          : "currentCountry"]: location.name,
+    }))
+    setLocationSuggestions([])
+    setShowLocationSuggestions(false)
   }
 
   const addSkill = (type: "primary" | "secondary") => {
@@ -578,6 +724,40 @@ export default function ProfileSettingsPage() {
     }))
   }
 
+  const updateWorkHistoryItem = (
+    index: number,
+    field: keyof WorkHistoryItem,
+    value: string | boolean,
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      workHistory: prev.workHistory.map((item, i) => {
+        if (i !== index) return item
+
+        const updated = { ...item, [field]: value }
+        if (field === "isCurrent" && value) {
+          updated.endDate = ""
+        }
+
+        return updated
+      }),
+    }))
+  }
+
+  const addWorkHistoryItem = () => {
+    setFormData((prev) => ({
+      ...prev,
+      workHistory: [...prev.workHistory, emptyWorkHistoryItem()],
+    }))
+  }
+
+  const removeWorkHistoryItem = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      workHistory: prev.workHistory.filter((_, i) => i !== index),
+    }))
+  }
+
   const addProfessionalLink = () => {
     setFormData((prev) =>
       prev.professionalLinks.length >= 5
@@ -624,7 +804,12 @@ export default function ProfileSettingsPage() {
             name: formData.name,
             phone: formData.phone,
             gender: formData.gender,
-            address: formData.address,
+            address: {
+              street: formData.address.street,
+              city: formData.address.city,
+              state: formData.address.state,
+              zip: formData.address.postalCode,
+            },
             linkedinUrl:
               formData.professionalLinks[0]?.url || formData.linkedinUrl,
             githubUrl: formData.professionalLinks[1]?.url || formData.githubUrl,
@@ -642,6 +827,17 @@ export default function ProfileSettingsPage() {
             primarySkills: formData.primarySkills,
             secondarySkills: formData.secondarySkills,
             education: formData.education,
+            workHistory: formData.workHistory.map((item) => ({
+              company: item.company,
+              role: item.role,
+              startDate: item.startDate || undefined,
+              endDate: item.isCurrent ? undefined : item.endDate || undefined,
+              isCurrent: item.isCurrent,
+              description: item.description,
+            })),
+            currentCity: formData.currentCity,
+            currentState: formData.currentState,
+            currentCountry: formData.currentCountry,
           },
           employerProfile: {},
         }),
@@ -670,6 +866,17 @@ export default function ProfileSettingsPage() {
   return (
     <>
       <form onSubmit={handleSubmit} className="divide-y divide-border">
+        {boostBannerVisible ? (
+          <div className="mx-4 mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm sm:mx-6 lg:mx-8">
+            Your profile boost is active and will increase visibility for a
+            short time.
+            {boostQuota ? (
+              <span className="ml-2 font-medium">
+                {boostQuota.remaining}/{boostQuota.limit} boosts remaining.
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         <div className="grid max-w-7xl grid-cols-1 gap-x-8 gap-y-10 px-4 py-16 sm:px-6 md:grid-cols-3 lg:px-8">
           <div>
             <h2 className="text-base/7 font-semibold">Profile Media</h2>
@@ -823,7 +1030,7 @@ export default function ProfileSettingsPage() {
                 className="bg-muted"
               />
               <p className="text-xs text-muted-foreground">
-                Contact support to change email
+                Open account settings to change your email address.
               </p>
             </div>
 
@@ -888,6 +1095,105 @@ export default function ProfileSettingsPage() {
                 onChange={handleInputChange}
                 rows={4}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Current Location</Label>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="relative">
+                  <Input
+                    placeholder="City"
+                    value={formData.currentCity}
+                    onChange={(e) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        currentCity: e.target.value,
+                      }))
+                      handleLocationSearch(e.target.value, "city")
+                      setShowLocationSuggestions(true)
+                    }}
+                    onFocus={() => setShowLocationSuggestions(true)}
+                  />
+                  {showLocationSuggestions &&
+                    locationSuggestions.some((s) => s.type === "city") && (
+                      <div className="absolute top-full left-0 right-0 bg-card border rounded-md shadow-lg z-10 mt-1 max-h-40 overflow-y-auto">
+                        {locationSuggestions
+                          .filter((s) => s.type === "city")
+                          .map((loc, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => handleSelectLocation(loc)}
+                              className="w-full text-left px-3 py-2 hover:bg-muted text-sm"
+                            >
+                              {loc.name}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                </div>
+                <div className="relative">
+                  <Input
+                    placeholder="State"
+                    value={formData.currentState}
+                    onChange={(e) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        currentState: e.target.value,
+                      }))
+                      handleLocationSearch(e.target.value, "state")
+                      setShowLocationSuggestions(true)
+                    }}
+                    onFocus={() => setShowLocationSuggestions(true)}
+                  />
+                  {showLocationSuggestions &&
+                    locationSuggestions.some((s) => s.type === "state") && (
+                      <div className="absolute top-full left-0 right-0 bg-card border rounded-md shadow-lg z-10 mt-1 max-h-40 overflow-y-auto">
+                        {locationSuggestions
+                          .filter((s) => s.type === "state")
+                          .map((loc, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => handleSelectLocation(loc)}
+                              className="w-full text-left px-3 py-2 hover:bg-muted text-sm"
+                            >
+                              {loc.name}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                </div>
+                <div className="relative">
+                  <Input
+                    placeholder="Country"
+                    value={formData.currentCountry}
+                    onChange={(e) => {
+                      setFormData((prev) => ({
+                        ...prev,
+                        currentCountry: e.target.value,
+                      }))
+                      handleLocationSearch(e.target.value, "country")
+                      setShowLocationSuggestions(true)
+                    }}
+                    onFocus={() => setShowLocationSuggestions(true)}
+                  />
+                  {showLocationSuggestions &&
+                    locationSuggestions.some((s) => s.type === "country") && (
+                      <div className="absolute top-full left-0 right-0 bg-card border rounded-md shadow-lg z-10 mt-1 max-h-40 overflow-y-auto">
+                        {locationSuggestions
+                          .filter((s) => s.type === "country")
+                          .map((loc, idx) => (
+                            <button
+                              key={idx}
+                              onClick={() => handleSelectLocation(loc)}
+                              className="w-full text-left px-3 py-2 hover:bg-muted text-sm"
+                            >
+                              {loc.name}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -1167,58 +1473,235 @@ export default function ProfileSettingsPage() {
 
         <div className="grid max-w-7xl grid-cols-1 gap-x-8 gap-y-10 px-4 py-16 sm:px-6 md:grid-cols-3 lg:px-8">
           <div>
-            <h2 className="text-base/7 font-semibold">Privacy</h2>
+            <h2 className="text-base/7 font-semibold">Work Experience</h2>
             <p className="mt-1 text-sm/6 text-muted-foreground">
-              Control who can see your information.
+              Add your recent work history and timelines.
             </p>
           </div>
-          <div className="md:col-span-2 space-y-4">
-            <div className="flex items-center justify-between">
-              <Label>Show email on profile</Label>
-              <Switch
-                checked={formData.visibility.showEmail}
-                onCheckedChange={(checked) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    visibility: { ...prev.visibility, showEmail: checked },
-                  }))
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label>Show phone on profile</Label>
-              <Switch
-                checked={formData.visibility.showPhone}
-                onCheckedChange={(checked) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    visibility: { ...prev.visibility, showPhone: checked },
-                  }))
-                }
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label>Show resumes on profile</Label>
-              <Switch
-                checked={formData.visibility.showResumes}
-                onCheckedChange={(checked) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    visibility: { ...prev.visibility, showResumes: checked },
-                  }))
-                }
-              />
-            </div>
+          <div className="md:col-span-2 space-y-6">
+            {formData.workHistory.map((work, index) => (
+              <div
+                key={index}
+                className="space-y-4 p-4 border border-border rounded-lg"
+              >
+                <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Company</Label>
+                    <Input
+                      placeholder="Company name"
+                      value={work.company}
+                      onChange={(e) =>
+                        updateWorkHistoryItem(index, "company", e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Role</Label>
+                    <Input
+                      placeholder="e.g. Software Engineer"
+                      value={work.role}
+                      onChange={(e) =>
+                        updateWorkHistoryItem(index, "role", e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Start Date</Label>
+                    <Input
+                      type="date"
+                      value={work.startDate}
+                      onChange={(e) =>
+                        updateWorkHistoryItem(
+                          index,
+                          "startDate",
+                          e.target.value,
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>End Date</Label>
+                    <Input
+                      type="date"
+                      value={work.endDate}
+                      disabled={work.isCurrent}
+                      onChange={(e) =>
+                        updateWorkHistoryItem(index, "endDate", e.target.value)
+                      }
+                      placeholder="Leave empty if current"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      id={`current-role-${index}`}
+                      type="checkbox"
+                      checked={work.isCurrent}
+                      onChange={(e) =>
+                        updateWorkHistoryItem(
+                          index,
+                          "isCurrent",
+                          e.target.checked,
+                        )
+                      }
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                    />
+                    <Label htmlFor={`current-role-${index}`}>
+                      I currently work here
+                    </Label>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Description</Label>
+                  <Textarea
+                    placeholder="Describe your responsibilities and achievements"
+                    value={work.description}
+                    onChange={(e) =>
+                      updateWorkHistoryItem(
+                        index,
+                        "description",
+                        e.target.value,
+                      )
+                    }
+                    rows={4}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => removeWorkHistoryItem(index)}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={addWorkHistoryItem}
+              className="w-full"
+            >
+              <Plus className="h-4 w-4" />
+              Add Work Experience
+            </Button>
           </div>
         </div>
 
         <div className="px-4 py-5 sm:px-6 lg:px-8">
-          <Button type="submit" disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Save Changes
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button type="submit" disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Save Changes
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              disabled={boostLoading}
+              onClick={async () => {
+                try {
+                  setBoostLoading(true)
+
+                  // make sure we have the latest quota
+                  let quota = boostQuota
+                  if (!quota) {
+                    try {
+                      const qres = await fetch("/api/boost/use", {
+                        method: "GET",
+                        cache: "no-store",
+                      })
+                      if (qres.ok) {
+                        const qj = await qres.json()
+                        quota = qj.quota ?? null
+                        setBoostQuota(quota)
+                      }
+                    } catch (e) {
+                      // ignore
+                    }
+                  }
+
+                  // If user is on free plan (limit 0) or has no remaining, prompt upgrade
+                  if (
+                    !quota ||
+                    quota.limit === 0 ||
+                    (typeof quota.remaining === "number" &&
+                      quota.remaining <= 0)
+                  ) {
+                    setUpgradeOpen(true)
+                    return
+                  }
+
+                  const res = await fetch("/api/boost/use", { method: "POST" })
+                  const json = await res.json()
+                  if (!res.ok) {
+                    if (res.status === 429) {
+                      setUpgradeOpen(true)
+                      toast.error(json?.error || "Boost limit reached")
+                      return
+                    }
+                    toast.error(json?.error || "Failed to boost profile")
+                    return
+                  }
+
+                  setBoostQuota(json.quota ?? null)
+                  setBoostBannerVisible(true)
+                  if (boostBannerTimer.current) {
+                    window.clearTimeout(boostBannerTimer.current)
+                  }
+                  boostBannerTimer.current = window.setTimeout(() => {
+                    setBoostBannerVisible(false)
+                  }, 4500)
+                  toast.success("Profile boosted")
+                } catch (e) {
+                  console.error(e)
+                  toast.error("Boost failed")
+                } finally {
+                  setBoostLoading(false)
+                }
+              }}
+            >
+              {boostLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Rocket className="h-4 w-4 mr-2" />
+              )}
+              Boost
+            </Button>
+
+            {boostQuota ? (
+              <div className="text-sm text-muted-foreground">
+                Boosts: {boostQuota.remaining}/{boostQuota.limit} remaining
+              </div>
+            ) : null}
+          </div>
         </div>
       </form>
+      <Dialog open={upgradeOpen} onOpenChange={setUpgradeOpen}>
+        <DialogContent className="w-full max-w-md p-6">
+          <DialogHeader>
+            <DialogTitle>Upgrade to unlock Boosts</DialogTitle>
+            <DialogDescription>
+              Boosts are available on paid plans. Upgrade your subscription to
+              get more boosts and increased visibility.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setUpgradeOpen(false)}>
+              Close
+            </Button>
+            <Button
+              onClick={() => {
+                setUpgradeOpen(false)
+                router.push("/subscription")
+              }}
+            >
+              Upgrade
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog
         open={cropModalOpen && Boolean(imageToCrop)}
         onOpenChange={(open) => {

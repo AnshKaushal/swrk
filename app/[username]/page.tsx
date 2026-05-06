@@ -15,11 +15,12 @@ import {
   MapPin,
   Briefcase,
   Award,
+  FileText,
+  Crown,
   BookOpen,
   MessageCircle,
   ExternalLink,
   Loader2,
-  FileText,
 } from "lucide-react"
 
 interface UserProfile {
@@ -65,6 +66,8 @@ interface EmployeeProfile {
   currentStatus: string
   desiredRoles: string[]
   currentCity: string
+  currentState: string
+  currentCountry: string
   preferredLocations: string[]
   workPreference: string
   primarySkills: string[]
@@ -75,6 +78,8 @@ interface EmployeeProfile {
     institution: string
     degree: string
     field: string
+    startYear?: string
+    endYear?: string
   }>
   workHistory: Array<{
     company: string
@@ -110,11 +115,32 @@ interface EmployerProfile {
   companySize: string
 }
 
+interface SubscriptionData {
+  _id: string
+  status: string
+  plan?: {
+    name: string
+    displayName: string
+  }
+}
+
+const formatMonthYear = (value?: string | null) => {
+  if (!value) return "Unknown"
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return "Unknown"
+
+  return parsed.toLocaleDateString("en-US", {
+    month: "short",
+    year: "numeric",
+  })
+}
+
 export default function ProfilePage() {
   const { data: session } = useSession()
   const params = useParams()
   const router = useRouter()
-  const username = params.username as string
+  const username = params?.username as string
 
   const [user, setUser] = useState<UserProfile | null>(null)
   const [profile, setProfile] = useState<
@@ -124,6 +150,9 @@ export default function ProfilePage() {
   const [isOwnProfile, setIsOwnProfile] = useState(false)
   const [error, setError] = useState("")
   const [isProfileVisible, setIsProfileVisible] = useState(true)
+  const [subscription, setSubscription] = useState<SubscriptionData | null>(
+    null,
+  )
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -159,8 +188,27 @@ export default function ProfilePage() {
       }
     }
 
-    if (username) fetchProfile()
-  }, [username, session])
+    const fetchSubscription = async () => {
+      if (isOwnProfile) {
+        try {
+          const res = await fetch("/api/subscriptions/manage")
+          if (res.ok) {
+            const data = await res.json()
+            if (data.subscription) {
+              setSubscription(data.subscription)
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch subscription", err)
+        }
+      }
+    }
+
+    if (username) {
+      fetchProfile()
+      fetchSubscription()
+    }
+  }, [username, session, isOwnProfile])
 
   if (loading) {
     return (
@@ -202,9 +250,11 @@ export default function ProfilePage() {
 
   const canShowResumes = user.privacy?.showResumes !== false
   const empProfile = profile as EmployeeProfile
+  const isPremium =
+    subscription && ["active", "created"].includes(subscription.status)
 
   return (
-    <div className="min-h-screen bg-background py-8 sm:py-12">
+    <div className="min-h-screen py-8 sm:py-12">
       <div className="max-w-7xl mx-auto space-y-8 px-4 sm:px-6 lg:px-8">
         <div className="flex justify-end gap-3">
           {isOwnProfile && (
@@ -232,11 +282,14 @@ export default function ProfilePage() {
           <div className="lg:col-span-3">
             <Card className="overflow-hidden shadow-lg pt-0">
               {user.banner ? (
-                <img
-                  src={user.banner}
-                  alt={`${user.name} banner`}
-                  className="h-40 sm:h-48 w-full object-cover"
-                />
+                <div className="relative">
+                  <img
+                    src={user.banner}
+                    alt={`${user.name} banner`}
+                    className="h-40 sm:h-48 w-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-card via-card/20 to-transparent" />
+                </div>
               ) : (
                 <div className="h-40 sm:h-48 bg-secondary" />
               )}
@@ -247,10 +300,20 @@ export default function ProfilePage() {
                     <img
                       src={user.avatar}
                       alt={user.name}
-                      className="w-36 h-36 sm:w-40 sm:h-40 rounded-full border-4 border-secondary shadow-xl object-cover flex-shrink-0"
+                      className={`w-36 h-36 sm:w-40 sm:h-40 rounded-full shadow-xl object-cover flex-shrink-0 ${
+                        isPremium
+                          ? "border-4 border-amber-400"
+                          : "border-4 border-secondary"
+                      }`}
                     />
                   ) : (
-                    <div className="w-36 h-36 sm:w-40 sm:h-40 rounded-full border-4 border-background bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center shadow-xl flex-shrink-0">
+                    <div
+                      className={`w-36 h-36 sm:w-40 sm:h-40 rounded-full border-4 flex items-center justify-center shadow-xl flex-shrink-0 ${
+                        isPremium
+                          ? "border-amber-400 bg-gradient-to-br from-amber-500/20 to-amber-500/5"
+                          : "border-background bg-gradient-to-br from-primary/20 to-primary/5"
+                      }`}
+                    >
                       <span className="text-5xl font-bold text-muted-foreground">
                         {user.name.charAt(0)}
                       </span>
@@ -267,11 +330,19 @@ export default function ProfilePage() {
                           @{user.username}
                         </p>
                       </div>
-                      {(user.isVerified || user.profileVerified) && (
-                        <Badge className="bg-green-500 text-white">
-                          Verified
-                        </Badge>
-                      )}
+                      <div className="flex gap-2 flex-wrap justify-end">
+                        {isPremium && (
+                          <Badge className="bg-amber-500 text-white flex items-center gap-1">
+                            <Crown className="w-3 h-3" />
+                            Premium
+                          </Badge>
+                        )}
+                        {(user.isVerified || user.profileVerified) && (
+                          <Badge className="bg-green-500 text-white">
+                            Verified
+                          </Badge>
+                        )}
+                      </div>
                     </div>
 
                     {empProfile?.headline && (
@@ -288,7 +359,7 @@ export default function ProfilePage() {
 
                     <div className="flex flex-wrap gap-2 mb-5">
                       <Badge variant="secondary" className="capitalize">
-                        {user.role}
+                        #{user.role === "employee" ? "Open to work" : "Hiring"}
                       </Badge>
                       {user.role === "both" && user.activeRole && (
                         <Badge variant="outline" className="capitalize">
@@ -302,18 +373,28 @@ export default function ProfilePage() {
                           {user.gender.replace("-", " ")}
                         </Badge>
                       )}
-                      {empProfile?.currentStatus && (
+                      {!user.role && empProfile?.currentStatus && (
                         <Badge className="capitalize bg-blue-500">
-                          {empProfile.currentStatus.replace("-", " ")}
+                          {empProfile.currentStatus}
                         </Badge>
                       )}
                     </div>
 
                     <div className="flex flex-wrap gap-4 text-sm sm:text-base text-muted-foreground">
-                      {empProfile?.currentCity && (
+                      {(empProfile?.currentCity ||
+                        empProfile?.currentState ||
+                        empProfile?.currentCountry) && (
                         <div className="flex items-center gap-2">
                           <MapPin className="w-4 h-4 flex-shrink-0" />
-                          <span>{empProfile.currentCity}</span>
+                          <span>
+                            {[
+                              empProfile?.currentCity,
+                              empProfile?.currentState,
+                              empProfile?.currentCountry,
+                            ]
+                              .filter(Boolean)
+                              .join(", ")}
+                          </span>
                         </div>
                       )}
                       {user.phone && user.privacy?.showPhone && (
@@ -411,20 +492,10 @@ export default function ProfilePage() {
                           {exp.company}
                         </p>
                         <p className="text-sm text-muted-foreground mt-2">
-                          {new Date(exp.startDate).toLocaleDateString("en-US", {
-                            month: "short",
-                            year: "numeric",
-                          })}{" "}
-                          -{" "}
+                          {formatMonthYear(exp.startDate)} -{" "}
                           {exp.isCurrent
                             ? "Present"
-                            : new Date(exp.endDate!).toLocaleDateString(
-                                "en-US",
-                                {
-                                  month: "short",
-                                  year: "numeric",
-                                },
-                              )}
+                            : formatMonthYear(exp.endDate)}
                         </p>
                       </div>
                     ))}
@@ -457,6 +528,12 @@ export default function ProfilePage() {
                         {edu.field && (
                           <p className="text-xs text-muted-foreground mt-1">
                             {edu.field}
+                          </p>
+                        )}
+                        {(edu.startYear || edu.endYear) && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {edu.startYear || "Start"}
+                            {edu.endYear ? ` - ${edu.endYear}` : ""}
                           </p>
                         )}
                       </div>
@@ -550,106 +627,90 @@ export default function ProfilePage() {
                 <CardTitle className="text-lg">Connect</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-col gap-2">
-                  {(user.linkedinUrl ||
-                    empProfile?.socialLinks?.some(
-                      (l) => l.platform === "linkedin",
-                    )) &&
-                    user.privacy?.showLinkedin && (
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 justify-start"
+                {session ? (
+                  <div className="flex items-center gap-4">
+                    {user.linkedinUrl && user.privacy?.showLinkedin && (
+                      <a
+                        href={user.linkedinUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
                       >
-                        <a
-                          href={
-                            user.linkedinUrl ||
-                            empProfile?.socialLinks?.find(
-                              (l) => l.platform === "linkedin",
-                            )?.url
-                          }
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <Share2 className="w-4 h-4" />
-                          LinkedIn
-                          <ExternalLink className="w-3 h-3 ml-auto" />
-                        </a>
-                      </Button>
+                        <img
+                          src="/logos/linkedin.svg"
+                          alt="LinkedIn"
+                          className="w-5 md:w-10 h-5 md:h-10 hover:-translate-y-2 transition-transform"
+                        />
+                      </a>
                     )}
-                  {(user.githubUrl ||
-                    empProfile?.socialLinks?.some(
-                      (l) => l.platform === "github",
-                    )) && (
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 justify-start"
-                    >
+                    {user.githubUrl && (
                       <a
-                        href={
-                          user.githubUrl ||
-                          empProfile?.socialLinks?.find(
-                            (l) => l.platform === "github",
-                          )?.url
-                        }
+                        href={user.githubUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        <Code2 className="w-4 h-4" />
-                        GitHub
-                        <ExternalLink className="w-3 h-3 ml-auto" />
+                        <img
+                          src="/logos/github.svg"
+                          alt="GitHub"
+                          className="w-4 md:w-8 h-4 md:h-8 hover:-translate-y-2 transition-transform"
+                        />
                       </a>
-                    </Button>
-                  )}
-                  {(user.portfolioUrl ||
-                    empProfile?.socialLinks?.some(
-                      (l) => l.platform === "website",
-                    )) && (
-                    <Button
-                      asChild
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 justify-start"
-                    >
+                    )}
+                    {user.portfolioUrl && (
                       <a
-                        href={
-                          user.portfolioUrl ||
-                          empProfile?.socialLinks?.find(
-                            (l) => l.platform === "website",
-                          )?.url
-                        }
+                        href={user.portfolioUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        <Globe className="w-4 h-4" />
-                        Portfolio
-                        <ExternalLink className="w-3 h-3 ml-auto" />
+                        <img
+                          src="/logos/portfolio.svg"
+                          alt="Portfolio"
+                          className="w-4 md:w-8 h-4 md:h-8 hover:-translate-y-2 transition-transform"
+                        />
                       </a>
-                    </Button>
-                  )}
-                  {user.professionalLinks?.map((link) => (
+                    )}
+                    {user.professionalLinks?.map((link) => {
+                      const isNotStandardLink = ![
+                        user.linkedinUrl,
+                        user.githubUrl,
+                        user.portfolioUrl,
+                      ].includes(link.url)
+                      return (
+                        isNotStandardLink && (
+                          <Button
+                            key={`${link.label}-${link.url}`}
+                            asChild
+                            variant="outline"
+                            size="sm"
+                            className="gap-2 justify-start"
+                          >
+                            <a
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Globe className="w-4 h-4" />
+                              <span className="truncate">{link.label}</span>
+                              <ExternalLink className="w-3 h-3 ml-auto flex-shrink-0" />
+                            </a>
+                          </Button>
+                        )
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Sign in to view social links
+                    </p>
                     <Button
-                      key={`${link.label}-${link.url}`}
-                      asChild
+                      onClick={() => router.push("/signin")}
                       variant="outline"
                       size="sm"
-                      className="gap-2 justify-start"
                     >
-                      <a
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Globe className="w-4 h-4" />
-                        <span className="truncate">{link.label}</span>
-                        <ExternalLink className="w-3 h-3 ml-auto flex-shrink-0" />
-                      </a>
+                      Sign In
                     </Button>
-                  ))}
-                </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

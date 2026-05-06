@@ -17,9 +17,9 @@ export default function Footer() {
   if (
     pathname === "/signin" ||
     pathname === "/signup" ||
-    pathname.includes("/onboarding") ||
-    pathname.includes("/dashboard") ||
-    pathname.includes("/settings")
+    pathname?.includes("/onboarding") ||
+    pathname?.includes("/dashboard") ||
+    pathname?.includes("/settings")
   ) {
     return null
   }
@@ -169,9 +169,9 @@ export default function Footer() {
         >
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm">
             <div className="flex items-center gap-2 text-muted-foreground">
-              <span>© 2024 Swrk. Made with</span>
-              <Heart className="w-4 h-4 text-red-500 fill-current" />
-              <span>for better careers.</span>
+              <span>
+                © {new Date().getFullYear()} Swrk. All Rights Reserved
+              </span>
             </div>
 
             <div className="flex items-center gap-4 text-muted-foreground">

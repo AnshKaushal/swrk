@@ -4,7 +4,7 @@ dotenv.config({ path: ".env.local" })
 import mongoose from "mongoose"
 import Razorpay from "razorpay"
 
-import SubscriptionPlan from "../models/subscription-plan.js"
+import SubscriptionPlan from "../models/subscription-plan.ts"
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -136,7 +136,7 @@ async function upsertPlan(planData) {
   return SubscriptionPlan.findOneAndUpdate(
     { name: planData.name, interval: planData.interval },
     { $set: planData },
-    { upsert: true, new: true }
+    { upsert: true, new: true },
   )
 }
 

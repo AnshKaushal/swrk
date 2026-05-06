@@ -127,7 +127,6 @@ export async function POST(req: NextRequest) {
       customer_notify: 1,
       quantity: 1,
       total_count: 12,
-      start_at: Math.floor(Date.now() / 1000) + 86400,
       expire_by: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
       addons: [],
       notes: {

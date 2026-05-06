@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/app/api/auth/[...nextauth]/route"
 import { db } from "@/lib/mongodb"
-import { Match } from "@/models/swipe"
+import { Match, Swipe } from "@/models/swipe"
 import User from "@/models/user"
 
 export async function GET(req: NextRequest) {
@@ -31,10 +31,36 @@ export async function GET(req: NextRequest) {
       .populate("employee", "name avatar email username")
       .lean()
 
-    const total = await Match.countDocuments(query)
+    const mutualMatches = [] as typeof matches
+    for (const match of matches) {
+      const employerId = String(match.employer?._id ?? match.employer)
+      const employeeId = String(match.employee?._id ?? match.employee)
+      const [employerSwipe, employeeSwipe] = await Promise.all([
+        Swipe.findOne({
+          swipedBy: employerId,
+          swipedOn: employeeId,
+          direction: { $in: ["right", "super"] },
+        })
+          .select("_id")
+          .lean(),
+        Swipe.findOne({
+          swipedBy: employeeId,
+          swipedOn: employerId,
+          direction: { $in: ["right", "super"] },
+        })
+          .select("_id")
+          .lean(),
+      ])
+
+      if (employerSwipe && employeeSwipe) {
+        mutualMatches.push(match)
+      }
+    }
+
+    const total = mutualMatches.length
 
     return NextResponse.json({
-      matches,
+      matches: mutualMatches,
       total,
       limit,
       skip,

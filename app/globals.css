@@ -85,6 +85,25 @@
   --sidebar-ring: oklch(0.708 0 0);
 }
 
+/* Swipe colors */
+:root {
+  --swipe-like-start: 255 0 140; /* fallback RGB triple for gradients */
+  --swipe-like-end: 211 9 225;
+  --swipe-pass-start: 230 255 0;
+  --swipe-pass-end: 3 209 0;
+  --swipe-like-shadow: rgba(45, 150, 45, 0.75);
+  --swipe-pass-shadow: rgba(224, 83, 83, 0.75);
+}
+
+.dark {
+  --swipe-like-start: 119 0 255;
+  --swipe-like-end: 68 0 255;
+  --swipe-pass-start: 230 255 0;
+  --swipe-pass-end: 3 209 0;
+  --swipe-like-shadow: rgba(119, 0, 255, 0.7);
+  --swipe-pass-shadow: rgba(224, 83, 83, 0.75);
+}
+
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

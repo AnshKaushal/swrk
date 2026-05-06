@@ -1,7 +1,7 @@
 "use client"
 
 import { ReactNode, useEffect, useState } from "react"
-import { SettingsSidebar } from "@/components/settings-sidebar"
+import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { Button } from "@/components/ui/button"
 import { Menu } from "lucide-react"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -25,7 +25,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <aside className="hidden w-64 border-r border-border bg-card lg:block overflow-y-auto fixed left-0 top-0 bottom-0 z-40">
-        <SettingsSidebar />
+        <DashboardSidebar />
       </aside>
 
       <main className="flex min-h-0 flex-1 flex-col overflow-hidden lg:ml-64">
@@ -38,7 +38,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
             </SheetTrigger>
 
             <SheetContent side="left" className="w-64 p-0 lg:hidden">
-              <SettingsSidebar onClose={() => setSidebarOpen(false)} />
+              <DashboardSidebar onClose={() => setSidebarOpen(false)} />
             </SheetContent>
           </Sheet>
 

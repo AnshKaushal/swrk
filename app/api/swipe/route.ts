@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/app/api/auth/[...nextauth]/route"
 import { db } from "@/lib/mongodb"
-import { checkRateLimit } from "@/lib/rate-limiter"
+import { getSwipeQuota } from "@/lib/swipe-limits"
 import { Swipe, Match } from "@/models/swipe"
 import User from "@/models/user"
 import mongoose from "mongoose"
@@ -35,15 +35,38 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const rateLimit = await checkRateLimit(session.user.id)
-    if (!rateLimit.allowed) {
+    const quota = await getSwipeQuota(session.user.id)
+    if (!quota.allowed) {
       return NextResponse.json(
         {
-          error: "Rate limit exceeded",
-          resetAt: rateLimit.resetAt,
+          error: "Daily swipe limit reached",
+          resetAt: quota.resetAt,
+          remaining: quota.remaining,
+          limit: quota.limit,
+          plan: quota.planName,
+          isUnlimited: quota.isUnlimited,
         },
         { status: 429 },
-      ) 
+      )
+    }
+
+    // If this is a super swipe, enforce monthly super-like quotas
+    if (direction === "super") {
+      const { getSuperQuota } = await import("@/lib/swipe-limits")
+      const superQuota = await getSuperQuota(session.user.id)
+      if (!superQuota.allowed) {
+        return NextResponse.json(
+          {
+            error: "Super like limit reached",
+            remaining: superQuota.remaining,
+            limit: superQuota.limit,
+            resetAt: superQuota.resetAt,
+            plan: superQuota.planName,
+            isUnlimited: superQuota.isUnlimited,
+          },
+          { status: 429 },
+        )
+      }
     }
 
     let target = null
@@ -153,7 +176,13 @@ export async function POST(req: NextRequest) {
       success: true,
       matched,
       match: match?.toObject() || null,
-      remaining: rateLimit.remaining - 1,
+      remaining:
+        quota.isUnlimited || quota.remaining === null
+          ? null
+          : Math.max(0, quota.remaining - 1),
+      limit: quota.limit,
+      plan: quota.planName,
+      isUnlimited: quota.isUnlimited,
     })
   } catch (err) {
     console.error("[api/swipe POST]", err)

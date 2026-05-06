@@ -306,6 +306,7 @@ export default function SubscriptionPage() {
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       active: { variant: "default" as const, text: "Active" },
+      created: { variant: "default" as const, text: "Active" },
       canceled: { variant: "destructive" as const, text: "Canceled" },
       past_due: { variant: "destructive" as const, text: "Past Due" },
       trialing: { variant: "secondary" as const, text: "Trial" },
@@ -911,7 +912,7 @@ export default function SubscriptionPage() {
                   </ul>
                 </div>
 
-                {userSubscription.status === "active" && (
+                {["active", "created"].includes(userSubscription.status) && (
                   <div className="mt-3 p-2 bg-amber-50 border border-amber-100 rounded text-xs text-amber-800">
                     This subscription is active. Cancellation will be scheduled
                     at the end of the current billing period.

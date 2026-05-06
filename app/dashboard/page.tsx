@@ -1,12 +1,10 @@
 "use client"
 
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useSession } from "next-auth/react"
-import dynamic from "next/dynamic"
-import { ArrowRight, ShieldCheck, Sparkles, UserCircle2 } from "lucide-react"
-
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardContent,
@@ -14,34 +12,126 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { AdminDashboardFront } from "@/components/dashboard/admin-dashboard-front"
+import { EmployeeDashboardFront } from "@/components/dashboard/employee-dashboard-front"
+import { EmployerDashboardFront } from "@/components/dashboard/employer-dashboard-front"
+import { DashboardProfileLink } from "@/components/dashboard/dashboard-shared"
 
-const SwipeDeck = dynamic(() => import("@/components/swipe/SwipeDeck"), {
-  ssr: false,
-})
+type ActiveRole = "employee" | "employer"
 
-const quickLinks = [
-  {
-    title: "Profile",
-    description: "Edit your public profile and work history.",
-    href: "/settings/profile",
-    icon: UserCircle2,
-  },
-  {
-    title: "Verification",
-    description: "Submit verification details and documents.",
-    href: "/settings/verification",
-    icon: ShieldCheck,
-  },
-  {
-    title: "Subscription",
-    description: "Review plans and unlock premium discovery.",
-    href: "/settings/subscription",
-    icon: Sparkles,
-  },
-]
+type DashboardMatchPreview = {
+  _id: string
+  lastMessageAt?: string
+  lastMessagePreview?: string
+  unreadByEmployer?: number
+  unreadByEmployee?: number
+  employer?: { _id?: string; name?: string; username?: string; avatar?: string }
+  employee?: { _id?: string; name?: string; username?: string; avatar?: string }
+}
 
 export default function DashboardPage() {
   const { data: session, status } = useSession()
+  const [activeRole, setActiveRole] = useState<ActiveRole>("employee")
+  const [roleLoading, setRoleLoading] = useState(true)
+  const [switchingRole, setSwitchingRole] = useState(false)
+  const [recentMatches, setRecentMatches] = useState<DashboardMatchPreview[]>(
+    [],
+  )
+
+  useEffect(() => {
+    if (status !== "authenticated" || !session?.user) {
+      setRoleLoading(false)
+      return
+    }
+
+    if (session.user.role !== "both") {
+      setRoleLoading(false)
+      return
+    }
+
+    const loadActiveRole = async () => {
+      try {
+        const response = await fetch("/api/profile/me", { cache: "no-store" })
+        if (!response.ok) return
+        const data = await response.json()
+        const nextRole: ActiveRole =
+          data?.activeRole === "employer" ? "employer" : "employee"
+        setActiveRole(nextRole)
+      } finally {
+        setRoleLoading(false)
+      }
+    }
+
+    loadActiveRole()
+  }, [session, status])
+
+  useEffect(() => {
+    if (status !== "authenticated") return
+
+    const loadRecentMatches = async () => {
+      try {
+        const response = await fetch("/api/matches?status=active&limit=4", {
+          cache: "no-store",
+        })
+        if (!response.ok) return
+        const data = await response.json()
+        setRecentMatches((data?.matches || []) as DashboardMatchPreview[])
+      } catch {
+        setRecentMatches([])
+      }
+    }
+
+    void loadRecentMatches()
+    const onUpdate = () => void loadRecentMatches()
+    window.addEventListener("swrk:messages-updated", onUpdate)
+    window.addEventListener("focus", onUpdate)
+    return () => {
+      window.removeEventListener("swrk:messages-updated", onUpdate)
+      window.removeEventListener("focus", onUpdate)
+    }
+  }, [status])
+
+  const handleSwitchRole = async (nextRole: ActiveRole) => {
+    if (!session?.user || switchingRole || nextRole === activeRole) return
+    const previousRole = activeRole
+    setActiveRole(nextRole)
+    setSwitchingRole(true)
+
+    try {
+      const response = await fetch("/api/profile/me", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activeRole: nextRole,
+          user: { activeRole: nextRole },
+        }),
+      })
+
+      if (!response.ok) {
+        setActiveRole(previousRole)
+      }
+    } catch {
+      setActiveRole(previousRole)
+    } finally {
+      setSwitchingRole(false)
+    }
+  }
+
+  const dashboardView = useMemo(() => {
+    if (session?.user?.isAdmin) {
+      return "admin" as const
+    }
+
+    const role = session?.user?.role
+    if (role === "employer") {
+      return "employer" as const
+    }
+    if (role === "both") {
+      return activeRole
+    }
+    return "employee" as const
+  }, [activeRole, session?.user?.isAdmin, session?.user?.role])
 
   if (status === "loading") {
     return (
@@ -55,115 +145,121 @@ export default function DashboardPage() {
     return null
   }
 
+  const name = session.user.name || "there"
+
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        <section className="grid gap-4 rounded-3xl border border-border bg-card p-6 shadow-sm lg:grid-cols-[1.5fr_1fr] lg:p-8">
-          <div className="space-y-4">
-            <Badge variant="secondary" className="w-fit">
-              Dashboard
-            </Badge>
-            <div className="space-y-2">
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                Welcome back, {session.user.name || "there"}.
-              </h1>
-              <p className="max-w-2xl text-sm text-muted-foreground sm:text-base">
-                Discover new candidates, jump into your profile settings, and keep your hiring workflow moving from one place.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Button asChild>
-                <Link href="#discover">
-                  Start swiping <ArrowRight className="h-4 w-4" />
-                </Link>
-              </Button>
-              <Button variant="outline" asChild>
-                <Link href="#links">Quick links</Link>
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-            {[
-              { label: "Profile status", value: "Ready" },
-              { label: "Matching mode", value: "Live" },
-              { label: "AI", value: "Auto after 25 swipes" },
-            ].map((item) => (
-              <Card key={item.label} className="border-border/60 bg-muted/20">
-                <CardContent className="p-4">
-                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                    {item.label}
-                  </p>
-                  <p className="mt-1 text-lg font-semibold">{item.value}</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        <section id="discover" className="grid gap-6 lg:grid-cols-[1.6fr_0.9fr]">
+    <div className="min-h-screen">
+      <div className="flex w-full max-w-[1600px] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+        {recentMatches.length > 0 ? (
           <Card className="border-border/60 bg-card shadow-sm">
-            <CardHeader className="border-b border-border/60">
-              <CardTitle>Discover</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Recent messages</CardTitle>
               <CardDescription>
-                Swipe through candidate cards. Drag left or right on the card, or use the action buttons.
+                Jump back into the latest conversations.
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-4 sm:p-6">
-              <SwipeDeck />
-            </CardContent>
-          </Card>
+            <CardContent>
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {recentMatches.map((match) => {
+                  const currentUserId = session.user.id
+                  const isEmployer =
+                    String(match.employer?._id) === currentUserId
+                  const other = isEmployer ? match.employee : match.employer
+                  const unread = isEmployer
+                    ? match.unreadByEmployer || 0
+                    : match.unreadByEmployee || 0
 
-          <div id="links" className="space-y-4">
-            <Card className="border-border/60 bg-card shadow-sm">
-              <CardHeader className="border-b border-border/60">
-                <CardTitle>Quick Links</CardTitle>
-                <CardDescription>
-                  Jump into profile and settings without leaving the dashboard.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3 p-4 sm:p-6">
-                {quickLinks.map((link) => {
-                  const Icon = link.icon
                   return (
-                    <Button
-                      key={link.href}
-                      variant="outline"
-                      asChild
-                      className="h-auto w-full justify-start rounded-2xl p-4"
+                    <Link
+                      key={match._id}
+                      href={`/dashboard/messages?matchId=${match._id}`}
+                      className="min-w-[240px] rounded-2xl border border-border bg-background p-3 transition-colors hover:border-primary/30 hover:bg-muted/40"
                     >
-                      <Link href={link.href} className="flex w-full items-start gap-3">
-                        <Icon className="mt-0.5 h-5 w-5" />
-                        <span className="flex-1 text-left">
-                          <span className="block text-sm font-semibold">{link.title}</span>
-                          <span className="block text-xs text-muted-foreground">
-                            {link.description}
-                          </span>
-                        </span>
-                      </Link>
-                    </Button>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-11 w-11 border border-border">
+                          <AvatarImage
+                            src={other?.avatar}
+                            alt={other?.name || "Match"}
+                          />
+                          <AvatarFallback>
+                            {(other?.name || "M")
+                              .split(" ")
+                              .slice(0, 2)
+                              .map((part) => part.charAt(0).toUpperCase())
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-sm font-semibold">
+                              {other?.name || other?.username || "Match"}
+                            </span>
+                            {unread > 0 ? (
+                              <Badge className="rounded-full px-2 py-0.5 text-[11px]">
+                                {unread > 99 ? "99+" : unread}
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {match.lastMessagePreview || "New conversation"}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
                   )
                 })}
-              </CardContent>
-            </Card>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
+        {session.user.role === "both" && !session.user.isAdmin ? (
+          <Card className="border-border/60 bg-card shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Current Mode</CardTitle>
+              <CardDescription>
+                Switch between Open to work and Hiring dashboard views.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant={activeRole === "employee" ? "default" : "outline"}
+                disabled={switchingRole || roleLoading}
+                onClick={() => handleSwitchRole("employee")}
+              >
+                Open to work
+              </Button>
+              <Button
+                type="button"
+                variant={activeRole === "employer" ? "default" : "outline"}
+                disabled={switchingRole || roleLoading}
+                onClick={() => handleSwitchRole("employer")}
+              >
+                Hiring
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
 
-            <Card className="border-border/60 bg-card shadow-sm">
-              <CardHeader className="border-b border-border/60">
-                <CardTitle>Profile Link</CardTitle>
-                <CardDescription>
-                  Share your public profile or open it in a new tab.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6">
-                <Button variant="secondary" asChild className="w-full">
-                  <Link href={`/${session.user.username || ""}`}>
-                    Open public profile <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-        </section>
+        {roleLoading ? (
+          <Card className="border-border/60 bg-card shadow-sm">
+            <CardContent className="p-6 text-sm text-muted-foreground">
+              Loading dashboard...
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {!roleLoading && dashboardView === "admin" ? (
+          <AdminDashboardFront name={name} />
+        ) : null}
+        {!roleLoading && dashboardView === "employer" ? (
+          <EmployerDashboardFront name={name} />
+        ) : null}
+        {!roleLoading && dashboardView === "employee" ? (
+          <EmployeeDashboardFront name={name} />
+        ) : null}
+
+        <DashboardProfileLink href={`/${session.user.username || ""}`} />
       </div>
     </div>
   )

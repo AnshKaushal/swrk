@@ -20,7 +20,7 @@ function ConfirmEmailChangeContent() {
   const { status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const pendingEmail = searchParams.get("email") || ""
+  const pendingEmail = searchParams?.get("email") || ""
   const [saving, setSaving] = useState(false)
   const [otp, setOtp] = useState("")
 

@@ -9,7 +9,7 @@ import { AlertCircle, ArrowRight } from "lucide-react"
 
 export default function UnsubscribeContent() {
   const searchParams = useSearchParams()
-  const token = searchParams.get("token")
+  const token = searchParams?.get("token") ?? ""
   const [isProcessing, setIsProcessing] = useState(false)
   const [isUnsubscribed, setIsUnsubscribed] = useState(false)
 

@@ -19,6 +19,7 @@ interface Privacy {
   showLinkedin: boolean
   showPhone: boolean
   showEmail: boolean
+  showResumes: boolean
   profileVisibility: string
 }
 
@@ -26,6 +27,7 @@ const defaultPrivacy: Privacy = {
   showLinkedin: false,
   showPhone: false,
   showEmail: true,
+  showResumes: false,
   profileVisibility: "public",
 }
 
@@ -145,6 +147,22 @@ export default function PrivacySettingsPage() {
               checked={privacy.showEmail}
               onCheckedChange={(checked) =>
                 updatePrivacy({ showEmail: checked })
+              }
+              disabled={saving}
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Show Resumes</Label>
+              <p className="text-sm text-muted-foreground">
+                Let others see your resumes on your profile
+              </p>
+            </div>
+            <Switch
+              checked={privacy.showResumes}
+              onCheckedChange={(checked) =>
+                updatePrivacy({ showResumes: checked })
               }
               disabled={saving}
             />

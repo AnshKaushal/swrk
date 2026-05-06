@@ -22,7 +22,7 @@ function SigninForm() {
   const searchParams = useSearchParams()
 
   useEffect(() => {
-    const error = searchParams.get("error")
+    const error = searchParams?.get("error") ?? ""
     if (error) {
       const message = ERROR_MESSAGES[error] || ERROR_MESSAGES.Default
       toast.error(message)

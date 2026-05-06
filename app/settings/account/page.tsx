@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useSession, signOut } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -20,16 +20,22 @@ import {
 } from "@/components/ui/dialog"
 
 export default function AccountSettingsPage() {
-  const { status, data: session } = useSession()
+  const { status, data: session, update } = useSession()
   const router = useRouter()
   const [passwordSaving, setPasswordSaving] = useState(false)
   const [emailChangeSaving, setEmailChangeSaving] = useState(false)
+  const [usernameSaving, setUsernameSaving] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deleteRequestSaving, setDeleteRequestSaving] = useState(false)
   const [deleteConfirmSaving, setDeleteConfirmSaving] = useState(false)
   const [deleteOtpSent, setDeleteOtpSent] = useState(false)
   const [deleteOtp, setDeleteOtp] = useState("")
   const [emailForm, setEmailForm] = useState({ newEmail: "" })
+  const [usernameForm, setUsernameForm] = useState("")
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(
+    null,
+  )
+  const [usernameError, setUsernameError] = useState<string | null>(null)
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: "",
     newPassword: "",
@@ -37,13 +43,57 @@ export default function AccountSettingsPage() {
   })
 
   useEffect(() => {
+    if (status === "authenticated") {
+      setUsernameForm(session?.user?.username || "")
+    }
+
     if (status === "unauthenticated") {
       router.push("/signin")
     }
   }, [status, router])
 
+  const checkUsernameAvailability = useMemo(() => {
+    let timeout: NodeJS.Timeout | undefined
+
+    return (value: string) => {
+      if (timeout) clearTimeout(timeout)
+
+      timeout = setTimeout(async () => {
+        const nextUsername = value.trim().toLowerCase()
+        const currentUsername =
+          session?.user?.username?.trim().toLowerCase() || ""
+
+        if (!nextUsername || nextUsername.length < 3) {
+          setUsernameAvailable(null)
+          setUsernameError(null)
+          return
+        }
+
+        if (nextUsername === currentUsername) {
+          setUsernameAvailable(true)
+          setUsernameError(null)
+          return
+        }
+
+        try {
+          const response = await fetch(
+            `/api/auth/check-username?username=${encodeURIComponent(nextUsername)}`,
+          )
+          const data = await response.json()
+          setUsernameAvailable(Boolean(data.available))
+          setUsernameError(data.error || null)
+        } catch {
+          setUsernameAvailable(null)
+          setUsernameError(null)
+        }
+      }, 400)
+    }
+  }, [session?.user?.username])
+
   const isValidEmail = (value: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
+
+  const isValidUsername = (value: string) => /^[a-zA-Z0-9_-]{3,20}$/.test(value)
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -133,6 +183,61 @@ export default function AccountSettingsPage() {
     }
   }
 
+  const handleUsernameSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    const nextUsername = usernameForm.trim().toLowerCase()
+    const currentUsername = session?.user?.username?.trim().toLowerCase() || ""
+
+    if (!nextUsername) {
+      toast.error("Username is required")
+      return
+    }
+
+    if (!isValidUsername(nextUsername)) {
+      toast.error(
+        "Username must be 3-20 characters and use only letters, numbers, underscore, or dash",
+      )
+      return
+    }
+
+    if (nextUsername === currentUsername) {
+      toast.info("Username is unchanged")
+      return
+    }
+
+    if (usernameAvailable === false) {
+      toast.error(usernameError || "Username is already taken")
+      return
+    }
+
+    try {
+      setUsernameSaving(true)
+      const response = await fetch("/api/profile/me", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user: { username: nextUsername } }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        toast.error(data.error || "Failed to update username")
+        return
+      }
+
+      await update({ username: nextUsername })
+      setUsernameForm(nextUsername)
+      setUsernameAvailable(true)
+      setUsernameError(null)
+      toast.success("Username updated successfully")
+    } catch (error) {
+      console.error("Error updating username:", error)
+      toast.error("Failed to update username")
+    } finally {
+      setUsernameSaving(false)
+    }
+  }
+
   const handleDeleteRequest = async () => {
     try {
       setDeleteRequestSaving(true)
@@ -213,6 +318,58 @@ export default function AccountSettingsPage() {
               className="bg-muted"
             />
           </div>
+
+          <form className="space-y-3" onSubmit={handleUsernameSave}>
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                value={usernameForm}
+                onChange={(e) => {
+                  const nextValue = e.target.value
+                    .toLowerCase()
+                    .replace(/[^a-z0-9_-]/g, "")
+                  setUsernameForm(nextValue)
+                  setUsernameAvailable(null)
+                  setUsernameError(null)
+                  checkUsernameAvailability(nextValue)
+                }}
+                disabled={usernameSaving}
+                placeholder="Choose a username"
+                className={
+                  usernameAvailable === true
+                    ? "ring-2 ring-green-500/50"
+                    : usernameAvailable === false
+                      ? "ring-2 ring-destructive/50"
+                      : ""
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                This is your public profile handle.
+              </p>
+              {usernameError ? (
+                <p className="text-xs text-destructive">{usernameError}</p>
+              ) : null}
+            </div>
+            <Button
+              type="submit"
+              disabled={
+                usernameSaving ||
+                !usernameForm.trim() ||
+                usernameAvailable === false
+              }
+            >
+              {usernameSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Username"
+              )}
+            </Button>
+          </form>
 
           <form className="space-y-3" onSubmit={handleEmailChangeRequest}>
             <div className="space-y-2">

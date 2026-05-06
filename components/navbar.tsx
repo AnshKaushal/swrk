@@ -60,9 +60,9 @@ export default function Navbar() {
   if (
     pathname === "/signin" ||
     pathname === "/signup" ||
-    pathname.includes("/onboarding") ||
-    pathname.includes("/dashboard") ||
-    pathname.includes("/settings")
+    pathname?.includes("/onboarding") ||
+    pathname?.includes("/dashboard") ||
+    pathname?.includes("/settings")
   ) {
     return null
   }

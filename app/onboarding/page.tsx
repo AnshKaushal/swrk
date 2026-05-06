@@ -88,19 +88,45 @@ function debounce(
   }
 }
 
+const parseYear = (value?: string | null) => {
+  if (!value) return null
+  const year = Number.parseInt(value, 10)
+  return Number.isFinite(year) ? year : null
+}
+
 export default function OnboardingPage() {
   const { data: session, status, update } = useSession()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cropPreviewUrlRef = useRef<string | null>(null)
+  const hasHydratedRef = useRef(false)
 
   const [step, setStep] = useState(1)
 
-  // Form State
   const [name, setName] = useState("")
   const [username, setUsername] = useState("")
   const [avatar, setAvatar] = useState("")
+  const [headline, setHeadline] = useState("")
+  const [bio, setBio] = useState("")
+  const [education, setEducation] = useState([
+    { school: "", degree: "", field: "", year: "", endYear: "" },
+  ])
+  const [workHistory, setWorkHistory] = useState([
+    {
+      company: "",
+      position: "",
+      duration: "",
+      endYear: "",
+      isCurrent: false,
+      description: "",
+    },
+  ])
+  const [desiredRoles, setDesiredRoles] = useState<string[]>([])
+  const [desiredIndustries, setDesiredIndustries] = useState<string[]>([])
+  const [preferredLocations, setPreferredLocations] = useState("")
+  const [expectedCTCMin, setExpectedCTCMin] = useState("")
+  const [expectedCTCMax, setExpectedCTCMax] = useState("")
   const [role, setRole] = useState("")
   const [phone, setPhone] = useState("")
   const [dateOfBirth, setDateOfBirth] = useState("")
@@ -111,7 +137,6 @@ export default function OnboardingPage() {
   const [zoom, setZoom] = useState(1)
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null)
 
-  // Username validation
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(
     null,
   )
@@ -120,21 +145,42 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
-      const timeout = window.setTimeout(() => {
-        setStep(session.user.onboardingStep || 1)
+      if (!hasHydratedRef.current) {
+        const storageKey = `swrk:onboarding-step:${session.user.id || session.user.username || "guest"}`
+        const savedStep = Number(window.localStorage.getItem(storageKey) || "0")
+        const initialStep = Math.max(
+          session.user.onboardingStep || 1,
+          savedStep || 1,
+        )
+
+        setStep(initialStep)
         setName(session.user.name || "")
         setAvatar(session.user.avatar || "")
         setUsername(session.user.username || "")
         setRole(session.user.role || "")
-      }, 0)
-
-      return () => window.clearTimeout(timeout)
+        hasHydratedRef.current = true
+      }
     }
 
     if (status === "unauthenticated") {
       router.push("/signin")
     }
   }, [session, status, router])
+
+  useEffect(() => {
+    if (
+      status !== "authenticated" ||
+      !session?.user ||
+      !hasHydratedRef.current
+    ) {
+      return
+    }
+
+    const storageKey = `swrk:onboarding-step:${session.user.id || session.user.username || "guest"}`
+    if (step >= 1 && step <= 4) {
+      window.localStorage.setItem(storageKey, String(step))
+    }
+  }, [session?.user, status, step])
 
   const checkUsernameAvailability = useMemo(
     () =>
@@ -250,6 +296,7 @@ export default function OnboardingPage() {
     targetStep: number,
     payload: Record<string, unknown>,
     sessionUpdates: Record<string, unknown>,
+    profilePayload?: Record<string, unknown>,
   ) => {
     setLoading(true)
     try {
@@ -260,14 +307,27 @@ export default function OnboardingPage() {
       })
       if (!res.ok) throw new Error("Update failed")
 
-      if (targetStep === 4) {
+      if (profilePayload && Object.keys(profilePayload).length > 0) {
+        const profileRes = await fetch("/api/profile/me", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(profilePayload),
+        })
+        if (!profileRes.ok) throw new Error("Profile update failed")
+      }
+
+      if (targetStep === 5) {
         toast.success("Profile completed successfully! Welcome to Swrk!")
-        await update({ ...sessionUpdates, onboardingStep: targetStep })
-        await new Promise((resolve) => setTimeout(resolve, 100))
+        const storageKey = `swrk:onboarding-step:${session?.user?.id || session?.user?.username || "guest"}`
+        window.localStorage.removeItem(storageKey)
+        await update({
+          ...sessionUpdates,
+          onboardingStep: 4,
+          onboardingCompleted: true,
+        })
         router.push("/dashboard")
       } else {
         setStep(targetStep)
-        await update({ ...sessionUpdates, onboardingStep: targetStep })
         toast.success("Saved successfully!")
       }
     } catch {
@@ -276,18 +336,98 @@ export default function OnboardingPage() {
     setLoading(false)
   }
 
-  const onNextStep1 = () =>
-    handleStepSubmit(
+  const onNextStep1 = () => {
+    if (!username.trim()) {
+      toast.error("Username is required to continue")
+      return
+    }
+
+    if (usernameAvailable === false) {
+      toast.error(usernameError || "Username is already taken")
+      return
+    }
+
+    return handleStepSubmit(
       2,
       { name, username, avatar },
       { name, username, image: avatar },
     )
-  const onNextStep2 = () => handleStepSubmit(3, { role }, { role })
-  const onNextStep3 = () =>
+  }
+  const onNextStep2 = () => {
+    const profilePayload: Record<string, unknown> = {}
+    if (headline) profilePayload.employeeProfile = { headline }
+    if (bio) {
+      if (!profilePayload.employeeProfile) profilePayload.employeeProfile = {}
+      ;(profilePayload.employeeProfile as Record<string, unknown>).bio = bio
+    }
+    const normalizedEducation = education
+      .filter((e) => e.school || e.degree)
+      .map((e) => ({
+        institution: e.school,
+        degree: e.degree,
+        field: e.field,
+        startYear: e.year,
+        endYear: e.endYear,
+      }))
+    if (normalizedEducation.length > 0) {
+      if (!profilePayload.employeeProfile) profilePayload.employeeProfile = {}
+      ;(profilePayload.employeeProfile as Record<string, unknown>).education =
+        normalizedEducation
+    }
+    const normalizedWorkHistory = workHistory
+      .filter((w) => w.company || w.position)
+      .map((w) => ({
+        company: w.company,
+        role: w.position,
+        startDate: (() => {
+          const startYear = parseYear(w.duration)
+          return startYear ? new Date(startYear, 0, 1).toISOString() : undefined
+        })(),
+        endDate:
+          !w.isCurrent && w.endYear && w.endYear.toLowerCase() !== "present"
+            ? (() => {
+                const endYear = parseYear(w.endYear)
+                return endYear
+                  ? new Date(endYear, 11, 31).toISOString()
+                  : undefined
+              })()
+            : undefined,
+        isCurrent: Boolean(w.isCurrent),
+        description: w.description,
+      }))
+    if (normalizedWorkHistory.length > 0) {
+      if (!profilePayload.employeeProfile) profilePayload.employeeProfile = {}
+      ;(profilePayload.employeeProfile as Record<string, unknown>).workHistory =
+        normalizedWorkHistory
+    }
+    return handleStepSubmit(3, {}, {}, profilePayload)
+  }
+  const onNextStep3 = () => {
+    const profilePayload: Record<string, unknown> = {}
+    const filters: Record<string, unknown> = {}
+    if (desiredRoles.length > 0) filters.desiredRoles = desiredRoles
+    if (desiredIndustries.length > 0)
+      filters.desiredIndustries = desiredIndustries
+    if (preferredLocations) filters.preferredLocations = [preferredLocations]
+    if (expectedCTCMin || expectedCTCMax) {
+      filters.expectedCTC = {}
+      if (expectedCTCMin)
+        (filters.expectedCTC as Record<string, unknown>).min =
+          parseInt(expectedCTCMin)
+      if (expectedCTCMax)
+        (filters.expectedCTC as Record<string, unknown>).max =
+          parseInt(expectedCTCMax)
+    }
+    if (Object.keys(filters).length > 0) {
+      profilePayload.employeeProfile = filters
+    }
+    return handleStepSubmit(4, {}, {}, profilePayload)
+  }
+  const onNextStep4 = () =>
     handleStepSubmit(
-      4,
-      { phone, dateOfBirth, gender },
-      { onboardingCompleted: true },
+      5,
+      { role, phone, dateOfBirth, gender },
+      { role, onboardingCompleted: true },
     )
 
   const getAvatarFallback = () => (name ? name.charAt(0).toUpperCase() : "U")
@@ -302,7 +442,7 @@ export default function OnboardingPage() {
 
   return (
     <div className="flex min-h-screen">
-      <div className="relative hidden w-1/2 lg:flex overflow-hidden bg-black">
+      <div className="relative hidden w-1/2 lg:flex overflow-hidden bg-black min-h-screen">
         <img
           src="https://images.unsplash.com/photo-1653447538278-f5f7ade70637?q=80&w=3996&auto=format&fit=crop"
           alt="Onboarding Background"
@@ -325,14 +465,14 @@ export default function OnboardingPage() {
           </div>
           <div className="flex items-center gap-8">
             <div>
-              <div className="text-3xl font-bold">{step}/3</div>
+              <div className="text-3xl font-bold">{step}/4</div>
               <div className="text-sm font-medium text-white/60 tracking-wider uppercase">
                 Steps
               </div>
             </div>
             <div>
               <div className="text-3xl font-bold">
-                2<span className="text-xl">m</span>
+                3<span className="text-xl">m</span>
               </div>
               <div className="text-sm font-medium text-white/60 tracking-wider uppercase">
                 Setup
@@ -347,19 +487,20 @@ export default function OnboardingPage() {
           <div className="space-y-2">
             <h2 className="text-3xl font-bold tracking-tight">
               {step === 1 && "Personal Info"}
-              {step === 2 && "Choose Your Role"}
-              {step === 3 && "Final Details (Optional)"}
+              {step === 2 && "Professional Profile"}
+              {step === 3 && "Your Preferences"}
+              {step === 4 && "Choose Your Role"}
             </h2>
             <p className="text-muted-foreground">
               {step === 1 && "Let's start with the basics to identify you."}
-              {step === 2 && "How will you be using Swrk?"}
-              {step === 3 &&
-                "Tell us a bit more about yourself to help with matching."}
+              {step === 2 && "Tell us about your professional background."}
+              {step === 3 && "Help us find the best matches for you."}
+              {step === 4 && "How will you be using Swrk?"}
             </p>
           </div>
 
           <div className="flex gap-2">
-            {[1, 2, 3].map((i) => (
+            {[1, 2, 3, 4].map((i) => (
               <div
                 key={i}
                 className={`h-1.5 flex-1 rounded-full transition-all ${step >= i ? "bg-primary" : "bg-muted"}`}
@@ -469,6 +610,392 @@ export default function OnboardingPage() {
 
           {step === 2 && (
             <div className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Professional Headline</Label>
+                  <Input
+                    value={headline}
+                    onChange={(e) => setHeadline(e.target.value)}
+                    placeholder="e.g. Senior Frontend Engineer | React Specialist"
+                    className="h-12 bg-muted/50 border-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Bio</Label>
+                  <textarea
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    placeholder="Tell us about yourself, your expertise, and what you're looking for..."
+                    className="h-24 w-full rounded-lg bg-muted/50 border-none px-4 py-3 font-sans text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold">Education</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setEducation([
+                        ...education,
+                        {
+                          school: "",
+                          degree: "",
+                          field: "",
+                          year: "",
+                          endYear: "",
+                        },
+                      ])
+                    }
+                  >
+                    + Add
+                  </Button>
+                </div>
+                {education.map((edu, idx) => (
+                  <div
+                    key={idx}
+                    className="space-y-3 rounded-lg border border-border p-4"
+                  >
+                    <div className="flex items-start justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          setEducation((prev) =>
+                            prev.filter((_, i) => i !== idx),
+                          )
+                        }
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                    <Input
+                      value={edu.school}
+                      onChange={(e) => {
+                        const updated = [...education]
+                        updated[idx].school = e.target.value
+                        setEducation(updated)
+                      }}
+                      placeholder="School/University"
+                      className="h-10 bg-muted/50 border-none text-sm"
+                    />
+                    <div className="grid grid-cols-3 gap-2">
+                      <Input
+                        value={edu.degree}
+                        onChange={(e) => {
+                          const updated = [...education]
+                          updated[idx].degree = e.target.value
+                          setEducation(updated)
+                        }}
+                        placeholder="Degree"
+                        className="h-10 bg-muted/50 border-none text-sm"
+                      />
+                      <Input
+                        value={edu.year}
+                        onChange={(e) => {
+                          const updated = [...education]
+                          updated[idx].year = e.target.value
+                          setEducation(updated)
+                        }}
+                        placeholder="Start year"
+                        className="h-10 bg-muted/50 border-none text-sm"
+                      />
+                      <Input
+                        value={(edu as any).endYear}
+                        onChange={(e) => {
+                          const updated = [...education]
+                          ;(updated[idx] as any).endYear = e.target.value
+                          setEducation(updated)
+                        }}
+                        placeholder="End year"
+                        className="h-10 bg-muted/50 border-none text-sm"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold">
+                    Work Experience
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setWorkHistory([
+                        ...workHistory,
+                        {
+                          company: "",
+                          position: "",
+                          duration: "",
+                          endYear: "",
+                          isCurrent: false,
+                          description: "",
+                        },
+                      ])
+                    }
+                  >
+                    + Add
+                  </Button>
+                </div>
+                {workHistory.map((work, idx) => (
+                  <div
+                    key={idx}
+                    className="space-y-3 rounded-lg border border-border p-4"
+                  >
+                    <div className="flex items-start justify-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          setWorkHistory((prev) =>
+                            prev.filter((_, i) => i !== idx),
+                          )
+                        }
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        value={work.company}
+                        onChange={(e) => {
+                          const updated = [...workHistory]
+                          updated[idx].company = e.target.value
+                          setWorkHistory(updated)
+                        }}
+                        placeholder="Company"
+                        className="h-10 bg-muted/50 border-none text-sm"
+                      />
+                      <Input
+                        value={work.position}
+                        onChange={(e) => {
+                          const updated = [...workHistory]
+                          updated[idx].position = e.target.value
+                          setWorkHistory(updated)
+                        }}
+                        placeholder="Position"
+                        className="h-10 bg-muted/50 border-none text-sm"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        value={work.duration}
+                        onChange={(e) => {
+                          const updated = [...workHistory]
+                          updated[idx].duration = e.target.value
+                          setWorkHistory(updated)
+                        }}
+                        placeholder="Start year (e.g. 2020)"
+                        className="h-10 bg-muted/50 border-none text-sm"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id={`current-work-${idx}`}
+                        type="checkbox"
+                        checked={Boolean((work as any).isCurrent)}
+                        onChange={(e) => {
+                          const updated = [...workHistory]
+                          ;(updated[idx] as any).isCurrent = e.target.checked
+                          if (e.target.checked) {
+                            ;(updated[idx] as any).endYear = ""
+                          }
+                          setWorkHistory(updated)
+                        }}
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                      />
+                      <Label
+                        htmlFor={`current-work-${idx}`}
+                        className="text-sm"
+                      >
+                        I currently work here
+                      </Label>
+                    </div>
+                    {!Boolean((work as any).isCurrent) && (
+                      <Input
+                        value={(work as any).endYear}
+                        onChange={(e) => {
+                          const updated = [...workHistory]
+                          ;(updated[idx] as any).endYear = e.target.value
+                          setWorkHistory(updated)
+                        }}
+                        placeholder="End year (e.g. 2023)"
+                        className="h-10 bg-muted/50 border-none text-sm"
+                      />
+                    )}
+                    <textarea
+                      value={work.description}
+                      onChange={(e) => {
+                        const updated = [...workHistory]
+                        updated[idx].description = e.target.value
+                        setWorkHistory(updated)
+                      }}
+                      placeholder="What did you accomplish?"
+                      className="h-16 w-full rounded-lg bg-muted/50 border-none px-3 py-2 font-sans text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex gap-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setStep(1)}
+                  className="h-12 w-12 p-0 shrink-0"
+                  disabled={loading}
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <Button
+                  onClick={onNextStep2}
+                  className="h-12 flex-1 text-base font-bold"
+                  disabled={loading || !headline}
+                >
+                  {loading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    "Continue"
+                  )}
+                  {!loading && <ArrowRight className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Desired Roles</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      "Frontend",
+                      "Backend",
+                      "Fullstack",
+                      "DevOps",
+                      "Data Science",
+                      "Product",
+                    ].map((r) => (
+                      <button
+                        key={r}
+                        onClick={() =>
+                          setDesiredRoles(
+                            desiredRoles.includes(r)
+                              ? desiredRoles.filter((x) => x !== r)
+                              : [...desiredRoles, r],
+                          )
+                        }
+                        className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
+                          desiredRoles.includes(r)
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Desired Industries</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      "SaaS",
+                      "FinTech",
+                      "HealthTech",
+                      "AI/ML",
+                      "E-commerce",
+                      "Web3",
+                    ].map((ind) => (
+                      <button
+                        key={ind}
+                        onClick={() =>
+                          setDesiredIndustries(
+                            desiredIndustries.includes(ind)
+                              ? desiredIndustries.filter((x) => x !== ind)
+                              : [...desiredIndustries, ind],
+                          )
+                        }
+                        className={`rounded-full px-4 py-2 text-sm font-medium transition-all ${
+                          desiredIndustries.includes(ind)
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80"
+                        }`}
+                      >
+                        {ind}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Preferred Locations</Label>
+                  <Input
+                    value={preferredLocations}
+                    onChange={(e) => setPreferredLocations(e.target.value)}
+                    placeholder="e.g. San Francisco, Remote, New York"
+                    className="h-12 bg-muted/50 border-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Expected Salary Range (Annual)</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      value={expectedCTCMin}
+                      onChange={(e) => setExpectedCTCMin(e.target.value)}
+                      placeholder="Min"
+                      type="number"
+                      className="h-12 bg-muted/50 border-none"
+                    />
+                    <Input
+                      value={expectedCTCMax}
+                      onChange={(e) => setExpectedCTCMax(e.target.value)}
+                      placeholder="Max"
+                      type="number"
+                      className="h-12 bg-muted/50 border-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setStep(2)}
+                  className="h-12 w-12 p-0 shrink-0"
+                  disabled={loading}
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <Button
+                  onClick={onNextStep3}
+                  className="h-12 flex-1 text-base font-bold"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    "Continue"
+                  )}
+                  {!loading && <ArrowRight className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {step === 4 && (
+            <div className="space-y-6">
               <RadioGroup
                 value={role}
                 onValueChange={setRole}
@@ -510,33 +1037,6 @@ export default function OnboardingPage() {
                 ))}
               </RadioGroup>
 
-              <div className="flex gap-4">
-                <Button
-                  variant="outline"
-                  onClick={() => setStep(1)}
-                  className="h-12 w-12 p-0 shrink-0"
-                  disabled={loading}
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-                <Button
-                  onClick={onNextStep2}
-                  className="h-12 flex-1 text-base font-bold"
-                  disabled={loading || !role}
-                >
-                  {loading ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    "Continue to Final Step"
-                  )}
-                  {!loading && <ArrowRight className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="space-y-6">
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Phone Number</Label>
@@ -578,16 +1078,16 @@ export default function OnboardingPage() {
               <div className="flex gap-4">
                 <Button
                   variant="outline"
-                  onClick={() => setStep(2)}
+                  onClick={() => setStep(3)}
                   className="h-12 w-12 p-0 shrink-0"
                   disabled={loading}
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <Button
-                  onClick={onNextStep3}
+                  onClick={onNextStep4}
                   className="h-12 flex-1 text-base font-bold"
-                  disabled={loading}
+                  disabled={loading || !role}
                 >
                   {loading ? (
                     <Loader2 className="h-5 w-5 animate-spin" />

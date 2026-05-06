@@ -19,11 +19,49 @@ interface CandidateProfile {
   bio?: string
   skills?: string[]
   currentCity?: string
+  currentState?: string
+  currentCountry?: string
+  preferredLocations?: string[]
+  workPreference?: string
+  expectedCTC?: {
+    min?: number
+    max?: number
+    currency?: string
+    period?: string
+    isNegotiable?: boolean
+  }
+  employmentType?: string[]
+  currentStatus?: string
   desiredRoles?: string[]
   desiredIndustries?: string[]
   companyName?: string
   companySize?: string
+  companyType?: string
+  companyTagline?: string
+  companyDescription?: string
+  headquarters?: string
+  workStyle?: string
   industry?: string[]
+  activeOpenings?: Array<{
+    title?: string
+    location?: string
+    locationType?: string
+    employmentType?: string
+    ctcMin?: number
+    ctcMax?: number
+    currency?: string
+    ctcPeriod?: string
+    isActive?: boolean
+    requiredSkills?: string[]
+    preferredSkills?: string[]
+  }>
+  filters?: {
+    locations?: string[]
+    employmentTypes?: string[]
+    workPreference?: string[]
+    ctcBudgetMin?: number
+    ctcBudgetMax?: number
+  }
   profileVisibility?: string
 }
 
@@ -67,13 +105,15 @@ async function fetchCandidateProfiles(
       if (userRole === "employer") {
         const emp = await EmployeeProfile.findOne({ user: user._id })
           .select(
-            "headline bio primarySkills currentCity desiredRoles desiredIndustries",
+            "headline bio primarySkills currentCity currentState currentCountry preferredLocations workPreference expectedCTC employmentType currentStatus desiredRoles desiredIndustries",
           )
           .lean()
         profile = emp || {}
       } else {
         const empl = await EmployerProfile.findOne({ user: user._id })
-          .select("companyName companySize industry")
+          .select(
+            "companyName companySize companyType companyTagline companyDescription headquarters workStyle industry activeOpenings filters",
+          )
           .lean()
         profile = empl || {}
       }

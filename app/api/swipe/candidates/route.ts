@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/app/api/auth/[...nextauth]/route"
 import { db } from "@/lib/mongodb"
+import { getSwipeQuota } from "@/lib/swipe-limits"
 import {
   getAIRankedCandidates,
   getHeuristicCandidates,
@@ -8,7 +9,7 @@ import {
 import { Swipe } from "@/models/swipe"
 import User from "@/models/user"
 
-const AI_MIN_SWIPES = Number(process.env.SWIPE_AI_MIN_SWIPES ?? 25)
+const USE_AI_RANKING = process.env.SWIPE_USE_AI_RANKING === "true"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -37,9 +38,10 @@ export async function GET(req: NextRequest) {
 
     const viewerRole = user.activeRole || user.role || "employee"
 
-    const [swipedProfiles, swipeCount] = await Promise.all([
+    const [swipedProfiles, swipeCount, quota] = await Promise.all([
       Swipe.find({ swipedBy: session.user.id }).select("swipedOn").lean(),
       Swipe.countDocuments({ swipedBy: session.user.id }),
+      getSwipeQuota(session.user.id),
     ])
 
     const excludeIds = Array.from(
@@ -49,7 +51,7 @@ export async function GET(req: NextRequest) {
       ]),
     )
 
-    const useAi = swipeCount >= AI_MIN_SWIPES
+    const useAi = USE_AI_RANKING
 
     const candidates = useAi
       ? await getAIRankedCandidates(session.user.id, excludeIds, limit)
@@ -60,25 +62,92 @@ export async function GET(req: NextRequest) {
           limit,
         )
 
-    const filtered = candidates.filter((c) => {
-      const visibility = c.profileVisibility || "public"
-      if (visibility === "hidden") return false
-      if (
-        visibility === "verified-only" &&
-        !c.isVerified &&
-        !c.profileVerified
-      ) {
-        return false
-      }
-      return true
-    })
+    // Fetch viewer profile to compute match percentage
+    let viewerProfile: any = null
+    if (viewerRole === "employer") {
+      const EmployerProfile = (await import("@/models/employer")).default
+      viewerProfile = await EmployerProfile.findOne({ user: user._id }).lean()
+    } else {
+      const EmployeeProfile = (await import("@/models/employee")).default
+      viewerProfile = await EmployeeProfile.findOne({ user: user._id }).lean()
+    }
+
+    const filtered = candidates
+      .filter((c) => {
+        const visibility = c.profileVisibility || "public"
+        if (visibility === "hidden") return false
+        if (
+          visibility === "verified-only" &&
+          !c.isVerified &&
+          !c.profileVerified
+        ) {
+          return false
+        }
+        return true
+      })
+      .map((c) => {
+        // compute match percent and expose job requirements
+        const candidate = { ...c } as any
+
+        function computePercent(
+          jobSkills: string[] = [],
+          personSkills: string[] = [],
+        ) {
+          const a = (jobSkills || []).map((s) => String(s).toLowerCase())
+          const b = (personSkills || []).map((s) => String(s).toLowerCase())
+          if (a.length > 0) {
+            const matched = a.filter((s) => b.includes(s)).length
+            return Math.round((matched / a.length) * 100)
+          }
+          // fallback: Jaccard-like
+          const set = new Set<string>([...a, ...b])
+          const intersect = a.filter((s) => b.includes(s)).length
+          const denom = set.size || 1
+          return Math.round((intersect / denom) * 100)
+        }
+
+        let jobSkills: string[] = []
+        let personSkills: string[] = []
+
+        if (viewerRole === "employer") {
+          // viewer is employer, candidates are employees
+          jobSkills =
+            (viewerProfile?.activeOpenings &&
+              viewerProfile.activeOpenings[0]?.requiredSkills) ||
+            viewerProfile?.filters?.skills ||
+            []
+          personSkills = candidate.primarySkills || candidate.skills || []
+        } else {
+          // viewer is employee, candidates are employers
+          jobSkills =
+            (candidate.activeOpenings &&
+              candidate.activeOpenings[0]?.requiredSkills) ||
+            candidate.filters?.skills ||
+            []
+          // viewer's own skills
+          personSkills =
+            viewerProfile?.primarySkills || viewerProfile?.skills || []
+        }
+
+        candidate.matchPercent = computePercent(jobSkills, personSkills)
+        candidate.jobRequirements = jobSkills
+        candidate.personSkills = personSkills
+
+        return candidate
+      })
 
     return NextResponse.json({
       candidates: filtered,
       total: filtered.length,
       swipeCount,
       rankingMode: useAi ? "ai" : "heuristic",
-      aiThreshold: AI_MIN_SWIPES,
+      swipeQuota: {
+        remaining: quota.remaining,
+        limit: quota.limit,
+        plan: quota.planName,
+        isUnlimited: quota.isUnlimited,
+        resetAt: quota.resetAt,
+      },
     })
   } catch (err) {
     console.error("[api/swipe/candidates GET]", err)

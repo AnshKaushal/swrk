@@ -25,6 +25,11 @@ const resolveActiveRole = (
   return normalizedRole
 }
 
+const normalizeUsername = (value?: string | null) =>
+  value?.trim().toLowerCase() || ""
+
+const isValidUsername = (value: string) => /^[a-zA-Z0-9_-]{3,20}$/.test(value)
+
 export async function GET() {
   try {
     const session = await auth()
@@ -106,6 +111,40 @@ export async function PUT(req: NextRequest) {
     const userUpdateData: Record<string, unknown> = {}
 
     if (userData.name !== undefined) userUpdateData.name = userData.name
+    if (userData.username !== undefined) {
+      const nextUsername = normalizeUsername(userData.username)
+
+      if (!nextUsername) {
+        return NextResponse.json(
+          { error: "Username is required" },
+          { status: 400 },
+        )
+      }
+
+      if (!isValidUsername(nextUsername)) {
+        return NextResponse.json(
+          {
+            error:
+              "Username must be 3-20 characters and use only letters, numbers, underscore, or dash",
+          },
+          { status: 400 },
+        )
+      }
+
+      const existingUser = await User.findOne({
+        username: nextUsername,
+        _id: { $ne: user._id },
+      }).select("_id")
+
+      if (existingUser) {
+        return NextResponse.json(
+          { error: "Username is already taken" },
+          { status: 409 },
+        )
+      }
+
+      userUpdateData.username = nextUsername
+    }
     if (userData.phone !== undefined) userUpdateData.phone = userData.phone
     if (userData.address !== undefined)
       userUpdateData.address = userData.address
@@ -147,6 +186,7 @@ export async function PUT(req: NextRequest) {
         currentStatus: employeeData.currentStatus,
         availableFrom: employeeData.availableFrom,
         currentCity: employeeData.currentCity,
+        currentState: employeeData.currentState,
         currentCountry: employeeData.currentCountry,
         workPreference: employeeData.workPreference,
         primarySkills: employeeData.primarySkills || [],

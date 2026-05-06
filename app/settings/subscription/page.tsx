@@ -131,12 +131,14 @@ export default function SubscriptionSettingsPage() {
                     <p className="mt-1 text-sm text-muted-foreground">
                       <Badge
                         variant={
-                          subscription.status === "active"
+                          ["active", "created"].includes(subscription.status)
                             ? "default"
                             : "secondary"
                         }
                       >
-                        {subscription.status}
+                        {subscription.status === "created"
+                          ? "active"
+                          : subscription.status}
                       </Badge>
                     </p>
                   </div>

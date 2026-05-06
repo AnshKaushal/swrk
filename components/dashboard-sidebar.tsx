@@ -4,18 +4,18 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut, useSession } from "next-auth/react"
 import {
-  LayoutDashboard,
-  Radar,
-  Link2,
-  Settings,
-  UserCircle,
+  User,
   Shield,
-  LogOut,
   Bell,
-  Home,
+  Settings,
+  Crown,
+  Filter,
+  FileText,
+  LogOut,
+  UserCircle,
+  Zap,
+  MessageSquare,
 } from "lucide-react"
-import React from "react"
-
 import { ModeToggle } from "@/components/theme-toggle"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -27,25 +27,56 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import { IconDashboard } from "@tabler/icons-react"
+import { Badge } from "@/components/ui/badge"
+import React from "react"
 
 const navigation = [
-  { name: "Home", href: "/home", icon: Home },
-  { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Discover", href: "/dashboard#discover", icon: Radar },
-  { name: "Quick Links", href: "/dashboard#links", icon: Link2 },
-  { name: "Profile", href: "/settings/profile", icon: UserCircle },
+  { name: "Dashboard", href: "/dashboard", icon: IconDashboard },
+  { name: "Messages", href: "/dashboard/messages", icon: MessageSquare },
+  { name: "Swipe", href: "/dashboard/swipe", icon: Zap },
+  { name: "Profile", href: "/settings/profile", icon: User },
   { name: "Verification", href: "/settings/verification", icon: Shield },
+  { name: "Filters", href: "/settings/role-filters", icon: Filter },
+  { name: "Resumes", href: "/settings/resume", icon: FileText },
+  { name: "Privacy", href: "/settings/privacy", icon: Shield },
   { name: "Notifications", href: "/settings/notifications", icon: Bell },
+  { name: "Subscription", href: "/settings/subscription", icon: Crown },
   { name: "Account", href: "/settings/account", icon: Settings },
 ]
 
 export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname()
   const { data: session, status, update } = useSession()
+  const [unreadCount, setUnreadCount] = React.useState(0)
 
   const handleSignOut = () => {
     signOut({ callbackUrl: "/" })
   }
+
+  const loadUnreadCount = React.useCallback(async () => {
+    if (status !== "authenticated" || !session?.user?.id) return
+
+    try {
+      const response = await fetch("/api/matches?status=active&limit=100", {
+        cache: "no-store",
+      })
+      if (!response.ok) return
+      const data = await response.json()
+      const matches = Array.isArray(data?.matches) ? data.matches : []
+      const totalUnread = matches.reduce((count: number, match: any) => {
+        const isEmployer =
+          String(match?.employer?._id || match?.employer) === session.user.id
+        const unread = isEmployer
+          ? match?.unreadByEmployer || 0
+          : match?.unreadByEmployee || 0
+        return count + unread
+      }, 0)
+      setUnreadCount(totalUnread)
+    } catch (error) {
+      console.warn("failed to load unread count", error)
+    }
+  }, [session?.user?.id, status])
 
   React.useEffect(() => {
     if (!update) return
@@ -59,6 +90,21 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
     window.addEventListener("swrk:session-updated", handler)
     return () => window.removeEventListener("swrk:session-updated", handler)
   }, [update])
+
+  React.useEffect(() => {
+    void loadUnreadCount()
+    const onFocus = () => void loadUnreadCount()
+    const onMessageUpdate = () => void loadUnreadCount()
+    window.addEventListener("focus", onFocus)
+    window.addEventListener("swrk:messages-updated", onMessageUpdate)
+    const interval = window.setInterval(() => void loadUnreadCount(), 15000)
+
+    return () => {
+      window.removeEventListener("focus", onFocus)
+      window.removeEventListener("swrk:messages-updated", onMessageUpdate)
+      window.clearInterval(interval)
+    }
+  }, [loadUnreadCount])
 
   const getAvatarUrl = () => {
     if (session?.user?.avatar) {
@@ -84,7 +130,7 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
   return (
     <nav className="flex h-full flex-col">
       <div className="flex items-center justify-between p-4 pt-6">
-        <Link href="/home" className="flex items-center gap-3">
+        <Link href="/" className="flex items-center gap-3">
           <img src="/swrk.svg" alt="Swrk" className="h-8 w-8 object-contain" />
           <span className="font-semibold">Swrk</span>
         </Link>
@@ -94,11 +140,11 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
         <div className="flex flex-col gap-1">
           {navigation.map((item) => {
             const Icon = item.icon
-            const isActive =
-              pathname === item.href ||
-              (item.href.includes("#") && pathname === "/dashboard")
+            const isActive = pathname === item.href
+            const showUnreadBadge =
+              item.href === "/dashboard/messages" && unreadCount > 0
             return (
-              <Link key={item.href} href={item.href} onClick={onClose}>
+              <Link key={item.href} href={item.href}>
                 <div
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
@@ -106,9 +152,15 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
+                  onClick={onClose}
                 >
                   <Icon className="h-5 w-5 flex-shrink-0" />
-                  {item.name}
+                  <span className="flex-1">{item.name}</span>
+                  {showUnreadBadge ? (
+                    <Badge className="ml-auto rounded-full px-2 py-0.5 text-[11px]">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </Badge>
+                  ) : null}
                 </div>
               </Link>
             )
@@ -118,7 +170,6 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
 
       <div className="mt-auto border-t border-border px-4 py-4">
         <div className="flex items-center justify-between gap-3">
-          <ModeToggle />
           {status === "authenticated" && session?.user ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -136,11 +187,11 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
                     </AvatarFallback>
                   </Avatar>
                   <span className="max-w-24 truncate text-sm font-medium">
-                    {session.user.name || "Profile"}
+                    @{session.user.username || "username"}
                   </span>
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56" forceMount>
+              <DropdownMenuContent align="start" className="w-56" forceMount>
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">
@@ -164,12 +215,12 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link
-                    href="/settings/profile"
+                    href="/dashboard"
                     className="cursor-pointer"
                     onClick={onClose}
                   >
-                    <Settings className="h-4 w-4" />
-                    <span>Settings</span>
+                    <IconDashboard className="h-4 w-4" />
+                    <span>Dashboard</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -183,6 +234,7 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}
+          <ModeToggle />
         </div>
       </div>
     </nav>

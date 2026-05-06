@@ -13,6 +13,7 @@ import {
   FileText,
   LogOut,
   UserCircle,
+  Zap,
 } from "lucide-react"
 import { ModeToggle } from "@/components/theme-toggle"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -30,6 +31,7 @@ import React from "react"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: IconDashboard },
+  { name: "Swipe", href: "/dashboard/swipe", icon: Zap },
   { name: "Profile", href: "/settings/profile", icon: User },
   { name: "Verification", href: "/settings/verification", icon: Shield },
   { name: "Filters", href: "/settings/role-filters", icon: Filter },
@@ -118,71 +120,69 @@ export function SettingsSidebar({ onClose }: { onClose?: () => void }) {
 
       <div className="mt-auto border-t border-border px-4 py-4">
         <div className="flex items-center justify-between gap-3">
-          <ModeToggle />
-          {status === "authenticated" && session?.user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="flex h-10 items-center gap-2 rounded-full border border-border bg-background px-2 pr-3 transition-colors hover:bg-muted"
-                >
-                  <Avatar className="h-8 w-8 border">
-                    <AvatarImage
-                      src={getAvatarUrl()}
-                      alt={session.user.name || "User"}
-                    />
-                    <AvatarFallback className="text-xs">
-                      {getAvatarFallback()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="max-w-24 truncate text-sm font-medium">
-                    {session.user.name || "Profile"}
-                  </span>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      {session.user.name}
-                    </p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {session.user.email}
-                    </p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link
-                    href={`/${session.user.username || ""}`}
-                    className="cursor-pointer"
-                    onClick={onClose}
-                  >
-                    <UserCircle className="h-4 w-4" />
-                    <span>Profile</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link
-                    href="/dashboard"
-                    className="cursor-pointer"
-                    onClick={onClose}
-                  >
-                    <IconDashboard className="h-4 w-4" />
-                    <span>Dashboard</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleSignOut}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex h-10 items-center gap-2 rounded-full border border-border bg-background px-2 pr-3 transition-colors hover:bg-muted"
+              >
+                <Avatar className="h-8 w-8 border">
+                  <AvatarImage
+                    src={getAvatarUrl()}
+                    alt={session?.user.name || "User"}
+                  />
+                  <AvatarFallback className="text-xs">
+                    {getAvatarFallback()}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="max-w-24 truncate text-sm font-medium">
+                  @{session?.user.username || "username"}
+                </span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-56" forceMount>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">
+                    {session?.user.name}
+                  </p>
+                  <p className="text-xs leading-none text-muted-foreground">
+                    {session?.user.email}
+                  </p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link
+                  href={`/${session?.user.username || ""}`}
                   className="cursor-pointer"
+                  onClick={onClose}
                 >
-                  <LogOut className="h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null}
+                  <UserCircle className="h-4 w-4" />
+                  <span>Profile</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link
+                  href="/dashboard"
+                  className="cursor-pointer"
+                  onClick={onClose}
+                >
+                  <IconDashboard className="h-4 w-4" />
+                  <span>Dashboard</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleSignOut}
+                className="cursor-pointer"
+              >
+                <LogOut className="h-4 w-4" />
+                <span>Log out</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <ModeToggle />
         </div>
       </div>
     </nav>

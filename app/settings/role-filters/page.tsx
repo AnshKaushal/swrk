@@ -503,17 +503,6 @@ export default function RoleFiltersPage() {
 
   return (
     <div className="divide-y divide-border">
-      <div className="px-4 py-6 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between gap-x-6">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Role Filters</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Manage filters for matching and swipe discovery
-            </p>
-          </div>
-        </div>
-      </div>
-
       {formData.role === "both" && (
         <div className="px-4 py-6 sm:px-6 lg:px-8">
           <div className="max-w-2xl">

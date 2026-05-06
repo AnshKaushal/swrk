@@ -25,11 +25,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      <aside className="fixed left-0 top-0 bottom-0 z-40 hidden w-72 overflow-y-auto border-r border-border bg-card lg:block">
+      <aside className="fixed left-0 top-0 bottom-0 z-40 hidden w-64 overflow-y-auto border-r border-border bg-card lg:block">
         <DashboardSidebar />
       </aside>
 
-      <main className="flex min-h-0 flex-1 flex-col overflow-hidden lg:ml-72">
+      <main className="flex min-h-0 flex-1 flex-col overflow-hidden lg:ml-64">
         <div className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-x-4 border-b border-border bg-card px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8 lg:hidden">
           <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
             <SheetTrigger asChild className="lg:hidden">

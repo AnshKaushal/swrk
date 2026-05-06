@@ -104,6 +104,7 @@ const EmployeeProfileSchema = new mongoose.Schema(
     },
 
     currentCity: String,
+    currentState: String,
     currentCountry: { type: String, default: "India" },
     preferredLocations: [String],
     willingToRelocate: { type: Boolean, default: false },
