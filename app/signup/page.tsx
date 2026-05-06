@@ -56,14 +56,11 @@ export default function SignupPage() {
       setOtpToken(data.otpLoginToken)
       if (data.hasPassword) {
         try {
-          const result = await signIn("otp", {
+          await signIn("otp", {
             email,
             otpToken: data.otpLoginToken,
-            redirect: false,
+            callbackUrl: "/onboarding",
           })
-          if (result?.ok) {
-            setTimeout(() => router.push("/onboarding"), 100)
-          }
         } catch (error) {
           toast.error("OTP sign in failed")
         }
@@ -87,16 +84,11 @@ export default function SignupPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       try {
-        const result = await signIn("credentials", {
+        await signIn("credentials", {
           email,
           password,
-          redirect: false,
+          callbackUrl: "/onboarding",
         })
-        if (result?.ok) {
-          setTimeout(() => router.push("/onboarding"), 100)
-        } else {
-          toast.error("Sign in failed after account creation")
-        }
       } catch (error) {
         toast.error("Sign in error after account creation")
       }
