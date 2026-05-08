@@ -215,7 +215,7 @@ export default function OnboardingPage() {
     }
 
     if (status === "unauthenticated") {
-      redirectTimer = window.setTimeout(() => router.push("/signin"), 1500)
+      redirectTimer = window.setTimeout(() => router.push("/signin"), 2000)
     }
     return () => {
       if (redirectTimer) clearTimeout(redirectTimer)

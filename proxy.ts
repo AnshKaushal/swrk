@@ -27,8 +27,14 @@ export async function proxy(req: NextRequest) {
   const onboardingCompleted = token?.onboardingCompleted === true
 
   if (!isLoggedIn) {
-    if (isProtectedRoute || isOnboarding) {
+    if (isProtectedRoute) {
       return NextResponse.redirect(new URL("/signin", nextUrl))
+    }
+    if (isAuthRoute) {
+      return NextResponse.next()
+    }
+    if (isOnboarding) {
+      return NextResponse.next()
     }
     return NextResponse.next()
   }
