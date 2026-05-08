@@ -4,6 +4,8 @@ import { db } from "@/lib/mongodb"
 import { getSwipeQuota } from "@/lib/swipe-limits"
 import { Swipe, Match } from "@/models/swipe"
 import User from "@/models/user"
+import Notification from "@/models/notification"
+import { emitToUser, getSocketServer } from "@/lib/socket-server"
 import mongoose from "mongoose"
 
 export async function POST(req: NextRequest) {
@@ -170,6 +172,49 @@ export async function POST(req: NextRequest) {
           await reciprocalSwipe.save()
         }
       }
+    }
+    // Create basic notifications for the target user about the action
+    try {
+      const notifType =
+        direction === "super"
+          ? "super_like"
+          : direction === "right"
+            ? "like"
+            : "pass"
+      const notificationTitle =
+        direction === "super"
+          ? "You received a Super Like"
+          : direction === "right"
+            ? "Someone liked you"
+            : "Profile viewed"
+      const notificationMessage =
+        direction === "super"
+          ? `${user.name || "Someone"} Super Liked you!`
+          : direction === "right"
+            ? `${user.name || "Someone"} liked you!`
+            : `${user.name || "Someone"} interacted with your profile.`
+
+      await Notification.create({
+        user: targetUserId,
+        actor: session.user.id,
+        type: notifType,
+        title: notificationTitle,
+        message: notificationMessage,
+        link: `/${user.username || user._id}`,
+        data: { swipeId: swipe._id },
+      })
+
+      if (getSocketServer()) {
+        emitToUser(targetUserId.toString(), "notification:new", {
+          type: notifType,
+          title: notificationTitle,
+          message: notificationMessage,
+          link: `/${user.username || user._id}`,
+          swipeId: swipe._id,
+        })
+      }
+    } catch (e) {
+      console.warn("failed to create notification", e)
     }
 
     return NextResponse.json({

@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -15,7 +16,15 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Camera, Check, X, Loader2, ArrowRight, ArrowLeft } from "lucide-react"
+import {
+  Camera,
+  Check,
+  X,
+  Loader2,
+  ArrowRight,
+  ArrowLeft,
+  Plus,
+} from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import Cropper, { Area } from "react-easy-crop"
@@ -161,11 +170,12 @@ export default function OnboardingPage() {
     },
   ])
   const [projects, setProjects] = useState([
-    { title: "", description: "", link: "" },
+    { title: "", description: "", url: "" },
   ])
   const [desiredRoles, setDesiredRoles] = useState<string[]>([])
   const [desiredIndustries, setDesiredIndustries] = useState<string[]>([])
-  const [preferredLocations, setPreferredLocations] = useState("")
+  const [preferredLocations, setPreferredLocations] = useState<string[]>([])
+  const [preferredLocationInput, setPreferredLocationInput] = useState("")
   const [expectedCTCMin, setExpectedCTCMin] = useState("")
   const [expectedCTCMax, setExpectedCTCMax] = useState("")
   const [role, setRole] = useState("")
@@ -222,6 +232,12 @@ export default function OnboardingPage() {
       window.localStorage.setItem(storageKey, String(step))
     }
   }, [session?.user, status, step])
+
+  useEffect(() => {
+    if (role === "employer" && step > 4 && step < 7) {
+      setStep(4)
+    }
+  }, [role, step])
 
   const checkUsernameAvailability = useMemo(
     () =>
@@ -389,6 +405,10 @@ export default function OnboardingPage() {
   }
 
   const onNextStep1 = () => {
+    if (!role) {
+      toast.error("Please select a role to continue")
+      return
+    }
     if (!username.trim()) {
       toast.error("Username is required to continue")
       return
@@ -401,8 +421,8 @@ export default function OnboardingPage() {
 
     return handleStepSubmit(
       2,
-      { name, username, avatar },
-      { name, username, image: avatar },
+      { name, username, avatar, role },
+      { name, username, image: avatar, role },
     )
   }
   const onNextStep2 = () => {
@@ -462,9 +482,7 @@ export default function OnboardingPage() {
         degree: e.degree?.trim() || undefined,
         field: e.field?.trim() || undefined,
         startYear: startYear ?? undefined,
-        endYear:
-          endYear ??
-          (e.endYear?.toLowerCase() === "present" ? "present" : undefined),
+        endYear: endYear ?? undefined,
       })
     }
 
@@ -524,13 +542,18 @@ export default function OnboardingPage() {
     if (normalizedWorkHistory.length > 0) {
       profilePayload.employeeProfile = { workHistory: normalizedWorkHistory }
     }
+
+    if (role === "employer") {
+      return handleStepSubmit(7, {}, {}, profilePayload)
+    }
+
     return handleStepSubmit(5, {}, {}, profilePayload)
   }
 
   const onNextStep5 = () => {
     // Projects step - required for employees/both
     const projectEntries = projects.filter(
-      (p) => p.title || p.description || p.link,
+      (p) => p.title || p.description || p.url,
     )
     if (projectEntries.length === 0) {
       toast.error("Please add at least one project to continue")
@@ -544,7 +567,7 @@ export default function OnboardingPage() {
         toast.error("Each project requires a title")
         return
       }
-      if (p.link && !isValidUrl(p.link)) {
+      if (p.url && !isValidUrl(p.url)) {
         toast.error("Please provide a valid project URL")
         return
       }
@@ -552,7 +575,7 @@ export default function OnboardingPage() {
       normalizedProjects.push({
         title,
         description: p.description?.trim() || undefined,
-        link: p.link?.trim() || undefined,
+        url: p.url?.trim() || undefined,
       })
     }
 
@@ -562,13 +585,30 @@ export default function OnboardingPage() {
     return handleStepSubmit(6, {}, {}, profilePayload)
   }
 
+  const addPreferredLocation = () => {
+    const value = preferredLocationInput.trim()
+    if (!value) return
+
+    setPreferredLocations((previous) =>
+      previous.includes(value) ? previous : [...previous, value],
+    )
+    setPreferredLocationInput("")
+  }
+
+  const removePreferredLocation = (location: string) => {
+    setPreferredLocations((previous) =>
+      previous.filter((item) => item !== location),
+    )
+  }
+
   const onNextStep6 = () => {
     const profilePayload: Record<string, unknown> = {}
     const filters: Record<string, unknown> = {}
     if (desiredRoles.length > 0) filters.desiredRoles = desiredRoles
     if (desiredIndustries.length > 0)
       filters.desiredIndustries = desiredIndustries
-    if (preferredLocations) filters.preferredLocations = [preferredLocations]
+    if (preferredLocations.length > 0)
+      filters.preferredLocations = preferredLocations
 
     if (expectedCTCMin && !isPositiveNumberString(expectedCTCMin)) {
       toast.error("Please enter a valid minimum expected CTC")
@@ -681,16 +721,17 @@ export default function OnboardingPage() {
         <div className="w-full max-w-md space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="space-y-2">
             <h2 className="text-3xl font-bold tracking-tight">
-              {step === 1 && "Personal Info"}
+              {step === 1 && "Choose Your Role"}
               {step === 2 && "Professional Profile"}
               {step === 3 && "Education"}
               {step === 4 && "Work Experience"}
               {step === 5 && "Projects"}
               {step === 6 && "Your Preferences"}
-              {step === 7 && "Choose Your Role"}
+              {step === 7 && "Final Details"}
             </h2>
             <p className="text-muted-foreground">
-              {step === 1 && "Let's start with the basics to identify you."}
+              {step === 1 &&
+                "Select how you'll use Swrk, then share the basics."}
               {step === 2 && "Tell us about your professional background."}
               {step === 3 &&
                 "Add your education history so teams know your background."}
@@ -699,7 +740,7 @@ export default function OnboardingPage() {
               {step === 5 &&
                 "Showcase your projects to stand out to employers."}
               {step === 6 && "Help us find the best matches for you."}
-              {step === 7 && "How will you be using Swrk?"}
+              {step === 7 && "Add your contact details to complete setup."}
             </p>
           </div>
 
@@ -718,6 +759,52 @@ export default function OnboardingPage() {
 
           {step === 1 && (
             <div className="space-y-6">
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">
+                  How will you be using Swrk?
+                </Label>
+                <RadioGroup
+                  value={role}
+                  onValueChange={setRole}
+                  className="grid grid-cols-1 gap-4"
+                >
+                  {[
+                    {
+                      id: "employee",
+                      label: "Open to work",
+                      desc: "Discover opportunities and apply to roles",
+                    },
+                    {
+                      id: "employer",
+                      label: "Hiring",
+                      desc: "Post openings and find top talent",
+                    },
+                    {
+                      id: "both",
+                      label: "Both",
+                      desc: "Open to work and hiring",
+                    },
+                  ].map((r) => (
+                    <div key={r.id}>
+                      <RadioGroupItem
+                        value={r.id}
+                        id={`role-${r.id}`}
+                        className="peer sr-only"
+                      />
+                      <Label
+                        htmlFor={`role-${r.id}`}
+                        className="flex cursor-pointer flex-col rounded-xl border-2 border-muted bg-transparent p-4 transition-all hover:bg-muted/30 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5"
+                      >
+                        <span className="text-base font-bold">{r.label}</span>
+                        <span className="mt-1 text-sm text-muted-foreground">
+                          {r.desc}
+                        </span>
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+
               <div className="flex flex-col items-center justify-center space-y-4">
                 <div
                   className="relative group cursor-pointer"
@@ -803,7 +890,11 @@ export default function OnboardingPage() {
                 onClick={onNextStep1}
                 className="w-full h-12 text-base font-bold"
                 disabled={
-                  loading || !name || !username || usernameAvailable === false
+                  loading ||
+                  !role ||
+                  !name ||
+                  !username ||
+                  usernameAvailable === false
                 }
               >
                 {loading ? (
@@ -1145,7 +1236,7 @@ export default function OnboardingPage() {
                     onClick={() =>
                       setProjects([
                         ...projects,
-                        { title: "", description: "", link: "" },
+                        { title: "", description: "", url: "" },
                       ])
                     }
                   >
@@ -1192,10 +1283,10 @@ export default function OnboardingPage() {
                       className="h-20 w-full rounded-lg bg-muted/50 border-none px-3 py-2 font-sans text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                     <Input
-                      value={proj.link}
+                      value={proj.url}
                       onChange={(e) => {
                         const updated = [...projects]
-                        updated[idx].link = e.target.value
+                        updated[idx].url = e.target.value
                         setProjects(updated)
                       }}
                       placeholder="https://github.com/your-project"
@@ -1299,12 +1390,49 @@ export default function OnboardingPage() {
 
                 <div className="space-y-2">
                   <Label>Preferred Locations</Label>
-                  <Input
-                    value={preferredLocations}
-                    onChange={(e) => setPreferredLocations(e.target.value)}
-                    placeholder="e.g. San Francisco, Remote, New York"
-                    className="h-12 bg-muted/50 border-none"
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      value={preferredLocationInput}
+                      onChange={(e) =>
+                        setPreferredLocationInput(e.target.value)
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault()
+                          addPreferredLocation()
+                        }
+                      }}
+                      placeholder="Add a preferred location"
+                      className="h-12 bg-muted/50 border-none"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={addPreferredLocation}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {preferredLocations.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {preferredLocations.map((location) => (
+                        <Badge
+                          key={location}
+                          variant="secondary"
+                          className="pr-1"
+                        >
+                          {location}
+                          <button
+                            type="button"
+                            onClick={() => removePreferredLocation(location)}
+                            className="ml-1"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="space-y-2">
@@ -1355,47 +1483,6 @@ export default function OnboardingPage() {
 
           {step === 7 && (
             <div className="space-y-6">
-              <RadioGroup
-                value={role}
-                onValueChange={setRole}
-                className="grid grid-cols-1 gap-4"
-              >
-                {[
-                  {
-                    id: "employee",
-                    label: "Open to work",
-                    desc: "Discover opportunities and apply to roles",
-                  },
-                  {
-                    id: "employer",
-                    label: "Hiring",
-                    desc: "Post openings and find top talent",
-                  },
-                  {
-                    id: "both",
-                    label: "Both",
-                    desc: "Open to work and hiring",
-                  },
-                ].map((r) => (
-                  <div key={r.id}>
-                    <RadioGroupItem
-                      value={r.id}
-                      id={r.id}
-                      className="peer sr-only"
-                    />
-                    <Label
-                      htmlFor={r.id}
-                      className="flex flex-col rounded-xl border-2 border-muted bg-transparent p-4 hover:bg-muted/30 peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/5 cursor-pointer transition-all"
-                    >
-                      <span className="text-base font-bold">{r.label}</span>
-                      <span className="text-sm text-muted-foreground mt-1">
-                        {r.desc}
-                      </span>
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
-
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label>Phone Number</Label>
@@ -1437,7 +1524,7 @@ export default function OnboardingPage() {
               <div className="flex gap-4">
                 <Button
                   variant="outline"
-                  onClick={() => setStep(6)}
+                  onClick={() => setStep(role === "employer" ? 4 : 6)}
                   className="h-12 w-12 p-0 shrink-0"
                   disabled={loading}
                 >
@@ -1446,7 +1533,7 @@ export default function OnboardingPage() {
                 <Button
                   onClick={onNextStep7}
                   className="h-12 flex-1 text-base font-bold"
-                  disabled={loading || !role}
+                  disabled={loading}
                 >
                   {loading ? (
                     <Loader2 className="h-5 w-5 animate-spin" />

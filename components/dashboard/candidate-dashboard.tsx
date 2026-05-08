@@ -39,6 +39,15 @@ interface StatsData {
   recentMatches: MatchData[]
 }
 
+interface InterviewData {
+  _id: string
+  title: string
+  scheduledFor: string
+  employer: { name: string; avatar: string; companyName: string }
+  status: string
+  duration: number
+}
+
 type ActivityPoint = { day: string; value: number }
 
 export function CandidateDashboard({ name }: { name: string }) {
@@ -48,6 +57,10 @@ export function CandidateDashboard({ name }: { name: string }) {
   const [chartData, setChartData] = useState<ActivityPoint[]>([])
   const [activityLoading, setActivityLoading] = useState(false)
   const [range, setRange] = useState<number>(7)
+  const [upcomingInterviews, setUpcomingInterviews] = useState<InterviewData[]>(
+    [],
+  )
+  const [interviewsLoading, setInterviewsLoading] = useState(true)
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -65,6 +78,30 @@ export function CandidateDashboard({ name }: { name: string }) {
     }
 
     fetchStats()
+  }, [])
+
+  useEffect(() => {
+    const fetchInterviews = async () => {
+      try {
+        const response = await fetch("/api/interviews?status=scheduled")
+        if (response.ok) {
+          const data = await response.json()
+          const now = new Date()
+          const futureInterviews = (data.interviews || []).filter(
+            (interview: InterviewData) => {
+              return new Date(interview.scheduledFor) > now
+            },
+          )
+          setUpcomingInterviews(futureInterviews.slice(0, 3))
+        }
+      } catch (error) {
+        console.error("Failed to fetch interviews:", error)
+      } finally {
+        setInterviewsLoading(false)
+      }
+    }
+
+    fetchInterviews()
   }, [])
 
   useEffect(() => {
@@ -276,42 +313,48 @@ export function CandidateDashboard({ name }: { name: string }) {
               <CardTitle>Upcoming Interviews</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
-                <div className="w-10 h-10 flex items-center justify-center bg-background rounded-lg border border-border">
-                  <Calendar className="w-5 h-5 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Tech Interview</p>
-                  <p className="text-xs text-muted-foreground">
-                    Tomorrow, 10:00 AM
-                  </p>
-                </div>
-                <Badge className="text-xs">PREPARE</Badge>
-              </div>
-
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
-                <div className="w-10 h-10 flex items-center justify-center bg-background rounded-lg border border-border">
-                  <Building2 className="w-5 h-5 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">HR Round</p>
-                  <p className="text-xs text-muted-foreground">
-                    Friday, 2:00 PM
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
-                <div className="w-10 h-10 flex items-center justify-center bg-background rounded-lg border border-border">
-                  <Heart className="w-5 h-5 text-red-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Follow Up</p>
-                  <p className="text-xs text-muted-foreground">
-                    Check application status
-                  </p>
-                </div>
-              </div>
+              {interviewsLoading ? (
+                <p className="text-sm text-muted-foreground">Loading...</p>
+              ) : upcomingInterviews.length > 0 ? (
+                upcomingInterviews.map((interview) => {
+                  const company =
+                    interview.employer.companyName || interview.employer.name
+                  const scheduledDate = new Date(interview.scheduledFor)
+                  const dateStr = scheduledDate.toLocaleDateString(undefined, {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  })
+                  const timeStr = scheduledDate.toLocaleTimeString(undefined, {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                  return (
+                    <div
+                      key={interview._id}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50"
+                    >
+                      <div className="w-10 h-10 flex items-center justify-center bg-background rounded-lg border border-border">
+                        <Calendar className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{interview.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {dateStr}, {timeStr}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {company}
+                        </p>
+                      </div>
+                      <Badge className="text-xs">PREPARE</Badge>
+                    </div>
+                  )
+                })
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No upcoming interviews
+                </p>
+              )}
             </CardContent>
           </Card>
 

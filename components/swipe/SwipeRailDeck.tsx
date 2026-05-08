@@ -85,6 +85,30 @@ type Candidate = {
   jobRequirements?: string[]
 }
 
+type Position = {
+  _id: string
+  title: string
+  description: string
+  roles: string[]
+  locations: string[]
+  industry: string
+  skills: string[]
+  experience: string
+  salaryRange?: {
+    min?: number
+    max?: number
+    currency?: string
+  }
+  employmentType: string
+  matchCount: number
+  employerId: {
+    _id: string
+    name: string
+    avatar?: string
+    companyName?: string
+  }
+}
+
 type SwipeResponse = {
   candidates?: Candidate[]
   rankingMode?: "ai" | "heuristic"
@@ -139,9 +163,15 @@ function getActiveOpening(candidate?: Candidate) {
   )
 }
 
+type QueueItem = {
+  type: "candidate" | "position"
+  candidate?: Candidate
+  position?: Position
+}
+
 export default function SwipeRailDeck() {
   const { data: session } = useSession()
-  const [candidates, setCandidates] = useState<Candidate[]>([])
+  const [queue, setQueue] = useState<QueueItem[]>([])
   const [loading, setLoading] = useState(false)
   const [swipeCount, setSwipeCount] = useState(0)
   const [swipeQuota, setSwipeQuota] = useState<SwipeResponse["swipeQuota"]>()
@@ -163,7 +193,7 @@ export default function SwipeRailDeck() {
   const isEmployerMode = viewerRole === "employer"
 
   useEffect(() => {
-    void loadCandidates()
+    void loadQueue()
   }, [])
 
   useEffect(() => {
@@ -175,24 +205,77 @@ export default function SwipeRailDeck() {
   }, [])
 
   const focusItems = useMemo<FocusRailItem[]>(() => {
-    return candidates.map((candidate) => ({
-      id: candidate._id,
-      title: candidate.name,
-      description: candidate.headline || candidate.bio || "Ready to explore",
-      imageSrc: getCandidateImage(candidate),
-      href: candidate.username ? `/${candidate.username}` : undefined,
-      meta: isEmployerMode
-        ? candidate.currentCity || formatList(candidate.preferredLocations)
-        : candidate.companyName || candidate.headquarters || undefined,
-    }))
-  }, [candidates, isEmployerMode])
+    return queue.map((item) => {
+      if (item.type === "position" && item.position) {
+        return {
+          id: item.position._id,
+          title: item.position.title,
+          description: item.position.description.substring(0, 80),
+          imageSrc:
+            item.position.employerId?.avatar ||
+            `https://dummyimage.com/960x1280/0f172a/e2e8f0&text=${encodeURIComponent(item.position.title.charAt(0))}`,
+          meta: formatList(item.position.locations, 1) || "Remote",
+        }
+      }
 
-  const currentCandidate = candidates[activeIndex]
+      const candidate = item.candidate!
+      return {
+        id: candidate._id,
+        title: candidate.name,
+        description: candidate.headline || candidate.bio || "Ready to explore",
+        imageSrc: getCandidateImage(candidate),
+        href: candidate.username ? `/${candidate.username}` : undefined,
+        meta: isEmployerMode
+          ? candidate.currentCity || formatList(candidate.preferredLocations)
+          : candidate.companyName || candidate.headquarters || undefined,
+      }
+    })
+  }, [queue, isEmployerMode])
+
+  const currentItem = queue[activeIndex]
+  const currentCandidate =
+    currentItem?.type === "candidate" ? currentItem.candidate : null
+  const currentPosition =
+    currentItem?.type === "position" ? currentItem.position : null
   const currentOpening = useMemo(
-    () => getActiveOpening(currentCandidate),
+    () => (currentCandidate ? getActiveOpening(currentCandidate) : null),
     [currentCandidate],
   )
-  const candidateDetails = useMemo(() => {
+
+  const detailsData = useMemo(() => {
+    if (currentPosition) {
+      return [
+        {
+          label: "Role",
+          value: formatList(currentPosition.roles, 2) || "Multiple roles",
+        },
+        {
+          label: "Location",
+          value: formatList(currentPosition.locations, 2) || "Remote",
+        },
+        {
+          label: "Industry",
+          value: currentPosition.industry || "Open",
+        },
+        {
+          label: "Experience",
+          value: currentPosition.experience || "Any",
+        },
+        {
+          label: "Type",
+          value: currentPosition.employmentType || "Full-time",
+        },
+        {
+          label: "Salary",
+          value: formatMoneyRange(
+            currentPosition.salaryRange?.min,
+            currentPosition.salaryRange?.max,
+            currentPosition.salaryRange?.currency,
+          ),
+        },
+      ]
+    }
+
     if (!currentCandidate) return [] as Array<{ label: string; value: string }>
 
     if (isEmployerMode) {
@@ -277,7 +360,7 @@ export default function SwipeRailDeck() {
           "Open",
       },
     ]
-  }, [currentCandidate, currentOpening, isEmployerMode])
+  }, [currentCandidate, currentOpening, isEmployerMode, currentPosition])
 
   const superDisabled = Boolean(superQuota && superQuota.allowed === false)
   const outOfDailySwipes = Boolean(
@@ -287,79 +370,108 @@ export default function SwipeRailDeck() {
     swipeQuota.remaining <= 0,
   )
 
-  async function loadCandidates(excludeIds: string[] = []) {
+  async function loadQueue() {
     setLoading(true)
 
     try {
-      const params = new URLSearchParams({ limit: "30" })
-      excludeIds.forEach((id) => params.append("excludeId", id))
-
-      const res = await fetch(`/api/swipe/candidates?${params.toString()}`, {
+      const candidatesRes = await fetch("/api/swipe/candidates?limit=15", {
         cache: "no-store",
       })
-      const json = (await res.json()) as SwipeResponse
+      const candidatesData = (await candidatesRes.json()) as SwipeResponse
+      const candidates = candidatesData.candidates || []
+      setSwipeQuota(candidatesData.swipeQuota)
 
-      setCandidates(json.candidates || [])
-      setSwipeCount(json.swipeCount || 0)
-      setSwipeQuota(json.swipeQuota)
-      // fetch super-like quota and boost quota
+      const positionsRes = await fetch("/api/positions/candidates?limit=15", {
+        cache: "no-store",
+      })
+      const positionsData = await positionsRes.json()
+      const positions = positionsData.positions || []
+
+      const mergedQueue: QueueItem[] = []
+      const minLength = Math.min(candidates.length, positions.length)
+
+      for (let i = 0; i < minLength; i++) {
+        mergedQueue.push({ type: "candidate", candidate: candidates[i] })
+        mergedQueue.push({ type: "position", position: positions[i] })
+      }
+
+      if (candidates.length > minLength) {
+        for (let i = minLength; i < candidates.length; i++) {
+          mergedQueue.push({ type: "candidate", candidate: candidates[i] })
+        }
+      }
+
+      if (positions.length > minLength) {
+        for (let i = minLength; i < positions.length; i++) {
+          mergedQueue.push({ type: "position", position: positions[i] })
+        }
+      }
+
+      setQueue(mergedQueue)
+      setActiveIndex(0)
+
       try {
         const s = await fetch(`/api/swipe/super`, { cache: "no-store" })
         const sj = await s.json()
         setSuperQuota(sj.quota)
-      } catch (e) {
-        // ignore
-      }
-
-      setActiveIndex(0)
+      } catch (e) {}
     } catch (error) {
       console.error(error)
-      toast.error("Failed to load candidates")
+      toast.error("Failed to load queue")
     } finally {
       setLoading(false)
     }
   }
 
-  async function doAction(direction: "left" | "right" | "super", id: string) {
+  async function doAction(
+    direction: "left" | "right" | "super",
+    item: QueueItem,
+  ) {
     if (lock.current) return false
     lock.current = true
 
     try {
-      const res = await fetch("/api/swipe", {
+      let endpoint: string
+      let body: any
+
+      if (item.type === "candidate" && item.candidate) {
+        endpoint = "/api/swipe"
+        body = { targetId: item.candidate._id, direction }
+      } else if (item.type === "position" && item.position) {
+        if (direction === "super") {
+          lock.current = false
+          return false
+        }
+        endpoint = "/api/positions/swipe"
+        body = { positionId: item.position._id, direction }
+      } else {
+        lock.current = false
+        return false
+      }
+
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetId: id, direction }),
+        body: JSON.stringify(body),
       })
 
       const json = await res.json()
 
       if (!res.ok) {
         if (res.status === 404) {
-          toast.error(
-            "That profile is no longer available. Reloading candidates.",
-          )
-          await loadCandidates([id])
+          toast.error("Item no longer available.")
           return false
         }
 
-        if (res.status === 429) {
-          // open upgrade dialog for quota exceed
+        if (res.status === 429 && item.type === "candidate") {
           setUpgradeOpen(true)
           toast.error(
             json?.error || "Daily swipe limit reached for your current plan.",
           )
-          // refresh quotas without forcing full page reload
           try {
             const s = await fetch(`/api/swipe/super`, { cache: "no-store" })
             const sj = await s.json()
             setSuperQuota(sj.quota)
-          } catch (e) {}
-          try {
-            const r = await fetch(`/api/swipe/candidates?limit=8`, {
-              cache: "no-store",
-            })
-            const rr = await r.json()
-            setCandidates(rr.candidates || [])
           } catch (e) {}
           return false
         }
@@ -378,8 +490,42 @@ export default function SwipeRailDeck() {
         })
       }
 
+      if (direction === "super") {
+        try {
+          const s = await fetch(`/api/swipe/super`, { cache: "no-store" })
+          if (s.ok) {
+            const sj = await s.json()
+            setSuperQuota(sj.quota)
+          } else if (typeof json?.superRemaining !== "number") {
+            setSuperQuota((prev: any) => {
+              if (!prev) return prev
+              return {
+                ...prev,
+                remaining: Math.max(0, (prev.remaining || 0) - 1),
+              }
+            })
+          }
+        } catch (e) {
+          setSuperQuota((prev: any) => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              remaining: Math.max(0, (prev.remaining || 0) - 1),
+            }
+          })
+        }
+      }
+
+      try {
+        window.dispatchEvent(new Event("swrk:notifications-updated"))
+      } catch (e) {}
+
       if (json.matched) {
-        toast.success("It's a match!")
+        toast.success(
+          item.type === "position"
+            ? "It's a match! You can now message the employer."
+            : "It's a match!",
+        )
       }
 
       return true
@@ -393,16 +539,18 @@ export default function SwipeRailDeck() {
   }
 
   const performSwipe = async (direction: "left" | "right" | "super") => {
-    const candidate = currentCandidate
-    if (!candidate) return
+    const item = queue[activeIndex]
+    if (!item) return
 
-    // client-side guard for super-like quota
+    if (direction === "super" && item.type === "position") {
+      return
+    }
+
     if (direction === "super" && superQuota && superQuota.allowed === false) {
       setUpgradeOpen(true)
       return
     }
 
-    // client-side guard for daily swipe quota (like/pass)
     const outOfDailySwipes =
       swipeQuota &&
       !swipeQuota.isUnlimited &&
@@ -413,13 +561,22 @@ export default function SwipeRailDeck() {
       return
     }
 
-    const success = await doAction(direction, candidate._id)
+    const success = await doAction(direction, item)
     if (!success) return
 
-    setCandidates((previous) => {
-      const index = previous.findIndex((c) => c._id === candidate._id)
-      if (index === -1) return previous
-      const next = [...previous.slice(0, index), ...previous.slice(index + 1)]
+    if (pulseTimer.current) {
+      window.clearTimeout(pulseTimer.current)
+    }
+    setActionPulse(direction)
+    pulseTimer.current = window.setTimeout(() => {
+      setActionPulse(null)
+    }, 650)
+
+    setQueue((previous) => {
+      const next = [
+        ...previous.slice(0, activeIndex),
+        ...previous.slice(activeIndex + 1),
+      ]
       setActiveIndex((prev) => {
         if (next.length === 0) return 0
         if (prev >= next.length) return next.length - 1
@@ -428,19 +585,12 @@ export default function SwipeRailDeck() {
       return next
     })
 
-    if (candidates.length - 1 <= 6) {
-      await loadCandidates([candidate._id])
+    if (queue.length - 1 <= 6) {
+      await loadQueue()
     }
   }
 
   const triggerSwipe = async (direction: "left" | "right" | "super") => {
-    if (pulseTimer.current) {
-      window.clearTimeout(pulseTimer.current)
-    }
-    setActionPulse(direction)
-    pulseTimer.current = window.setTimeout(() => {
-      setActionPulse(null)
-    }, 650)
     await performSwipe(direction)
   }
 
@@ -452,18 +602,23 @@ export default function SwipeRailDeck() {
     )
   }
 
-  if (!currentCandidate || focusItems.length === 0) {
+  const hasContent = queue.length > 0
+
+  if (!hasContent) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4 py-6">
         <div className="text-center">
-          <p className="text-base font-medium">No more candidates right now.</p>
+          <p className="text-base font-medium">
+            No more items in your queue right now.
+          </p>
           <p className="mt-2 text-sm text-muted-foreground">
-            We&apos;ll refresh the queue after new profiles are available.
+            We'll refresh the queue after new profiles and positions are
+            available.
           </p>
           <Button
             className="mt-4"
             variant="outline"
-            onClick={() => void loadCandidates()}
+            onClick={() => void loadQueue()}
           >
             Refresh queue
           </Button>
@@ -473,7 +628,7 @@ export default function SwipeRailDeck() {
   }
 
   return (
-    <div className="min-h-screen bg-background px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex w-full max-w-[1600px] flex-col gap-4">
         <FocusRail
           items={focusItems}
@@ -485,160 +640,127 @@ export default function SwipeRailDeck() {
 
         <Card className="border-border/60 bg-card/95 p-4 sm:p-5">
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-xl font-semibold">{currentCandidate.name}</h3>
-              {typeof currentCandidate.matchPercent === "number" && (
-                <Badge>Match: {currentCandidate.matchPercent}%</Badge>
-              )}
-              <Badge variant="secondary" className="capitalize">
-                {isEmployerMode ? "hiring view" : "job search view"}
-              </Badge>
-              {(currentCandidate.isVerified ||
-                currentCandidate.profileVerified) && (
-                <Badge variant="outline" className="border-yellow-500">
-                  Verified
-                </Badge>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              {currentCandidate.currentCity ? (
-                <Badge variant="outline">{currentCandidate.currentCity}</Badge>
-              ) : null}
-              {!isEmployerMode && currentCandidate.companyName ? (
-                <Badge variant="outline">{currentCandidate.companyName}</Badge>
-              ) : null}
-              {currentCandidate.username ? (
-                <Badge variant="outline">@{currentCandidate.username}</Badge>
-              ) : null}
-              {currentCandidate.companyType ? (
-                <Badge variant="outline">{currentCandidate.companyType}</Badge>
-              ) : null}
-              {currentCandidate.skills?.slice(0, 8).map((skill) => (
-                <Badge key={skill} variant="outline">
-                  {skill}
-                </Badge>
-              ))}
-            </div>
-
-            {currentCandidate.companyTagline ? (
-              <p className="text-sm text-muted-foreground">
-                {currentCandidate.companyTagline}
-              </p>
-            ) : currentCandidate.bio ? (
-              <p className="text-sm text-muted-foreground">
-                {currentCandidate.bio}
-              </p>
-            ) : null}
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {candidateDetails.map((detail) => (
-                <div
-                  key={detail.label}
-                  className="rounded-2xl border border-border bg-muted/20 px-4 py-3"
-                >
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    {detail.label}
-                  </div>
-                  <div className="mt-1 text-sm font-medium leading-5 text-foreground">
-                    {detail.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/20 px-4 py-3">
-                <Building2 className="h-4 w-4 text-primary" />
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    Company
-                  </div>
-                  <div className="text-sm font-medium">
-                    {isEmployerMode
-                      ? currentCandidate.companyName || "Candidate"
-                      : currentCandidate.companyName || currentCandidate.name}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/20 px-4 py-3">
-                <MapPin className="h-4 w-4 text-primary" />
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    Location
-                  </div>
-                  <div className="text-sm font-medium">
-                    {isEmployerMode
-                      ? formatList(currentCandidate.preferredLocations, 2) ||
-                        currentCandidate.currentCity ||
-                        "Remote"
-                      : [currentOpening?.location, currentOpening?.locationType]
-                          .filter(Boolean)
-                          .join(" · ") ||
-                        currentCandidate.headquarters ||
-                        "Flexible"}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/20 px-4 py-3">
-                <Briefcase className="h-4 w-4 text-primary" />
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    Type
-                  </div>
-                  <div className="text-sm font-medium">
-                    {isEmployerMode
-                      ? formatList(currentCandidate.employmentType, 2) || "Any"
-                      : currentOpening?.employmentType ||
-                        currentCandidate.workStyle ||
-                        "Open"}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 rounded-2xl border border-border bg-muted/20 px-4 py-3">
-                <Clock3 className="h-4 w-4 text-primary" />
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    Salary
-                  </div>
-                  <div className="text-sm font-medium">
-                    {isEmployerMode
-                      ? formatMoneyRange(
-                          currentCandidate.expectedCTC?.min,
-                          currentCandidate.expectedCTC?.max,
-                          currentCandidate.expectedCTC?.currency,
-                        )
-                      : formatMoneyRange(
-                          currentOpening?.ctcMin,
-                          currentOpening?.ctcMax,
-                          currentOpening?.currency,
-                        )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {currentCandidate.jobRequirements?.length ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm text-muted-foreground">Required:</span>
-                {currentCandidate.jobRequirements.slice(0, 8).map((skill) => (
-                  <Badge key={skill} variant="secondary">
-                    {skill}
+            {currentPosition ? (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-xl font-semibold">
+                    {currentPosition.title}
+                  </h3>
+                  <Badge variant="secondary">
+                    {currentPosition.matchCount} interested
                   </Badge>
-                ))}
-              </div>
+                </div>
+
+                <p className="text-sm text-muted-foreground">
+                  {currentPosition.description.substring(0, 200)}...
+                </p>
+
+                <div className="flex flex-wrap gap-2">
+                  {currentPosition.employerId?.companyName && (
+                    <Badge variant="outline">
+                      {currentPosition.employerId.companyName}
+                    </Badge>
+                  )}
+                  {formatList(currentPosition.locations, 2) && (
+                    <Badge variant="outline">
+                      {formatList(currentPosition.locations, 2)}
+                    </Badge>
+                  )}
+                  {currentPosition.skills?.slice(0, 8).map((skill) => (
+                    <Badge key={skill} variant="outline">
+                      {skill}
+                    </Badge>
+                  ))}
+                </div>
+              </>
             ) : null}
 
-            <div className="grid gap-2 rounded-2xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
-              <span>Queue: {candidates.length} profiles</span>
-              <span>Viewed: {swipeCount}</span>
-              <span>Plan: {(swipeQuota?.plan || "free").toUpperCase()}</span>
-              <span>
-                {swipeQuota?.isUnlimited
-                  ? "Unlimited swipes"
-                  : `${swipeQuota?.remaining ?? 0}/${swipeQuota?.limit ?? 0} swipes left`}
-              </span>
-            </div>
+            {currentCandidate && (
+              <>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-xl font-semibold">
+                    {currentCandidate.name}
+                  </h3>
+                  {typeof currentCandidate.matchPercent === "number" && (
+                    <Badge>Match: {currentCandidate.matchPercent}%</Badge>
+                  )}
+                  <Badge variant="secondary" className="capitalize">
+                    {isEmployerMode ? "hiring view" : "job search view"}
+                  </Badge>
+                  {(currentCandidate.isVerified ||
+                    currentCandidate.profileVerified) && (
+                    <Badge variant="outline" className="border-yellow-500">
+                      Verified
+                    </Badge>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  {currentCandidate.currentCity ? (
+                    <Badge variant="outline">
+                      {currentCandidate.currentCity}
+                    </Badge>
+                  ) : null}
+                  {!isEmployerMode && currentCandidate.companyName ? (
+                    <Badge variant="outline">
+                      {currentCandidate.companyName}
+                    </Badge>
+                  ) : null}
+                  {currentCandidate.username ? (
+                    <Badge variant="outline">
+                      @{currentCandidate.username}
+                    </Badge>
+                  ) : null}
+                  {currentCandidate.companyType ? (
+                    <Badge variant="outline">
+                      {currentCandidate.companyType}
+                    </Badge>
+                  ) : null}
+                  {currentCandidate.skills?.slice(0, 8).map((skill) => (
+                    <Badge key={skill} variant="outline">
+                      {skill}
+                    </Badge>
+                  ))}
+                </div>
+
+                {currentCandidate.companyTagline ? (
+                  <p className="text-sm text-muted-foreground">
+                    {currentCandidate.companyTagline}
+                  </p>
+                ) : currentCandidate.bio ? (
+                  <p className="text-sm text-muted-foreground">
+                    {currentCandidate.bio}
+                  </p>
+                ) : null}
+
+                {currentCandidate.jobRequirements?.length ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      Required:
+                    </span>
+                    {currentCandidate.jobRequirements
+                      .slice(0, 8)
+                      .map((skill) => (
+                        <Badge key={skill} variant="secondary">
+                          {skill}
+                        </Badge>
+                      ))}
+                  </div>
+                ) : null}
+
+                <div className="grid gap-2 rounded-2xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
+                  <span>Queue: {queue.length} profiles</span>
+                  <span>
+                    Plan: {(swipeQuota?.plan || "free").toUpperCase()}
+                  </span>
+                  <span>
+                    {swipeQuota?.isUnlimited
+                      ? "Unlimited swipes"
+                      : `${swipeQuota?.remaining ?? 0}/${swipeQuota?.limit ?? 0} swipes left`}
+                  </span>
+                </div>
+              </>
+            )}
 
             <div className="grid gap-3 sm:grid-cols-3">
               <Button
@@ -655,24 +777,29 @@ export default function SwipeRailDeck() {
                 <X className="h-4 w-4 transition-transform group-hover:-rotate-12" />
                 Pass
               </Button>
-              <Button
-                type="button"
-                onClick={() => void triggerSwipe("super")}
-                title={
-                  superDisabled
-                    ? "No Super Likes left — upgrade to get more"
-                    : undefined
-                }
-                className="relative h-12 overflow-hidden bg-gradient-to-r from-fuchsia-600 via-pink-600 to-rose-500 text-white shadow-lg shadow-pink-500/25 hover:from-fuchsia-500 hover:via-pink-500 hover:to-rose-400"
-              >
-                {actionPulse === "super" ? (
-                  <span className="absolute right-3 top-2 text-white/90 animate-bounce">
-                    <Heart className="h-4 w-4 fill-white" />
-                  </span>
-                ) : null}
-                <Sparkles className="h-4 w-4" />
-                Super Like ({superQuota?.remaining ?? 0} / {superQuota?.limit ?? 0})
-              </Button>
+
+              {currentCandidate && (
+                <Button
+                  type="button"
+                  onClick={() => void triggerSwipe("super")}
+                  title={
+                    superDisabled
+                      ? "No Super Likes left — upgrade to get more"
+                      : undefined
+                  }
+                  className="relative h-12 overflow-hidden bg-rose-500 text-white hover:bg-rose-600"
+                >
+                  {actionPulse === "super" ? (
+                    <span className="absolute right-3 top-2 text-white/90 animate-bounce">
+                      <Heart className="h-4 w-4 fill-white" />
+                    </span>
+                  ) : null}
+                  <Sparkles className="h-4 w-4" />
+                  Super Like ({superQuota?.remaining ?? 0} /{" "}
+                  {superQuota?.limit ?? 0})
+                </Button>
+              )}
+
               <Button
                 type="button"
                 onClick={() => void triggerSwipe("right")}
@@ -681,7 +808,7 @@ export default function SwipeRailDeck() {
                     ? "Daily swipe limit reached — upgrade to continue"
                     : undefined
                 }
-                className="group relative h-12 overflow-hidden bg-gradient-to-r from-emerald-500 to-cyan-500 text-white shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-cyan-400"
+                className="group relative h-12 overflow-hidden bg-green-500 text-white hover:bg-green-600"
               >
                 {actionPulse === "right" ? (
                   <span className="absolute right-3 top-2 text-white/90 animate-ping">
@@ -689,7 +816,7 @@ export default function SwipeRailDeck() {
                   </span>
                 ) : null}
                 <Heart className="h-4 w-4 fill-white transition-transform group-hover:scale-110" />
-                Like
+                {currentPosition ? "Apply" : "Like"}
               </Button>
             </div>
           </div>

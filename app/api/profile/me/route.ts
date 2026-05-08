@@ -50,14 +50,8 @@ export async function GET() {
     const normalizedRole = normalizeRole(user.role)
     const activeRole = resolveActiveRole(user.role, user.activeRole)
 
-    const employeeProfile =
-      normalizedRole === "employee" || normalizedRole === "both"
-        ? await EmployeeProfile.findOne({ user: user._id })
-        : null
-    const employerProfile =
-      normalizedRole === "employer" || normalizedRole === "both"
-        ? await EmployerProfile.findOne({ user: user._id })
-        : null
+    const employeeProfile = await EmployeeProfile.findOne({ user: user._id })
+    const employerProfile = await EmployerProfile.findOne({ user: user._id })
     const resumes = await Resume.find({ user: user._id }).sort({
       isFeatured: -1,
       createdAt: -1,
@@ -174,49 +168,52 @@ export async function PUT(req: NextRequest) {
 
     await User.updateOne({ _id: user._id }, { $set: userUpdateData })
 
-    if (normalizedRole === "employee" || normalizedRole === "both") {
-      const existingEmployeeProfile = await EmployeeProfile.findOne({
-        user: user._id,
-      })
+    const hasEmployeePayload =
+      employeeData &&
+      typeof employeeData === "object" &&
+      Object.keys(employeeData).length > 0
 
-      const profileUpdateData = {
-        headline: employeeData.headline,
-        bio: employeeData.bio,
-        tagline: employeeData.tagline,
-        currentStatus: employeeData.currentStatus,
-        availableFrom: employeeData.availableFrom,
-        currentCity: employeeData.currentCity,
-        currentState: employeeData.currentState,
-        currentCountry: employeeData.currentCountry,
-        workPreference: employeeData.workPreference,
-        primarySkills: employeeData.primarySkills || [],
-        secondarySkills: employeeData.secondarySkills || [],
-        desiredRoles: employeeData.desiredRoles || [],
-        desiredIndustries: employeeData.desiredIndustries || [],
-        desiredCompanyTypes: employeeData.desiredCompanyTypes || [],
-        desiredCompanies: employeeData.desiredCompanies || [],
-        desiredCompanySize: employeeData.desiredCompanySize,
-        preferredLocations: employeeData.preferredLocations || [],
-        willingToRelocate: employeeData.willingToRelocate,
-        currentCTC: employeeData.currentCTC,
-        expectedCTC: employeeData.expectedCTC,
-        employmentType: employeeData.employmentType || [],
-        totalExperienceYears: employeeData.totalExperienceYears,
-        experienceLevel: employeeData.experienceLevel,
-        workHistory:
-          employeeData.workHistory || existingEmployeeProfile?.workHistory,
-        education: employeeData.education || existingEmployeeProfile?.education,
-        highestQualification: employeeData.highestQualification,
-        certifications:
-          employeeData.certifications ||
-          existingEmployeeProfile?.certifications,
-        projects: employeeData.projects || existingEmployeeProfile?.projects,
-        socialLinks:
-          employeeData.socialLinks || existingEmployeeProfile?.socialLinks,
-        companyRatingMin: employeeData.companyRatingMin,
-        avoidCompanies: employeeData.avoidCompanies || [],
-        preferredBenefits: employeeData.preferredBenefits || [],
+    if (hasEmployeePayload) {
+      const profileUpdateData: Record<string, unknown> = {}
+
+      const assignIfDefined = (key: string, value: unknown) => {
+        if (value !== undefined) {
+          profileUpdateData[key] = value
+        }
       }
+
+      assignIfDefined("headline", employeeData.headline)
+      assignIfDefined("bio", employeeData.bio)
+      assignIfDefined("tagline", employeeData.tagline)
+      assignIfDefined("currentStatus", employeeData.currentStatus)
+      assignIfDefined("availableFrom", employeeData.availableFrom)
+      assignIfDefined("currentCity", employeeData.currentCity)
+      assignIfDefined("currentState", employeeData.currentState)
+      assignIfDefined("currentCountry", employeeData.currentCountry)
+      assignIfDefined("workPreference", employeeData.workPreference)
+      assignIfDefined("primarySkills", employeeData.primarySkills)
+      assignIfDefined("secondarySkills", employeeData.secondarySkills)
+      assignIfDefined("desiredRoles", employeeData.desiredRoles)
+      assignIfDefined("desiredIndustries", employeeData.desiredIndustries)
+      assignIfDefined("desiredCompanyTypes", employeeData.desiredCompanyTypes)
+      assignIfDefined("desiredCompanies", employeeData.desiredCompanies)
+      assignIfDefined("desiredCompanySize", employeeData.desiredCompanySize)
+      assignIfDefined("preferredLocations", employeeData.preferredLocations)
+      assignIfDefined("willingToRelocate", employeeData.willingToRelocate)
+      assignIfDefined("currentCTC", employeeData.currentCTC)
+      assignIfDefined("expectedCTC", employeeData.expectedCTC)
+      assignIfDefined("employmentType", employeeData.employmentType)
+      assignIfDefined("totalExperienceYears", employeeData.totalExperienceYears)
+      assignIfDefined("experienceLevel", employeeData.experienceLevel)
+      assignIfDefined("workHistory", employeeData.workHistory)
+      assignIfDefined("education", employeeData.education)
+      assignIfDefined("highestQualification", employeeData.highestQualification)
+      assignIfDefined("certifications", employeeData.certifications)
+      assignIfDefined("projects", employeeData.projects)
+      assignIfDefined("socialLinks", employeeData.socialLinks)
+      assignIfDefined("companyRatingMin", employeeData.companyRatingMin)
+      assignIfDefined("avoidCompanies", employeeData.avoidCompanies)
+      assignIfDefined("preferredBenefits", employeeData.preferredBenefits)
 
       await EmployeeProfile.findOneAndUpdate(
         { user: user._id },
@@ -232,7 +229,12 @@ export async function PUT(req: NextRequest) {
       )
     }
 
-    if (normalizedRole === "employer" || normalizedRole === "both") {
+    const hasEmployerPayload =
+      employerData &&
+      typeof employerData === "object" &&
+      Object.keys(employerData).length > 0
+
+    if (hasEmployerPayload) {
       const existingEmployerProfile = await EmployerProfile.findOne({
         user: user._id,
       })

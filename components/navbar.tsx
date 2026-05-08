@@ -43,6 +43,20 @@ export default function Navbar() {
   const pathname = usePathname()
   const { data: session, status, update } = useSession()
   const [isOpen, setIsOpen] = React.useState(false)
+  const [notifUnread, setNotifUnread] = React.useState(0)
+
+  const loadNotifUnread = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications/unread", {
+        cache: "no-store",
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      setNotifUnread(data.unread || 0)
+    } catch (err) {
+      console.warn("failed to load notif unread", err)
+    }
+  }, [])
 
   React.useEffect(() => {
     if (!update) return
@@ -56,6 +70,14 @@ export default function Navbar() {
     window.addEventListener("swrk:session-updated", handler)
     return () => window.removeEventListener("swrk:session-updated", handler)
   }, [update])
+
+  React.useEffect(() => {
+    void loadNotifUnread()
+    const onMessage = () => void loadNotifUnread()
+    window.addEventListener("swrk:notifications-updated", onMessage)
+    return () =>
+      window.removeEventListener("swrk:notifications-updated", onMessage)
+  }, [loadNotifUnread])
 
   if (
     pathname === "/signin" ||
@@ -190,11 +212,18 @@ export default function Navbar() {
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                       <Link
-                        href="/settings/subscription"
-                        className="cursor-pointer"
+                        href="/dashboard/notifications"
+                        className="cursor-pointer flex items-center justify-between"
                       >
-                        <SubscriptIcon className="h-4 w-4" />
-                        <span>Manage Subscription</span>
+                        <div className="flex items-center gap-2">
+                          <SubscriptIcon className="h-4 w-4" />
+                          <span>Notifications</span>
+                        </div>
+                        {notifUnread > 0 ? (
+                          <span className="ml-2 text-xs rounded-full bg-primary px-2 py-0.5 text-white">
+                            {notifUnread > 99 ? "99+" : notifUnread}
+                          </span>
+                        ) : null}
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>

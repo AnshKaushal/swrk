@@ -52,16 +52,10 @@ export async function GET(
     const normalizedRole = normalizeRole(user.role)
     const activeRole = resolveActiveRole(user.role, user.activeRole)
 
-    const employeeProfile =
-      normalizedRole === "employee" || normalizedRole === "both"
-        ? await EmployeeProfile.findOne({ user: user._id }).select(
-            "-stats.totalLeftSwipes -stats.totalRightSwipes",
-          )
-        : null
-    const employerProfile =
-      normalizedRole === "employer" || normalizedRole === "both"
-        ? await EmployerProfile.findOne({ user: user._id })
-        : null
+    const employeeProfile = await EmployeeProfile.findOne({
+      user: user._id,
+    }).select("-stats.totalLeftSwipes -stats.totalRightSwipes")
+    const employerProfile = await EmployerProfile.findOne({ user: user._id })
     let resumes = []
     // respect user's resume privacy setting for non-owners
     const allowResumes = isOwner || user.privacy?.showResumes !== false

@@ -4,6 +4,7 @@ import { db } from "@/lib/mongodb"
 import { emitToMatch, emitToUser, getSocketServer } from "@/lib/socket-server"
 import { Match, Swipe } from "@/models/swipe"
 import Message from "@/models/message"
+import Notification from "@/models/notification"
 
 function buildMessagePreview(content: string) {
   return content.trim().replace(/\s+/g, " ").slice(0, 120)
@@ -164,6 +165,9 @@ export async function POST(req: NextRequest) {
     const recipientId = senderIsEmployer
       ? extractObjectId(match.employee)
       : extractObjectId(match.employer)
+    const senderName = senderIsEmployer
+      ? (match.employer as { name?: string } | undefined)?.name || "Someone"
+      : (match.employee as { name?: string } | undefined)?.name || "Someone"
 
     const message = await Message.create({
       match: matchId,
@@ -217,6 +221,26 @@ export async function POST(req: NextRequest) {
       emitToUser(extractObjectId(match.employee), "conversation:update", {
         matchId,
         match: updatedMatch,
+      })
+    }
+
+    await Notification.create({
+      user: recipientId,
+      actor: session.user.id,
+      type: "message",
+      title: "New message",
+      message: `${senderName} sent you a message.`,
+      link: `/dashboard/messages?matchId=${matchId}`,
+      data: { matchId, messageId: message._id },
+    })
+
+    if (getSocketServer()) {
+      emitToUser(recipientId, "notification:new", {
+        type: "message",
+        title: "New message",
+        message: `${senderName} sent you a message.`,
+        link: `/dashboard/messages?matchId=${matchId}`,
+        matchId,
       })
     }
 

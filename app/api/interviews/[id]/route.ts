@@ -1,7 +1,9 @@
 import { auth } from "../../auth/[...nextauth]/route"
 import Interview from "@/models/interview"
+import Notification from "@/models/notification"
 import { db } from "@/lib/mongodb"
 import { NextRequest, NextResponse } from "next/server"
+import { emitToUser, getSocketServer } from "@/lib/socket-server"
 
 export async function PUT(
   req: NextRequest,
@@ -48,6 +50,42 @@ export async function PUT(
     }
 
     await interview.save()
+
+    const recipientId =
+      interview.employer.toString() === session.user.id
+        ? interview.employee.toString()
+        : interview.employer.toString()
+
+    const notificationTitle =
+      status === "confirmed" ? "Interview confirmed" : "Interview declined"
+    const notificationMessage =
+      status === "confirmed"
+        ? "Your interview request has been confirmed."
+        : `Your interview request was declined${reason ? `: ${reason}` : ""}.`
+
+    await Notification.create({
+      user: recipientId,
+      actor: session.user.id,
+      type: `interview_${status}`,
+      title: notificationTitle,
+      message: notificationMessage,
+      link: "/dashboard/interviews",
+      data: { interviewId: interview._id, status },
+    })
+
+    if (getSocketServer()) {
+      emitToUser(recipientId, "notification:new", {
+        type: `interview_${status}`,
+        title: notificationTitle,
+        message: notificationMessage,
+        link: "/dashboard/interviews",
+        interviewId: interview._id,
+      })
+      emitToUser(recipientId, "interview:update", {
+        interviewId: interview._id,
+        status,
+      })
+    }
 
     return NextResponse.json({ interview: interview.toObject() })
   } catch (error) {

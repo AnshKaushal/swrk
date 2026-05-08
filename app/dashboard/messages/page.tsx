@@ -439,6 +439,16 @@ function MessagesPageContent() {
   }, [messages])
 
   const handleSelectMatch = (matchId: string) => {
+    setMatches((previous) =>
+      previous.map((match) => {
+        if (match._id !== matchId) return match
+
+        const isEmployer = String(match.employer?._id) === currentUserId
+        return isEmployer
+          ? { ...match, unreadByEmployer: 0 }
+          : { ...match, unreadByEmployee: 0 }
+      }),
+    )
     setActiveMatchId(matchId)
     router.replace(`/dashboard/messages?matchId=${matchId}`)
   }
@@ -509,33 +519,8 @@ function MessagesPageContent() {
   }
 
   return (
-    <div className="h-full bg-gradient-to-br from-background via-background to-muted/30 p-4 sm:p-6">
+    <div className="h-full p-4 sm:p-6">
       <div className="mx-auto flex h-full max-w-[1600px] flex-col gap-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">
-              Messaging
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight">Matches</h1>
-            <p className="text-sm text-muted-foreground">
-              Real-time conversations between matched users.
-            </p>
-          </div>
-
-          <Badge
-            variant={socketConnected ? "default" : "outline"}
-            className="w-fit gap-1.5 rounded-full px-3 py-1.5"
-          >
-            <Circle
-              className={cn(
-                "h-2 w-2",
-                socketConnected ? "fill-current" : "text-muted-foreground",
-              )}
-            />
-            {socketConnected ? "Live" : "Connecting"}
-          </Badge>
-        </div>
-
         <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
           <Card className="flex min-h-0 flex-col overflow-hidden border-border/60 bg-card/95 shadow-sm">
             <div className="border-b border-border/60 p-4">

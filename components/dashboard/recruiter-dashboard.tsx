@@ -40,6 +40,16 @@ interface StatsData {
   recentMatches: MatchData[]
 }
 
+interface InterviewData {
+  _id: string
+  title: string
+  scheduledFor: string
+  employee: { name: string; avatar: string }
+  candidate: { name: string; avatar: string }
+  status: string
+  duration: number
+}
+
 type ActivityPoint = { day: string; value: number }
 
 export function RecruiterDashboard({ name }: { name: string }) {
@@ -49,6 +59,10 @@ export function RecruiterDashboard({ name }: { name: string }) {
   const [chartData, setChartData] = useState<ActivityPoint[]>([])
   const [activityLoading, setActivityLoading] = useState(false)
   const [range, setRange] = useState<number>(7)
+  const [upcomingInterviews, setUpcomingInterviews] = useState<InterviewData[]>(
+    [],
+  )
+  const [interviewsLoading, setInterviewsLoading] = useState(true)
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -99,6 +113,30 @@ export function RecruiterDashboard({ name }: { name: string }) {
       mounted = false
     }
   }, [range])
+
+  useEffect(() => {
+    const fetchInterviews = async () => {
+      try {
+        const response = await fetch("/api/interviews?status=scheduled")
+        if (response.ok) {
+          const data = await response.json()
+          const now = new Date()
+          const futureInterviews = (data.interviews || []).filter(
+            (interview: InterviewData) => {
+              return new Date(interview.scheduledFor) > now
+            },
+          )
+          setUpcomingInterviews(futureInterviews.slice(0, 3))
+        }
+      } catch (error) {
+        console.error("Failed to fetch interviews:", error)
+      } finally {
+        setInterviewsLoading(false)
+      }
+    }
+
+    fetchInterviews()
+  }, [])
 
   const metrics = [
     {
@@ -278,45 +316,54 @@ export function RecruiterDashboard({ name }: { name: string }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card className="border border-border/50">
             <CardHeader>
-              <CardTitle>Upcoming Tasks</CardTitle>
+              <CardTitle>Upcoming Interviews</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
-                <div className="w-10 h-10 flex items-center justify-center bg-background rounded-lg border border-border">
-                  <Calendar className="w-5 h-5 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Interview Scheduled</p>
-                  <p className="text-xs text-muted-foreground">
-                    Today, 2:00 PM - Google Meet
-                  </p>
-                </div>
-                <Badge className="text-xs">JOIN</Badge>
-              </div>
-
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
-                <div className="w-10 h-10 flex items-center justify-center bg-background rounded-lg border border-border">
-                  <Briefcase className="w-5 h-5 text-blue-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Review Portfolio</p>
-                  <p className="text-xs text-muted-foreground">
-                    Creative Director Candidate
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
-                <div className="w-10 h-10 flex items-center justify-center bg-background rounded-lg border border-border">
-                  <MessageCircle className="w-5 h-5 text-purple-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Email Follow-ups</p>
-                  <p className="text-xs text-muted-foreground">
-                    Send offer letters
-                  </p>
-                </div>
-              </div>
+              {interviewsLoading ? (
+                <p className="text-sm text-muted-foreground">Loading...</p>
+              ) : upcomingInterviews.length > 0 ? (
+                upcomingInterviews.map((interview) => {
+                  const candidateName =
+                    interview.employee?.name ||
+                    interview.candidate?.name ||
+                    "Candidate"
+                  const avatar =
+                    interview.employee?.avatar || interview.candidate?.avatar
+                  const scheduledDate = new Date(interview.scheduledFor)
+                  const dateStr = scheduledDate.toLocaleDateString(undefined, {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                  })
+                  const timeStr = scheduledDate.toLocaleTimeString(undefined, {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                  return (
+                    <div
+                      key={interview._id}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50"
+                    >
+                      <img
+                        src={avatar || "/default-avatar.png"}
+                        alt={candidateName}
+                        className="w-10 h-10 rounded-full object-cover border border-border"
+                      />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">{interview.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {candidateName} • {dateStr}, {timeStr}
+                        </p>
+                      </div>
+                      <Badge className="text-xs">PREPARE</Badge>
+                    </div>
+                  )
+                })
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No upcoming interviews
+                </p>
+              )}
             </CardContent>
           </Card>
 

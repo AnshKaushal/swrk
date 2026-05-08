@@ -2,8 +2,10 @@ import { auth } from "../auth/[...nextauth]/route"
 import Interview from "@/models/interview"
 import { Match, Swipe } from "@/models/swipe"
 import Message from "@/models/message"
+import Notification from "@/models/notification"
 import { db } from "@/lib/mongodb"
 import { NextRequest, NextResponse } from "next/server"
+import { emitToUser, getSocketServer } from "@/lib/socket-server"
 
 export async function POST(req: NextRequest) {
   try {
@@ -70,6 +72,33 @@ export async function POST(req: NextRequest) {
 
     interview.messageId = message._id
     await interview.save()
+
+    const recipientId = String(match.employee._id)
+
+    await Notification.create({
+      user: recipientId,
+      actor: session.user.id,
+      type: "interview",
+      title: "Interview scheduled",
+      message: `${match.employer?.name || "An employer"} scheduled an interview.`,
+      link: "/dashboard/interviews",
+      data: { interviewId: interview._id, matchId },
+    })
+
+    if (getSocketServer()) {
+      emitToUser(recipientId, "notification:new", {
+        type: "interview",
+        title: "Interview scheduled",
+        message: `${match.employer?.name || "An employer"} scheduled an interview.`,
+        link: "/dashboard/interviews",
+        interviewId: interview._id,
+        matchId,
+      })
+      emitToUser(recipientId, "conversation:update", {
+        matchId,
+        interviewId: interview._id,
+      })
+    }
 
     return NextResponse.json(
       {

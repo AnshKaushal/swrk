@@ -45,6 +45,12 @@ type WorkHistoryItem = {
   description: string
 }
 
+type ProjectItem = {
+  title: string
+  description: string
+  url: string
+}
+
 type AddressFields = {
   street?: string
   city?: string
@@ -171,6 +177,12 @@ const emptyWorkHistoryItem = (): WorkHistoryItem => ({
   description: "",
 })
 
+const emptyProjectItem = (): ProjectItem => ({
+  title: "",
+  description: "",
+  url: "",
+})
+
 const normalizeEducation = (
   education: unknown[] | undefined,
 ): EducationItem[] => {
@@ -198,6 +210,39 @@ const formatDateInput = (value?: string | Date | null) => {
   return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10)
 }
 
+const formatDateDisplay = (value?: string | Date | null) => {
+  if (!value) return ""
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ""
+
+  const day = String(date.getDate()).padStart(2, "0")
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const year = date.getFullYear()
+  return `${day}/${month}/${year}`
+}
+
+const parseDisplayDate = (value?: string) => {
+  if (!value) return null
+
+  const normalized = value.trim()
+  if (!normalized) return null
+
+  const isoMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch
+    return new Date(Number(year), Number(month) - 1, Number(day))
+  }
+
+  const slashMatch = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (slashMatch) {
+    const [, day, month, year] = slashMatch
+    return new Date(Number(year), Number(month) - 1, Number(day))
+  }
+
+  const fallback = new Date(normalized)
+  return Number.isNaN(fallback.getTime()) ? null : fallback
+}
+
 const normalizeWorkHistory = (
   workHistory: unknown[] | undefined,
 ): WorkHistoryItem[] => {
@@ -210,14 +255,27 @@ const normalizeWorkHistory = (
       role: ((source.role as string) ||
         (source.position as string) ||
         "") as string,
-      startDate: formatDateInput(
+      startDate: formatDateDisplay(
         (source.startDate as string) || (source.duration as string) || null,
       ),
       endDate: source.isCurrent
         ? ""
-        : formatDateInput((source.endDate as string) || null),
+        : formatDateDisplay((source.endDate as string) || null),
       isCurrent: Boolean(source.isCurrent),
       description: (source.description as string) || "",
+    }
+  })
+}
+
+const normalizeProjects = (projects: unknown[] | undefined): ProjectItem[] => {
+  if (!Array.isArray(projects)) return []
+
+  return projects.map((item) => {
+    const source = item as Record<string, unknown>
+    return {
+      title: (source.title as string) || "",
+      description: (source.description as string) || "",
+      url: (source.url as string) || (source.link as string) || "",
     }
   })
 }
@@ -286,6 +344,7 @@ export default function ProfileSettingsPage() {
     Array<{ type: "city" | "state" | "country"; name: string }>
   >([])
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false)
+  const [preferredLocationInput, setPreferredLocationInput] = useState("")
 
   const [formData, setFormData] = useState({
     name: "",
@@ -312,9 +371,21 @@ export default function ProfileSettingsPage() {
     ] as ProfessionalLink[],
     education: [] as EducationItem[],
     workHistory: [] as WorkHistoryItem[],
+    projects: [] as ProjectItem[],
+    preferredLocations: [] as string[],
     role: "employee",
     activeRole: "employee",
     visibility: { showEmail: true, showPhone: false, showResumes: true },
+    companyName: "",
+    companyWebsite: "",
+    companyLinkedin: "",
+    companyDescription: "",
+    companyTagline: "",
+    industry: "" as string,
+    companyType: "",
+    companySize: "",
+    foundedYear: "",
+    fundingStage: "",
   })
   const [boostQuota, setBoostQuota] = useState<null | {
     remaining: number
@@ -372,6 +443,10 @@ export default function ProfileSettingsPage() {
           ),
           education: normalizeEducation(data.employeeProfile?.education),
           workHistory: normalizeWorkHistory(data.employeeProfile?.workHistory),
+          projects: normalizeProjects(data.employeeProfile?.projects),
+          preferredLocations: normalizeStringList(
+            data.employeeProfile?.preferredLocations,
+          ),
           visibility: {
             showEmail: privacy.showEmail ?? prev.visibility.showEmail,
             showPhone: privacy.showPhone ?? prev.visibility.showPhone,
@@ -382,6 +457,24 @@ export default function ProfileSettingsPage() {
           currentCity: data.employeeProfile?.currentCity || "",
           currentState: data.employeeProfile?.currentState || "",
           currentCountry: data.employeeProfile?.currentCountry || "India",
+          companyName: (data.employerProfile?.companyName as string) || "",
+          companyWebsite:
+            (data.employerProfile?.companyWebsite as string) || "",
+          companyLinkedin:
+            (data.employerProfile?.companyLinkedin as string) || "",
+          companyDescription:
+            (data.employerProfile?.companyDescription as string) || "",
+          companyTagline:
+            (data.employerProfile?.companyTagline as string) || "",
+          industry: Array.isArray(data.employerProfile?.industry)
+            ? (data.employerProfile.industry as string[])[0] || ""
+            : "",
+          companyType: (data.employerProfile?.companyType as string) || "",
+          companySize: (data.employerProfile?.companySize as string) || "",
+          foundedYear: (data.employerProfile?.foundedYear as number)
+            ? String(data.employerProfile?.foundedYear)
+            : "",
+          fundingStage: (data.employerProfile?.fundingStage as string) || "",
         }))
         // fetch boost quota after profile data
         try {
@@ -758,6 +851,57 @@ export default function ProfileSettingsPage() {
     }))
   }
 
+  const updateProjectItem = (
+    index: number,
+    field: keyof ProjectItem,
+    value: string,
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      projects: prev.projects.map((item, i) =>
+        i === index ? { ...item, [field]: value } : item,
+      ),
+    }))
+  }
+
+  const addProjectItem = () => {
+    setFormData((prev) => ({
+      ...prev,
+      projects: [...prev.projects, emptyProjectItem()],
+    }))
+  }
+
+  const removeProjectItem = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      projects: prev.projects.filter((_, i) => i !== index),
+    }))
+  }
+
+  const addPreferredLocation = () => {
+    const value = preferredLocationInput.trim()
+    if (!value) return
+
+    setFormData((prev) =>
+      prev.preferredLocations.includes(value)
+        ? prev
+        : {
+            ...prev,
+            preferredLocations: [...prev.preferredLocations, value],
+          },
+    )
+    setPreferredLocationInput("")
+  }
+
+  const removePreferredLocation = (location: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      preferredLocations: prev.preferredLocations.filter(
+        (item) => item !== location,
+      ),
+    }))
+  }
+
   const addProfessionalLink = () => {
     setFormData((prev) =>
       prev.professionalLinks.length >= 5
@@ -796,54 +940,109 @@ export default function ProfileSettingsPage() {
     e.preventDefault()
     setSaving(true)
     try {
+      // Coerce education years to numbers and workHistory dates to ISO strings
+      const educationPayload = formData.education
+        .map((e) => ({
+          institution: e.institution,
+          degree: e.degree || undefined,
+          field: e.field || undefined,
+          startYear: e.startYear ? parseInt(String(e.startYear)) : undefined,
+          endYear: e.endYear ? parseInt(String(e.endYear)) : undefined,
+          grade: e.grade || undefined,
+        }))
+        .filter((e) => e.institution)
+
+      const workPayload = formData.workHistory
+        .map((w) => {
+          const startDate = parseDisplayDate(w.startDate)
+          const endDate = parseDisplayDate(w.endDate)
+          return {
+            company: w.company,
+            role: w.role,
+            startDate: startDate ? startDate.toISOString() : undefined,
+            endDate: endDate ? endDate.toISOString() : undefined,
+            isCurrent: Boolean(w.isCurrent),
+            description: w.description || undefined,
+          }
+        })
+        .filter((w) => w.company && w.role)
+
+      const projectPayload = formData.projects
+        .map((project) => ({
+          title: project.title.trim(),
+          description: project.description.trim() || undefined,
+          url: project.url.trim() || undefined,
+        }))
+        .filter((project) => project.title)
+
+      const includeEmployerProfile = formData.role !== "employee"
+
+      const payload: Record<string, unknown> = {
+        user: {
+          name: formData.name,
+          phone: formData.phone,
+          gender: formData.gender,
+          address: {
+            street: formData.address.street,
+            city: formData.address.city,
+            state: formData.address.state,
+            zip: formData.address.postalCode,
+          },
+          linkedinUrl:
+            formData.professionalLinks[0]?.url || formData.linkedinUrl,
+          githubUrl: formData.professionalLinks[1]?.url || formData.githubUrl,
+          portfolioUrl:
+            formData.professionalLinks[2]?.url || formData.portfolioUrl,
+          professionalLinks: formData.professionalLinks.filter(
+            (link) => link.label || link.url,
+          ),
+          visibility: formData.visibility,
+          activeRole: formData.activeRole,
+        },
+        employeeProfile: {
+          headline: formData.headline,
+          bio: formData.bio,
+          primarySkills: formData.primarySkills,
+          secondarySkills: formData.secondarySkills,
+          education: educationPayload,
+          workHistory: workPayload,
+          projects: projectPayload,
+          currentCity: formData.currentCity,
+          currentState: formData.currentState,
+          currentCountry: formData.currentCountry,
+          preferredLocations: formData.preferredLocations,
+        },
+      }
+
+      if (includeEmployerProfile) {
+        payload.employerProfile = {
+          companyName: formData.companyName,
+          companyWebsite: formData.companyWebsite,
+          companyLinkedin: formData.companyLinkedin,
+          companyDescription: formData.companyDescription,
+          companyTagline: formData.companyTagline,
+          industry: formData.industry ? [formData.industry] : [],
+          companyType: formData.companyType,
+          companySize: formData.companySize,
+          foundedYear: formData.foundedYear
+            ? parseInt(formData.foundedYear)
+            : undefined,
+          fundingStage: formData.fundingStage,
+        }
+      }
+
       const response = await fetch("/api/profile/me", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user: {
-            name: formData.name,
-            phone: formData.phone,
-            gender: formData.gender,
-            address: {
-              street: formData.address.street,
-              city: formData.address.city,
-              state: formData.address.state,
-              zip: formData.address.postalCode,
-            },
-            linkedinUrl:
-              formData.professionalLinks[0]?.url || formData.linkedinUrl,
-            githubUrl: formData.professionalLinks[1]?.url || formData.githubUrl,
-            portfolioUrl:
-              formData.professionalLinks[2]?.url || formData.portfolioUrl,
-            professionalLinks: formData.professionalLinks.filter(
-              (link) => link.label || link.url,
-            ),
-            visibility: formData.visibility,
-            activeRole: formData.activeRole,
-          },
-          employeeProfile: {
-            headline: formData.headline,
-            bio: formData.bio,
-            primarySkills: formData.primarySkills,
-            secondarySkills: formData.secondarySkills,
-            education: formData.education,
-            workHistory: formData.workHistory.map((item) => ({
-              company: item.company,
-              role: item.role,
-              startDate: item.startDate || undefined,
-              endDate: item.isCurrent ? undefined : item.endDate || undefined,
-              isCurrent: item.isCurrent,
-              description: item.description,
-            })),
-            currentCity: formData.currentCity,
-            currentState: formData.currentState,
-            currentCountry: formData.currentCountry,
-          },
-          employerProfile: {},
-        }),
+        body: JSON.stringify(payload),
       })
       if (response.ok) {
         toast.success("Profile updated successfully!")
+        try {
+          // Let other UI refresh session/profile data
+          window.dispatchEvent(new Event("swrk:session-updated"))
+          window.dispatchEvent(new Event("swrk:notifications-updated"))
+        } catch (e) {}
       } else {
         const error = await response.json()
         toast.error(error.error || "Failed to update profile")
@@ -1508,7 +1707,8 @@ export default function ProfileSettingsPage() {
                   <div className="space-y-2">
                     <Label>Start Date</Label>
                     <Input
-                      type="date"
+                      type="text"
+                      placeholder="dd/mm/yyyy"
                       value={work.startDate}
                       onChange={(e) =>
                         updateWorkHistoryItem(
@@ -1522,13 +1722,13 @@ export default function ProfileSettingsPage() {
                   <div className="space-y-2">
                     <Label>End Date</Label>
                     <Input
-                      type="date"
+                      type="text"
+                      placeholder="dd/mm/yyyy"
                       value={work.endDate}
                       disabled={work.isCurrent}
                       onChange={(e) =>
                         updateWorkHistoryItem(index, "endDate", e.target.value)
                       }
-                      placeholder="Leave empty if current"
                     />
                   </div>
                   <div className="flex items-center gap-2">
@@ -1587,6 +1787,278 @@ export default function ProfileSettingsPage() {
             </Button>
           </div>
         </div>
+
+        <div className="grid max-w-7xl grid-cols-1 gap-x-8 gap-y-10 px-4 py-16 sm:px-6 md:grid-cols-3 lg:px-8">
+          <div>
+            <h2 className="text-base/7 font-semibold">Preferred Locations</h2>
+            <p className="mt-1 text-sm/6 text-muted-foreground">
+              Press Enter to add each preference as a separate location.
+            </p>
+          </div>
+          <div className="md:col-span-2 space-y-4 rounded-xl border border-border p-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Add a preferred location"
+                value={preferredLocationInput}
+                onChange={(e) => setPreferredLocationInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault()
+                    addPreferredLocation()
+                  }
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addPreferredLocation}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+            {formData.preferredLocations.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {formData.preferredLocations.map((location) => (
+                  <Badge key={location} variant="secondary" className="pr-1">
+                    {location}
+                    <button
+                      type="button"
+                      onClick={() => removePreferredLocation(location)}
+                      className="ml-1"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        {formData.role !== "employer" ? (
+          <div className="grid max-w-7xl grid-cols-1 gap-x-8 gap-y-10 px-4 py-16 sm:px-6 md:grid-cols-3 lg:px-8">
+            <div>
+              <h2 className="text-base/7 font-semibold">Projects</h2>
+              <p className="mt-1 text-sm/6 text-muted-foreground">
+                Add the projects that best represent your work.
+              </p>
+            </div>
+            <div className="md:col-span-2 space-y-6">
+              {formData.projects.map((project, index) => (
+                <div
+                  key={index}
+                  className="space-y-4 rounded-lg border border-border p-4"
+                >
+                  <div className="flex items-start justify-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeProjectItem(index)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                  <Input
+                    value={project.title}
+                    onChange={(e) =>
+                      updateProjectItem(index, "title", e.target.value)
+                    }
+                    placeholder="Project title"
+                  />
+                  <Textarea
+                    value={project.description}
+                    onChange={(e) =>
+                      updateProjectItem(index, "description", e.target.value)
+                    }
+                    placeholder="What does this project do?"
+                    rows={4}
+                  />
+                  <Input
+                    value={project.url}
+                    onChange={(e) =>
+                      updateProjectItem(index, "url", e.target.value)
+                    }
+                    placeholder="https://github.com/your-project"
+                  />
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={addProjectItem}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4" />
+                Add Project
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {formData.role !== "employee" ? (
+          <div className="grid max-w-7xl grid-cols-1 gap-x-8 gap-y-10 px-4 py-16 sm:px-6 md:grid-cols-3 lg:px-8">
+            <div>
+              <h2 className="text-base/7 font-semibold">Company Profile</h2>
+              <p className="mt-1 text-sm/6 text-muted-foreground">
+                Add your company information if you're an employer.
+              </p>
+            </div>
+            <div className="md:col-span-2 space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="companyName">Company Name</Label>
+                <Input
+                  id="companyName"
+                  name="companyName"
+                  placeholder="e.g. Acme Corporation"
+                  value={formData.companyName}
+                  onChange={handleInputChange}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="companyWebsite">Company Website</Label>
+                <Input
+                  id="companyWebsite"
+                  name="companyWebsite"
+                  placeholder="https://company.com"
+                  value={formData.companyWebsite}
+                  onChange={handleInputChange}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="companyLinkedin">Company LinkedIn</Label>
+                <Input
+                  id="companyLinkedin"
+                  name="companyLinkedin"
+                  placeholder="https://linkedin.com/company/..."
+                  value={formData.companyLinkedin}
+                  onChange={handleInputChange}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="companyTagline">Company Tagline</Label>
+                <Input
+                  id="companyTagline"
+                  name="companyTagline"
+                  placeholder="Brief tagline for your company"
+                  value={formData.companyTagline}
+                  onChange={handleInputChange}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="companyDescription">Company Description</Label>
+                <Textarea
+                  id="companyDescription"
+                  name="companyDescription"
+                  placeholder="Tell candidates about your company"
+                  value={formData.companyDescription}
+                  onChange={handleInputChange}
+                  rows={4}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="industry">Industry</Label>
+                  <Input
+                    id="industry"
+                    name="industry"
+                    placeholder="e.g. SaaS, FinTech"
+                    value={formData.industry}
+                    onChange={handleInputChange}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="companyType">Company Type</Label>
+                  <Select
+                    value={formData.companyType}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({ ...prev, companyType: value }))
+                    }
+                  >
+                    <SelectTrigger id="companyType">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="startup">Startup</SelectItem>
+                      <SelectItem value="mid-size">Mid-size</SelectItem>
+                      <SelectItem value="enterprise">Enterprise</SelectItem>
+                      <SelectItem value="mnc">MNC</SelectItem>
+                      <SelectItem value="product">Product</SelectItem>
+                      <SelectItem value="service">Service</SelectItem>
+                      <SelectItem value="ngo">NGO</SelectItem>
+                      <SelectItem value="government">Government</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="companySize">Company Size</Label>
+                  <Select
+                    value={formData.companySize}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({ ...prev, companySize: value }))
+                    }
+                  >
+                    <SelectTrigger id="companySize">
+                      <SelectValue placeholder="Select size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1-10">1-10 employees</SelectItem>
+                      <SelectItem value="11-50">11-50 employees</SelectItem>
+                      <SelectItem value="51-200">51-200 employees</SelectItem>
+                      <SelectItem value="201-500">201-500 employees</SelectItem>
+                      <SelectItem value="501-2000">
+                        501-2000 employees
+                      </SelectItem>
+                      <SelectItem value="2000+">2000+ employees</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="foundedYear">Founded Year</Label>
+                  <Input
+                    id="foundedYear"
+                    name="foundedYear"
+                    type="number"
+                    placeholder="e.g. 2020"
+                    value={formData.foundedYear}
+                    onChange={handleInputChange}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="fundingStage">Funding Stage</Label>
+                  <Select
+                    value={formData.fundingStage}
+                    onValueChange={(value) =>
+                      setFormData((prev) => ({ ...prev, fundingStage: value }))
+                    }
+                  >
+                    <SelectTrigger id="fundingStage">
+                      <SelectValue placeholder="Select stage" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bootstrapped">Bootstrapped</SelectItem>
+                      <SelectItem value="pre-seed">Pre-seed</SelectItem>
+                      <SelectItem value="seed">Seed</SelectItem>
+                      <SelectItem value="series-a">Series A</SelectItem>
+                      <SelectItem value="series-b">Series B</SelectItem>
+                      <SelectItem value="series-c+">Series C+</SelectItem>
+                      <SelectItem value="public">Public</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <div className="px-4 py-5 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">

@@ -16,6 +16,7 @@ import {
   Zap,
   MessageSquare,
   Calendar,
+  Briefcase,
 } from "lucide-react"
 import { ModeToggle } from "@/components/theme-toggle"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -37,12 +38,13 @@ const navigation = [
   { name: "Messages", href: "/dashboard/messages", icon: MessageSquare },
   { name: "Interviews", href: "/dashboard/interviews", icon: Calendar },
   { name: "Swipe", href: "/dashboard/swipe", icon: Zap },
+  { name: "Jobs", href: "/dashboard/jobs", icon: Briefcase },
   { name: "Profile", href: "/settings/profile", icon: User },
   { name: "Verification", href: "/settings/verification", icon: Shield },
   { name: "Filters", href: "/settings/role-filters", icon: Filter },
   { name: "Resumes", href: "/settings/resume", icon: FileText },
   { name: "Privacy", href: "/settings/privacy", icon: Shield },
-  { name: "Notifications", href: "/settings/notifications", icon: Bell },
+  { name: "Notifications", href: "/dashboard/notifications", icon: Bell },
   { name: "Subscription", href: "/settings/subscription", icon: Crown },
   { name: "Account", href: "/settings/account", icon: Settings },
 ]
@@ -51,6 +53,10 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname()
   const { data: session, status, update } = useSession()
   const [unreadCount, setUnreadCount] = React.useState(0)
+  const [notifUnread, setNotifUnread] = React.useState(0)
+  const [activeRole, setActiveRole] = React.useState<
+    "employee" | "employer" | null
+  >(null)
 
   const handleSignOut = () => {
     signOut({ callbackUrl: "/" })
@@ -60,23 +66,50 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
     if (status !== "authenticated" || !session?.user?.id) return
 
     try {
+      // messages / matches unread (keep previous behavior)
       const response = await fetch("/api/matches?status=active&limit=100", {
         cache: "no-store",
       })
-      if (!response.ok) return
-      const data = await response.json()
-      const matches = Array.isArray(data?.matches) ? data.matches : []
-      const totalUnread = matches.reduce((count: number, match: any) => {
-        const isEmployer =
-          String(match?.employer?._id || match?.employer) === session.user.id
-        const unread = isEmployer
-          ? match?.unreadByEmployer || 0
-          : match?.unreadByEmployee || 0
-        return count + unread
-      }, 0)
-      setUnreadCount(totalUnread)
+      if (response.ok) {
+        const data = await response.json()
+        const matches = Array.isArray(data?.matches) ? data.matches : []
+        const totalUnread = matches.reduce((count: number, match: any) => {
+          const isEmployer =
+            String(match?.employer?._id || match?.employer) === session.user.id
+          const unread = isEmployer
+            ? match?.unreadByEmployer || 0
+            : match?.unreadByEmployee || 0
+          return count + unread
+        }, 0)
+        setUnreadCount(totalUnread)
+      }
+
+      // notifications unread
+      const nres = await fetch("/api/notifications/unread", {
+        cache: "no-store",
+      })
+      if (nres.ok) {
+        const nd = await nres.json()
+        setNotifUnread(nd.unread || 0)
+      }
     } catch (error) {
       console.warn("failed to load unread count", error)
+    }
+  }, [session?.user?.id, status])
+
+  const loadActiveRole = React.useCallback(async () => {
+    if (status !== "authenticated" || !session?.user?.id) {
+      setActiveRole(null)
+      return
+    }
+
+    try {
+      const response = await fetch("/api/profile/me", { cache: "no-store" })
+      if (!response.ok) return
+      const data = await response.json()
+      setActiveRole(data?.activeRole === "employer" ? "employer" : "employee")
+    } catch (error) {
+      console.warn("failed to load active role", error)
     }
   }, [session?.user?.id, status])
 
@@ -95,18 +128,25 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
 
   React.useEffect(() => {
     void loadUnreadCount()
-    const onFocus = () => void loadUnreadCount()
+    void loadActiveRole()
+    const onFocus = () => {
+      void loadUnreadCount()
+      void loadActiveRole()
+    }
     const onMessageUpdate = () => void loadUnreadCount()
     window.addEventListener("focus", onFocus)
     window.addEventListener("swrk:messages-updated", onMessageUpdate)
-    const interval = window.setInterval(() => void loadUnreadCount(), 15000)
+    const interval = window.setInterval(() => {
+      void loadUnreadCount()
+      void loadActiveRole()
+    }, 15000)
 
     return () => {
       window.removeEventListener("focus", onFocus)
       window.removeEventListener("swrk:messages-updated", onMessageUpdate)
       window.clearInterval(interval)
     }
-  }, [loadUnreadCount])
+  }, [loadActiveRole, loadUnreadCount])
 
   const getAvatarUrl = () => {
     if (session?.user?.avatar) {
@@ -129,6 +169,13 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
     return "U"
   }
 
+  const canShowJobs =
+    session?.user?.role === "employer" ||
+    (session?.user?.role === "both" && activeRole === "employer")
+  const visibleNavigation = navigation.filter(
+    (item) => item.href !== "/dashboard/jobs" || canShowJobs,
+  )
+
   return (
     <nav className="flex h-full flex-col">
       <div className="flex items-center justify-between p-4 pt-6">
@@ -140,11 +187,13 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
 
       <div className="px-4 pb-4">
         <div className="flex flex-col gap-1">
-          {navigation.map((item) => {
+          {visibleNavigation.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href
             const showUnreadBadge =
               item.href === "/dashboard/messages" && unreadCount > 0
+            const showNotificationsBadge =
+              item.href === "/dashboard/notifications" && notifUnread > 0
             return (
               <Link key={item.href} href={item.href}>
                 <div
@@ -161,6 +210,11 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
                   {showUnreadBadge ? (
                     <Badge className="ml-auto rounded-full px-2 py-0.5 text-[11px]">
                       {unreadCount > 99 ? "99+" : unreadCount}
+                    </Badge>
+                  ) : null}
+                  {showNotificationsBadge ? (
+                    <Badge className="ml-2 rounded-full px-2 py-0.5 text-[11px]">
+                      {notifUnread > 99 ? "99+" : notifUnread}
                     </Badge>
                   ) : null}
                 </div>
