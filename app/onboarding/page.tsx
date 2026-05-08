@@ -195,6 +195,7 @@ export default function OnboardingPage() {
   const [checkingUsername, setCheckingUsername] = useState(false)
 
   useEffect(() => {
+    let redirectTimer: number | undefined
     if (status === "authenticated" && session?.user) {
       if (!hasHydratedRef.current) {
         const storageKey = `swrk:onboarding-step:${session.user.id || session.user.username || "guest"}`
@@ -214,7 +215,10 @@ export default function OnboardingPage() {
     }
 
     if (status === "unauthenticated") {
-      router.push("/signin")
+      redirectTimer = window.setTimeout(() => router.push("/signin"), 800)
+    }
+    return () => {
+      if (redirectTimer) clearTimeout(redirectTimer)
     }
   }, [session, status, router])
 

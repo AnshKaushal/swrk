@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { signIn } from "next-auth/react"
+import { signIn, getSession } from "next-auth/react"
 import type { SignInResponse } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -21,6 +21,16 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [otpToken, setOtpToken] = useState("")
   const router = useRouter()
+
+  const waitForSession = async (attempts = 6, interval = 500) => {
+    for (let i = 0; i < attempts; i++) {
+      const s = await getSession()
+      if (s && s.user) return s
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((r) => setTimeout(r, interval))
+    }
+    return null
+  }
 
   const sendOtp = async () => {
     if (!email.trim()) {
@@ -63,7 +73,12 @@ export default function SignupPage() {
             redirect: false,
           } as any)) as SignInResponse | undefined
           if (signInRes?.ok) {
-            router.push("/onboarding")
+            const s = await waitForSession()
+            if (s) {
+              router.push("/onboarding")
+            } else {
+              toast.error("Sign in succeeded but session not available yet")
+            }
           } else {
             toast.error(signInRes?.error || "OTP sign in failed")
           }
@@ -96,7 +111,12 @@ export default function SignupPage() {
           redirect: false,
         } as any)) as SignInResponse | undefined
         if (signInRes?.ok) {
-          router.push("/onboarding")
+          const s = await waitForSession()
+          if (s) {
+            router.push("/onboarding")
+          } else {
+            toast.error("Sign in succeeded but session not available yet")
+          }
         } else {
           toast.error(
             signInRes?.error || "Sign in error after account creation",
