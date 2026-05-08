@@ -192,7 +192,7 @@ const authOptions = {
           const loggedInUser = await User.findByIdAndUpdate(
             user.id,
             { lastSeen: new Date() },
-            { new: true },
+            { returnDocument: "after" },
           )
           if (!loggedInUser) {
             console.error("User not found in database:", user.id)
@@ -270,6 +270,7 @@ const authOptions = {
     maxAge: 30 * 24 * 60 * 60,
   },
 
+  trustHost: true,
   secret: process.env.NEXTAUTH_SECRET,
 }
 

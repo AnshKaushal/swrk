@@ -19,7 +19,7 @@ export async function PUT(
     const notif = await Notification.findOneAndUpdate(
       { _id: id, user: session.user.id },
       { $set: { read: body.read === true } },
-      { new: true },
+      { returnDocument: "after" },
     )
 
     if (!notif)

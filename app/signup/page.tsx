@@ -22,7 +22,7 @@ export default function SignupPage() {
   const [otpToken, setOtpToken] = useState("")
   const router = useRouter()
 
-  const waitForSession = async (attempts = 6, interval = 500) => {
+  const waitForSession = async (attempts = 12, interval = 300) => {
     for (let i = 0; i < attempts; i++) {
       const s = await getSession()
       if (s && s.user) return s

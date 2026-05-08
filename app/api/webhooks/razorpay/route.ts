@@ -92,7 +92,7 @@ async function handleSubscriptionActivated(subscription: any) {
         currentPeriodEnd: new Date(subscription.current_end * 1000),
         nextPaymentDate: new Date(subscription.charge_at * 1000),
       },
-      { new: true },
+      { returnDocument: "after" },
     ).populate("user plan")
 
     if (updatedSubscription) {
