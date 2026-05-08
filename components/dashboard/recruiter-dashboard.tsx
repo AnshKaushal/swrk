@@ -217,7 +217,7 @@ export function RecruiterDashboard({ name }: { name: string }) {
                 key={idx}
                 className="border border-border/50 bg-card hover:shadow-md transition-shadow"
               >
-                <CardContent className="pt-6">
+                <CardContent>
                   <div className="flex justify-between items-start mb-4">
                     <div className={`p-2 rounded-lg ${metric.color}`}>
                       <Icon className="w-5 h-5" />
@@ -396,9 +396,8 @@ export function RecruiterDashboard({ name }: { name: string }) {
             </CardContent>
           </Card>
 
-          <Card className="border border-border/50 bg-gradient-to-br from-primary/15 to-primary/5 relative overflow-hidden">
-            <div className="absolute -top-12 -right-12 w-40 h-40 bg-primary/10 rounded-full blur-3xl" />
-            <CardContent className="pt-8 relative z-10">
+          <Card className="border border-border/50 relative overflow-hidden">
+            <CardContent className="relative z-10">
               <div className="flex flex-col h-full justify-between">
                 <div>
                   <div className="flex items-center gap-2 mb-3">
@@ -425,7 +424,7 @@ export function RecruiterDashboard({ name }: { name: string }) {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
           <Card className="border border-border/50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

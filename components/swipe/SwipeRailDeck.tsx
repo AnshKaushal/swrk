@@ -83,6 +83,8 @@ type Candidate = {
   }
   matchPercent?: number
   jobRequirements?: string[]
+  likedYou?: boolean
+  likedType?: string | null
 }
 
 type Position = {
@@ -684,6 +686,9 @@ export default function SwipeRailDeck() {
                   {typeof currentCandidate.matchPercent === "number" && (
                     <Badge>Match: {currentCandidate.matchPercent}%</Badge>
                   )}
+                  {currentCandidate.likedYou && (
+                    <Badge variant="destructive">They liked you</Badge>
+                  )}
                   <Badge variant="secondary" className="capitalize">
                     {isEmployerMode ? "hiring view" : "job search view"}
                   </Badge>
@@ -797,6 +802,21 @@ export default function SwipeRailDeck() {
                   <Sparkles className="h-4 w-4" />
                   Super Like ({superQuota?.remaining ?? 0} /{" "}
                   {superQuota?.limit ?? 0})
+                </Button>
+              )}
+
+              {currentCandidate?.likedYou && (
+                <Button
+                  type="button"
+                  onClick={() => void triggerSwipe("right")}
+                  title={
+                    outOfDailySwipes
+                      ? "Daily swipe limit reached — upgrade to continue"
+                      : undefined
+                  }
+                  className="group h-12 border border-green-200 bg-green-50 text-green-700 hover:border-green-300 hover:bg-green-100"
+                >
+                  Like Back
                 </Button>
               )}
 

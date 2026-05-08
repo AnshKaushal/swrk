@@ -135,10 +135,33 @@ export async function GET(req: NextRequest) {
 
         return candidate
       })
+    // Determine which of these candidates have already liked the viewer
+    const candidateIds = filtered.map((c: any) => c._id).filter(Boolean)
+    let likedMap: Record<string, { direction: string }> = {}
+    if (candidateIds.length > 0) {
+      const likes = await Swipe.find({
+        swipedBy: { $in: candidateIds },
+        swipedOn: session.user.id,
+        direction: { $in: ["right", "super"] },
+      })
+        .select("swipedBy direction")
+        .lean()
+
+      likedMap = likes.reduce((acc: any, l: any) => {
+        acc[String(l.swipedBy)] = { direction: l.direction }
+        return acc
+      }, {})
+    }
+
+    const enriched = filtered.map((c: any) => ({
+      ...c,
+      likedYou: Boolean(likedMap[String(c._id)]),
+      likedType: likedMap[String(c._id)]?.direction || null,
+    }))
 
     return NextResponse.json({
-      candidates: filtered,
-      total: filtered.length,
+      candidates: enriched,
+      total: enriched.length,
       swipeCount,
       rankingMode: useAi ? "ai" : "heuristic",
       swipeQuota: {

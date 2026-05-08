@@ -59,13 +59,23 @@ export function ScheduleInterviewModal({
 
     setIsLoading(true)
     try {
+      // Convert datetime-local (local wall time) to an ISO string (UTC)
+      const payload = {
+        matchId,
+        title: formData.title,
+        description: formData.description,
+        // datetime-local has no timezone info in the string; convert in-browser
+        scheduledFor: formData.scheduledFor
+          ? new Date(formData.scheduledFor).toISOString()
+          : "",
+        timezone: formData.timezone,
+        duration: formData.duration,
+      }
+
       const res = await fetch("/api/interviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          matchId,
-          ...formData,
-        }),
+        body: JSON.stringify(payload),
       })
 
       if (!res.ok) {
