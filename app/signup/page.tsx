@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { signIn } from "next-auth/react"
+import type { SignInResponse } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -46,24 +47,28 @@ export default function SignupPage() {
   const verifyOtp = async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/auth/verify-otp", {
+      const fetchRes = await fetch("/api/auth/verify-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      const data = await fetchRes.json()
+      if (!fetchRes.ok) throw new Error(data.error)
       setOtpToken(data.otpLoginToken)
       if (data.hasPassword) {
         try {
-          // trigger NextAuth redirect to ensure session is established server-side
-          signIn("otp", {
+          const signInRes = (await signIn("otp", {
             email,
             otpToken: data.otpLoginToken,
-            callbackUrl: "/onboarding",
-          })
-        } catch (error) {
-          toast.error("OTP sign in failed")
+            redirect: false,
+          } as any)) as SignInResponse | undefined
+          if (signInRes?.ok) {
+            router.push("/onboarding")
+          } else {
+            toast.error(signInRes?.error || "OTP sign in failed")
+          }
+        } catch (error: any) {
+          toast.error(error?.message || "OTP sign in failed")
         }
       } else {
         setStep("password")
@@ -77,22 +82,28 @@ export default function SignupPage() {
   const setPasswordAndSignIn = async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/auth/set-password", {
+      const fetchRes = await fetch("/api/auth/set-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, name, password }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      const data = await fetchRes.json()
+      if (!fetchRes.ok) throw new Error(data.error)
       try {
-        // trigger NextAuth redirect to ensure session is established server-side
-        signIn("credentials", {
+        const signInRes = (await signIn("credentials", {
           email,
           password,
-          callbackUrl: "/onboarding",
-        })
-      } catch (error) {
-        toast.error("Sign in error after account creation")
+          redirect: false,
+        } as any)) as SignInResponse | undefined
+        if (signInRes?.ok) {
+          router.push("/onboarding")
+        } else {
+          toast.error(
+            signInRes?.error || "Sign in error after account creation",
+          )
+        }
+      } catch (error: any) {
+        toast.error(error?.message || "Sign in error after account creation")
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to create account")
