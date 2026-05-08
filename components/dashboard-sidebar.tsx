@@ -31,7 +31,7 @@ import {
 import { cn } from "@/lib/utils"
 import { IconDashboard } from "@tabler/icons-react"
 import { Badge } from "@/components/ui/badge"
-import React from "react"
+import React, { useEffect } from "react"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: IconDashboard },
@@ -49,71 +49,18 @@ const navigation = [
   { name: "Account", href: "/settings/account", icon: Settings },
 ]
 
+import { useDashboard } from "@/components/dashboard-context"
+
 export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname()
   const { data: session, status, update } = useSession()
-  const [unreadCount, setUnreadCount] = React.useState(0)
-  const [notifUnread, setNotifUnread] = React.useState(0)
-  const [activeRole, setActiveRole] = React.useState<
-    "employee" | "employer" | null
-  >(null)
+  const { unreadNotifications, unreadMatches, activeRole } = useDashboard()
 
   const handleSignOut = () => {
     signOut({ callbackUrl: "/" })
   }
 
-  const loadUnreadCount = React.useCallback(async () => {
-    if (status !== "authenticated" || !session?.user?.id) return
-
-    try {
-      // messages / matches unread (keep previous behavior)
-      const response = await fetch("/api/matches?status=active&limit=100", {
-        cache: "no-store",
-      })
-      if (response.ok) {
-        const data = await response.json()
-        const matches = Array.isArray(data?.matches) ? data.matches : []
-        const totalUnread = matches.reduce((count: number, match: any) => {
-          const isEmployer =
-            String(match?.employer?._id || match?.employer) === session.user.id
-          const unread = isEmployer
-            ? match?.unreadByEmployer || 0
-            : match?.unreadByEmployee || 0
-          return count + unread
-        }, 0)
-        setUnreadCount(totalUnread)
-      }
-
-      // notifications unread
-      const nres = await fetch("/api/notifications/unread", {
-        cache: "no-store",
-      })
-      if (nres.ok) {
-        const nd = await nres.json()
-        setNotifUnread(nd.unread || 0)
-      }
-    } catch (error) {
-      console.warn("failed to load unread count", error)
-    }
-  }, [session?.user?.id, status])
-
-  const loadActiveRole = React.useCallback(async () => {
-    if (status !== "authenticated" || !session?.user?.id) {
-      setActiveRole(null)
-      return
-    }
-
-    try {
-      const response = await fetch("/api/profile/me", { cache: "no-store" })
-      if (!response.ok) return
-      const data = await response.json()
-      setActiveRole(data?.activeRole === "employer" ? "employer" : "employee")
-    } catch (error) {
-      console.warn("failed to load active role", error)
-    }
-  }, [session?.user?.id, status])
-
-  React.useEffect(() => {
+  useEffect(() => {
     if (!update) return
     const handler = () => {
       try {
@@ -125,28 +72,6 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
     window.addEventListener("swrk:session-updated", handler)
     return () => window.removeEventListener("swrk:session-updated", handler)
   }, [update])
-
-  React.useEffect(() => {
-    void loadUnreadCount()
-    void loadActiveRole()
-    const onFocus = () => {
-      void loadUnreadCount()
-      void loadActiveRole()
-    }
-    const onMessageUpdate = () => void loadUnreadCount()
-    window.addEventListener("focus", onFocus)
-    window.addEventListener("swrk:messages-updated", onMessageUpdate)
-    const interval = window.setInterval(() => {
-      void loadUnreadCount()
-      void loadActiveRole()
-    }, 15000)
-
-    return () => {
-      window.removeEventListener("focus", onFocus)
-      window.removeEventListener("swrk:messages-updated", onMessageUpdate)
-      window.clearInterval(interval)
-    }
-  }, [loadActiveRole, loadUnreadCount])
 
   const getAvatarUrl = () => {
     if (session?.user?.avatar) {
@@ -191,9 +116,10 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
             const Icon = item.icon
             const isActive = pathname === item.href
             const showUnreadBadge =
-              item.href === "/dashboard/messages" && unreadCount > 0
+              item.href === "/dashboard/messages" && unreadMatches > 0
             const showNotificationsBadge =
-              item.href === "/dashboard/notifications" && notifUnread > 0
+              item.href === "/dashboard/notifications" &&
+              unreadNotifications > 0
             return (
               <Link key={item.href} href={item.href}>
                 <div
@@ -209,12 +135,12 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
                   <span className="flex-1">{item.name}</span>
                   {showUnreadBadge ? (
                     <Badge className="ml-auto rounded-full px-2 py-0.5 text-[11px]">
-                      {unreadCount > 99 ? "99+" : unreadCount}
+                      {unreadMatches > 99 ? "99+" : unreadMatches}
                     </Badge>
                   ) : null}
                   {showNotificationsBadge ? (
                     <Badge className="ml-2 rounded-full px-2 py-0.5 text-[11px]">
-                      {notifUnread > 99 ? "99+" : notifUnread}
+                      {unreadNotifications > 99 ? "99+" : unreadNotifications}
                     </Badge>
                   ) : null}
                 </div>

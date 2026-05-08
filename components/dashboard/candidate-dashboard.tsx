@@ -23,6 +23,10 @@ import {
   Building2,
   Calendar,
   Briefcase,
+  Flame,
+  TrendingUp,
+  Clock,
+  AlertCircle,
 } from "lucide-react"
 
 interface MatchData {
@@ -37,6 +41,22 @@ interface StatsData {
   likesReceived: number
   matchesCount: number
   recentMatches: MatchData[]
+  responseRate?: number
+  lastActivityAt?: string
+}
+
+interface UserProfile {
+  profileCompletion?: number
+  resumeQuality?: number
+  skillsMatchScore?: number
+  avgResponseTime?: number
+  currentStreak?: number
+}
+
+interface DashboardMetrics {
+  avgResponseTime?: number
+  completionRate?: number
+  lastActivityDate?: string
 }
 
 interface InterviewData {
@@ -61,6 +81,8 @@ export function CandidateDashboard({ name }: { name: string }) {
     [],
   )
   const [interviewsLoading, setInterviewsLoading] = useState(true)
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [metricsLoading, setMetricsLoading] = useState(true)
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -134,6 +156,30 @@ export function CandidateDashboard({ name }: { name: string }) {
     }
   }, [range])
 
+  useEffect(() => {
+    const fetchUserMetrics = async () => {
+      try {
+        const response = await fetch("/api/profile/me")
+        if (response.ok) {
+          const data = await response.json()
+          setUserProfile({
+            profileCompletion: data.profileCompletion || 0,
+            resumeQuality: data.resumeQuality || 0,
+            skillsMatchScore: data.skillsMatchScore || 0,
+            avgResponseTime: data.avgResponseTime || 0,
+            currentStreak: data.currentStreak || 0,
+          })
+        }
+      } catch (error) {
+        console.error("Failed to fetch user metrics:", error)
+      } finally {
+        setMetricsLoading(false)
+      }
+    }
+
+    fetchUserMetrics()
+  }, [])
+
   const metrics = [
     {
       label: "Applications Sent",
@@ -150,11 +196,16 @@ export function CandidateDashboard({ name }: { name: string }) {
       color: "bg-red-100 text-red-700",
     },
     {
-      label: "Profile Views",
-      value: Math.floor((stats?.likesReceived || 0) * 2.5),
-      trend: "+24%",
-      icon: Eye,
-      color: "bg-orange-100 text-orange-700",
+      label: "Response Rate",
+      value: stats?.likesGiven
+        ? Math.round((stats.likesReceived / stats.likesGiven) * 100)
+        : 0,
+      trend: stats?.likesGiven
+        ? `${Math.round((stats.likesReceived / stats.likesGiven) * 100)}%`
+        : "0%",
+      suffix: "%",
+      icon: TrendingUp,
+      color: "bg-purple-100 text-purple-700",
     },
     {
       label: "Active Matches",
@@ -166,7 +217,7 @@ export function CandidateDashboard({ name }: { name: string }) {
   ]
 
   return (
-    <div className="min-h-screen pb-24 md:pb-0">
+    <div className="pb-24 md:pb-0">
       <main className="max-w-[1600px]">
         <section className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
@@ -185,7 +236,7 @@ export function CandidateDashboard({ name }: { name: string }) {
                 key={idx}
                 className="border border-border/50 bg-card hover:shadow-md transition-shadow"
               >
-                <CardContent className="pt-6">
+                <CardContent>
                   <div className="flex justify-between items-start mb-4">
                     <div className={`p-2 rounded-lg ${metric.color}`}>
                       <Icon className="w-5 h-5" />
@@ -204,6 +255,7 @@ export function CandidateDashboard({ name }: { name: string }) {
                   </p>
                   <p className="text-2xl md:text-3xl font-bold">
                     {metric.value.toLocaleString()}
+                    {metric.suffix ? metric.suffix : ""}
                   </p>
                 </CardContent>
               </Card>
@@ -358,13 +410,11 @@ export function CandidateDashboard({ name }: { name: string }) {
             </CardContent>
           </Card>
 
-          <Card className="border border-border/50 bg-gradient-to-br from-primary/15 to-primary/5 relative overflow-hidden">
-            <div className="absolute -top-12 -right-12 w-40 h-40 bg-primary/10 rounded-full blur-3xl" />
-            <CardContent className="pt-8 relative z-10">
+          <Card className="border border-border/50 relative overflow-hidden">
+            <CardContent className="relative z-10">
               <div className="flex flex-col h-full justify-between">
                 <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Zap className="w-6 h-6 text-primary" />
+                  <div className="mb-3">
                     <h3 className="text-xl md:text-2xl font-bold">
                       Discover More Roles
                     </h3>
@@ -386,6 +436,192 @@ export function CandidateDashboard({ name }: { name: string }) {
             </CardContent>
           </Card>
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
+          <Card className="border border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Flame className="w-5 h-5 text-orange-500" />
+                Your Performance
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">
+                      Profile Completion
+                    </span>
+                    <span className="text-sm font-semibold">
+                      {metricsLoading
+                        ? "-"
+                        : `${userProfile?.profileCompletion || 0}%`}
+                    </span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div
+                      className="bg-primary h-2 rounded-full"
+                      style={{
+                        width: `${userProfile?.profileCompletion || 0}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Resume Quality</span>
+                    <span className="text-sm font-semibold">
+                      {metricsLoading
+                        ? "-"
+                        : `${userProfile?.resumeQuality || 0}%`}
+                    </span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div
+                      className="bg-green-500 h-2 rounded-full"
+                      style={{ width: `${userProfile?.resumeQuality || 0}%` }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">
+                      Skills Match Score
+                    </span>
+                    <span className="text-sm font-semibold">
+                      {metricsLoading
+                        ? "-"
+                        : `${userProfile?.skillsMatchScore || 0}%`}
+                    </span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div
+                      className="bg-blue-500 h-2 rounded-full"
+                      style={{
+                        width: `${userProfile?.skillsMatchScore || 0}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="pt-2">
+                <Button variant="outline" size="sm" className="w-full">
+                  View Recommendations
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-blue-500" />
+                Quick Stats
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Avg Response Time
+                  </p>
+                  <p className="text-lg font-bold">
+                    {metricsLoading
+                      ? "-"
+                      : `${userProfile?.avgResponseTime ? Math.round(userProfile.avgResponseTime) + "h" : "N/A"}`}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Total Conversations
+                  </p>
+                  <p className="text-lg font-bold">
+                    {stats?.matchesCount || 0}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Current Streak
+                  </p>
+                  <p className="text-lg font-bold">
+                    {metricsLoading
+                      ? "-"
+                      : `${userProfile?.currentStreak || 0} days`}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Interview Rate
+                  </p>
+                  <p className="text-lg font-bold">
+                    {upcomingInterviews.length > 0 ? "Active" : "None"}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="border border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-yellow-500" />
+              Recommendations
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {(userProfile?.profileCompletion || 0) < 100 && (
+                <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                    Complete Your Profile
+                  </p>
+                  <p className="text-xs text-blue-800 dark:text-blue-200 mt-1">
+                    Your profile is {userProfile?.profileCompletion || 0}%
+                    complete. Add your certifications and skills to improve
+                    visibility.
+                  </p>
+                </div>
+              )}
+              {stats && stats.likesReceived > 0 && (
+                <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+                  <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                    Boost Your Visibility
+                  </p>
+                  <p className="text-xs text-purple-800 dark:text-purple-200 mt-1">
+                    You're getting interest from employers. Upgrade to reach
+                    more companies with a Boost.
+                  </p>
+                </div>
+              )}
+              {upcomingInterviews.length > 0 && (
+                <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                  <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                    Prepare for Interviews
+                  </p>
+                  <p className="text-xs text-green-800 dark:text-green-200 mt-1">
+                    You have {upcomingInterviews.length} upcoming interview
+                    {upcomingInterviews.length !== 1 ? "s" : ""}. Check out our
+                    interview tips and guides.
+                  </p>
+                </div>
+              )}
+              {!upcomingInterviews.length &&
+                (!stats?.likesReceived || stats.likesReceived === 0) &&
+                (userProfile?.profileCompletion || 0) >= 100 && (
+                  <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                      Start Exploring
+                    </p>
+                    <p className="text-xs text-blue-800 dark:text-blue-200 mt-1">
+                      Your profile is complete! Explore companies and start
+                      swiping to find your perfect match.
+                    </p>
+                  </div>
+                )}
+            </div>
+          </CardContent>
+        </Card>
       </main>
     </div>
   )

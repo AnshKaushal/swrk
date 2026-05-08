@@ -17,6 +17,7 @@ import { AdminDashboardFront } from "@/components/dashboard/admin-dashboard-fron
 import { EmployeeDashboardFront } from "@/components/dashboard/employee-dashboard-front"
 import { EmployerDashboardFront } from "@/components/dashboard/employer-dashboard-front"
 import { DashboardProfileLink } from "@/components/dashboard/dashboard-shared"
+import { Loader2 } from "lucide-react"
 
 type ActiveRole = "employee" | "employer"
 
@@ -244,6 +245,7 @@ export default function DashboardPage() {
         {roleLoading ? (
           <Card className="border-border/60 bg-card shadow-sm">
             <CardContent className="p-6 text-sm text-muted-foreground">
+              <Loader2 className="mr-2 inline-block h-4 w-4 animate-spin" />
               Loading dashboard...
             </CardContent>
           </Card>

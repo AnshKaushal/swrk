@@ -21,6 +21,10 @@ import {
   ShieldAlert,
   Activity,
   Clock,
+  Server,
+  DollarSign,
+  BarChart3,
+  TrendingDown,
 } from "lucide-react"
 
 interface AdminStatsData {
@@ -28,43 +32,59 @@ interface AdminStatsData {
   activeUsers?: number
   pendingReports?: number
   pendingVerifications?: number
+  activeSubscriptions?: number
+  systemHealth?: number
+  monthlyRevenue?: number
+  avgSessionTime?: number
+  bounceRate?: number
+  supportTickets?: number
+  databaseHealth?: number
+  apiUptime?: number
+  serverLoad?: number
 }
 
-const chartData = [
-  { day: "MON", users: 240, reports: 12 },
-  { day: "TUE", users: 280, reports: 8 },
-  { day: "WED", users: 250, reports: 15 },
-  { day: "THU", value: 320, reports: 18 },
-  { day: "FRI", users: 350, reports: 10 },
-  { day: "SAT", users: 180, reports: 5 },
-  { day: "SUN", users: 150, reports: 3 },
-]
+type ChartPoint = { day: string; users: number; reports: number }
 
 export function AdminDashboard({ name }: { name: string }) {
   const [stats, setStats] = useState<AdminStatsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [chartData, setChartData] = useState<ChartPoint[]>([])
+  const [chartLoading, setChartLoading] = useState(true)
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch("/api/profile/me")
+        const response = await fetch("/api/admin/stats")
         if (response.ok) {
           const data = await response.json()
-          setStats({
-            totalUsers: 1284,
-            activeUsers: 892,
-            pendingReports: 23,
-            pendingVerifications: 45,
-          })
+          setStats(data)
         }
       } catch (error) {
-        console.error("Failed to fetch stats:", error)
+        console.error("Failed to fetch admin stats:", error)
       } finally {
         setLoading(false)
       }
     }
 
     fetchStats()
+  }, [])
+
+  useEffect(() => {
+    const fetchChartData = async () => {
+      try {
+        const response = await fetch("/api/admin/activity?range=7")
+        if (response.ok) {
+          const data = await response.json()
+          setChartData(data.activity || [])
+        }
+      } catch (error) {
+        console.error("Failed to fetch activity chart:", error)
+      } finally {
+        setChartLoading(false)
+      }
+    }
+
+    fetchChartData()
   }, [])
 
   const metrics = [
@@ -90,11 +110,31 @@ export function AdminDashboard({ name }: { name: string }) {
       color: "bg-red-100 text-red-700",
     },
     {
-      label: "Verifications",
+      label: "Active Subscriptions",
+      value: stats?.activeSubscriptions || 0,
+      trend: "+6%",
+      icon: DollarSign,
+      color: "bg-purple-100 text-purple-700",
+    },
+  ]
+
+  const secondMetrics = [
+    {
+      label: "Pending Verifications",
       value: stats?.pendingVerifications || 0,
-      trend: "Review",
       icon: ShieldAlert,
-      color: "bg-orange-100 text-orange-700",
+    },
+    {
+      label: "System Health",
+      value: 98.5,
+      suffix: "%",
+      icon: Server,
+    },
+    {
+      label: "API Response Time",
+      value: 125,
+      suffix: "ms",
+      icon: TrendingUp,
     },
   ]
 
@@ -198,13 +238,17 @@ export function AdminDashboard({ name }: { name: string }) {
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium">Reports</p>
                     <Badge variant="destructive" className="text-xs">
-                      23
+                      {loading ? "-" : stats?.pendingReports || 0}
                     </Badge>
                   </div>
                   <div className="w-full bg-red-200/50 rounded-full h-1.5">
                     <div
                       className="bg-red-600 h-1.5 rounded-full"
-                      style={{ width: "65%" }}
+                      style={{
+                        width: stats?.pendingReports
+                          ? Math.min(stats.pendingReports * 3, 100) + "%"
+                          : "0%",
+                      }}
                     />
                   </div>
                 </div>
@@ -213,13 +257,17 @@ export function AdminDashboard({ name }: { name: string }) {
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium">Verifications</p>
                     <Badge variant="secondary" className="text-xs">
-                      45
+                      {loading ? "-" : stats?.pendingVerifications || 0}
                     </Badge>
                   </div>
                   <div className="w-full bg-orange-200/50 rounded-full h-1.5">
                     <div
                       className="bg-orange-600 h-1.5 rounded-full"
-                      style={{ width: "72%" }}
+                      style={{
+                        width: stats?.pendingVerifications
+                          ? Math.min(stats.pendingVerifications * 2, 100) + "%"
+                          : "0%",
+                      }}
                     />
                   </div>
                 </div>
@@ -252,7 +300,9 @@ export function AdminDashboard({ name }: { name: string }) {
                   <AlertCircle className="w-5 h-5 text-red-600" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium">23 User Reports</p>
+                  <p className="text-sm font-medium">
+                    {loading ? "-" : stats?.pendingReports || 0} User Reports
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     Pending review and action
                   </p>
@@ -266,7 +316,8 @@ export function AdminDashboard({ name }: { name: string }) {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium">
-                    45 Pending Verifications
+                    {loading ? "-" : stats?.pendingVerifications || 0} Pending
+                    Verifications
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Submit documents or info
@@ -300,8 +351,9 @@ export function AdminDashboard({ name }: { name: string }) {
                     </h3>
                   </div>
                   <p className="text-sm text-muted-foreground mb-6">
-                    23 user reports need your attention. Review suspected
-                    violations and take moderation actions.
+                    {loading ? "-" : stats?.pendingReports || 0} user reports
+                    need your attention. Review suspected violations and take
+                    moderation actions.
                   </p>
                 </div>
                 <Button
@@ -315,6 +367,193 @@ export function AdminDashboard({ name }: { name: string }) {
             </CardContent>
           </Card>
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card className="border border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-blue-500" />
+                System Health
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Database</span>
+                    <span className="text-sm font-semibold">
+                      {loading ? "-" : `${stats?.databaseHealth || 0}%`}
+                    </span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div
+                      className="bg-green-500 h-2 rounded-full"
+                      style={{ width: `${stats?.databaseHealth || 0}%` }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">API Uptime</span>
+                    <span className="text-sm font-semibold">
+                      {loading ? "-" : `${stats?.apiUptime || 0}%`}
+                    </span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div
+                      className="bg-green-500 h-2 rounded-full"
+                      style={{ width: `${stats?.apiUptime || 0}%` }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Server Load</span>
+                    <span className="text-sm font-semibold">
+                      {loading ? "-" : `${stats?.serverLoad || 0}%`}
+                    </span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div
+                      className="bg-blue-500 h-2 rounded-full"
+                      style={{ width: `${stats?.serverLoad || 0}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-purple-500" />
+                Platform Metrics
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Monthly Revenue
+                  </p>
+                  <p className="text-lg font-bold">
+                    {loading
+                      ? "-"
+                      : `$${(stats?.monthlyRevenue || 0).toLocaleString()}`}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Avg Session Time
+                  </p>
+                  <p className="text-lg font-bold">
+                    {loading ? "-" : stats?.avgSessionTime || "N/A"}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Bounce Rate
+                  </p>
+                  <p className="text-lg font-bold">
+                    {loading ? "-" : `${stats?.bounceRate || 0}%`}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Support Tickets
+                  </p>
+                  <p className="text-lg font-bold">
+                    {loading ? "-" : stats?.supportTickets || 0}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-orange-500" />
+                Recent Activities
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {chartLoading ? (
+                <p className="text-sm text-muted-foreground">
+                  Loading activities...
+                </p>
+              ) : chartData && chartData.length > 0 ? (
+                chartData.slice(0, 3).map((activity: any, idx) => (
+                  <div key={idx} className="flex items-start gap-3">
+                    <div
+                      className={`w-2 h-2 rounded-full mt-2 ${idx === 0 ? "bg-blue-500" : idx === 1 ? "bg-green-500" : "bg-red-500"}`}
+                    />
+                    <div>
+                      <p className="text-sm font-medium">
+                        {activity.users
+                          ? `${activity.users} new users registered`
+                          : activity.reports
+                            ? `${activity.reports} reports submitted`
+                            : "System activity"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {activity.day}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No activities yet
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="border border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-yellow-500" />
+              Admin Actions & Insights
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  Monitor User Growth
+                </p>
+                <p className="text-xs text-blue-800 dark:text-blue-200 mt-1">
+                  {loading
+                    ? "Loading..."
+                    : `Total users: ${stats?.totalUsers || 0}, Active users: ${stats?.activeUsers || 0}`}
+                </p>
+              </div>
+              <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+                <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                  Resolve Pending Verifications
+                </p>
+                <p className="text-xs text-purple-800 dark:text-purple-200 mt-1">
+                  {loading
+                    ? "Loading..."
+                    : `${stats?.pendingVerifications || 0} users awaiting verification. Process batch verifications to improve user experience.`}
+                </p>
+              </div>
+              <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                  System Performance
+                </p>
+                <p className="text-xs text-green-800 dark:text-green-200 mt-1">
+                  {loading
+                    ? "Loading..."
+                    : `System health: ${stats?.databaseHealth || 0}% uptime. Database optimization scheduled for next week.`}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </main>
     </div>
   )

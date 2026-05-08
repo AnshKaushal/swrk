@@ -24,6 +24,10 @@ import {
   Star,
   Eye,
   Zap,
+  Clock,
+  AlertCircle,
+  BarChart3,
+  Target,
 } from "lucide-react"
 
 interface MatchData {
@@ -38,6 +42,18 @@ interface StatsData {
   likesReceived: number
   matchesCount: number
   recentMatches: MatchData[]
+  avgTimeToHire?: number
+  candidateResponseRate?: number
+}
+
+interface RecruiterMetrics {
+  avgTimeToHire?: number
+  avgInterviews?: number
+  acceptanceRate?: number
+  costPerHire?: number
+  openPositions?: number
+  inProgress?: number
+  offersExtended?: number
 }
 
 interface InterviewData {
@@ -63,6 +79,9 @@ export function RecruiterDashboard({ name }: { name: string }) {
     [],
   )
   const [interviewsLoading, setInterviewsLoading] = useState(true)
+  const [recruiterMetrics, setRecruiterMetrics] =
+    useState<RecruiterMetrics | null>(null)
+  const [metricsLoading, setMetricsLoading] = useState(true)
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -115,27 +134,29 @@ export function RecruiterDashboard({ name }: { name: string }) {
   }, [range])
 
   useEffect(() => {
-    const fetchInterviews = async () => {
+    const fetchRecruiterMetrics = async () => {
       try {
-        const response = await fetch("/api/interviews?status=scheduled")
+        const response = await fetch("/api/profile/me")
         if (response.ok) {
           const data = await response.json()
-          const now = new Date()
-          const futureInterviews = (data.interviews || []).filter(
-            (interview: InterviewData) => {
-              return new Date(interview.scheduledFor) > now
-            },
-          )
-          setUpcomingInterviews(futureInterviews.slice(0, 3))
+          setRecruiterMetrics({
+            avgTimeToHire: data.avgTimeToHire,
+            avgInterviews: data.avgInterviews,
+            acceptanceRate: data.acceptanceRate,
+            costPerHire: data.costPerHire,
+            openPositions: data.openPositions || 0,
+            inProgress: data.inProgress || 0,
+            offersExtended: data.offersExtended || 0,
+          })
         }
       } catch (error) {
-        console.error("Failed to fetch interviews:", error)
+        console.error("Failed to fetch recruiter metrics:", error)
       } finally {
-        setInterviewsLoading(false)
+        setMetricsLoading(false)
       }
     }
 
-    fetchInterviews()
+    fetchRecruiterMetrics()
   }, [])
 
   const metrics = [
@@ -147,24 +168,31 @@ export function RecruiterDashboard({ name }: { name: string }) {
       color: "bg-blue-100 text-blue-700",
     },
     {
-      label: "Applications",
+      label: "Applications Received",
       value: stats?.likesReceived || 0,
       trend: "+8%",
       icon: Briefcase,
       color: "bg-purple-100 text-purple-700",
     },
     {
-      label: "Active Matches",
-      value: stats?.matchesCount || 0,
-      trend: "+5%",
-      icon: CheckCircle2,
-      color: "bg-green-100 text-green-700",
+      label: "Candidate Response Rate",
+      value:
+        stats?.likesReceived && stats?.likesGiven
+          ? Math.round((stats.likesReceived / stats.likesGiven) * 100)
+          : 0,
+      trend:
+        stats?.likesReceived && stats?.likesGiven
+          ? `${Math.round((stats.likesReceived / stats.likesGiven) * 100)}%`
+          : "0%",
+      suffix: "%",
+      icon: TrendingUp,
+      color: "bg-pink-100 text-pink-700",
     },
     {
-      label: "Profile Views",
-      value: Math.floor((stats?.likesReceived || 0) * 3.2),
-      trend: "+22%",
-      icon: Eye,
+      label: "Active Positions",
+      value: stats?.matchesCount || 0,
+      trend: "+5%",
+      icon: Target,
       color: "bg-orange-100 text-orange-700",
     },
   ]
@@ -210,6 +238,7 @@ export function RecruiterDashboard({ name }: { name: string }) {
                   </p>
                   <p className="text-2xl md:text-3xl font-bold">
                     {metric.value.toLocaleString()}
+                    {metric.suffix ? metric.suffix : ""}
                   </p>
                 </CardContent>
               </Card>
@@ -395,6 +424,184 @@ export function RecruiterDashboard({ name }: { name: string }) {
             </CardContent>
           </Card>
         </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <Card className="border border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-blue-500" />
+                Hiring Pipeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Open Positions</span>
+                    <span className="text-sm font-semibold">
+                      {recruiterMetrics?.openPositions || 0}
+                    </span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div
+                      className="bg-primary h-2 rounded-full"
+                      style={{
+                        width: recruiterMetrics?.openPositions
+                          ? Math.min(recruiterMetrics.openPositions * 10, 100) +
+                            "%"
+                          : "0%",
+                      }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">In Progress</span>
+                    <span className="text-sm font-semibold">
+                      {recruiterMetrics?.inProgress || 0}
+                    </span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div
+                      className="bg-orange-500 h-2 rounded-full"
+                      style={{
+                        width: recruiterMetrics?.inProgress
+                          ? Math.min(recruiterMetrics.inProgress * 10, 100) +
+                            "%"
+                          : "0%",
+                      }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Offers Extended</span>
+                    <span className="text-sm font-semibold">
+                      {recruiterMetrics?.offersExtended || 0}
+                    </span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2">
+                    <div
+                      className="bg-green-500 h-2 rounded-full"
+                      style={{
+                        width: recruiterMetrics?.offersExtended
+                          ? Math.min(
+                              recruiterMetrics.offersExtended * 10,
+                              100,
+                            ) + "%"
+                          : "0%",
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="w-5 h-5 text-purple-500" />
+                Recruitment Metrics
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Avg Time to Hire
+                  </p>
+                  <p className="text-lg font-bold">
+                    {metricsLoading
+                      ? "-"
+                      : `${recruiterMetrics?.avgTimeToHire || "N/A"}`}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Avg Interviews
+                  </p>
+                  <p className="text-lg font-bold">
+                    {metricsLoading
+                      ? "-"
+                      : `${recruiterMetrics?.avgInterviews || "N/A"}`}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Acceptance Rate
+                  </p>
+                  <p className="text-lg font-bold">
+                    {metricsLoading
+                      ? "-"
+                      : `${recruiterMetrics?.acceptanceRate || "N/A"}%`}
+                  </p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    Cost Per Hire
+                  </p>
+                  <p className="text-lg font-bold">
+                    {metricsLoading
+                      ? "-"
+                      : `${recruiterMetrics?.costPerHire ? "$" + recruiterMetrics.costPerHire : "N/A"}`}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="border border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-yellow-500" />
+              Hiring Recommendations
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {stats &&
+                stats.matchesCount > 0 &&
+                (recruiterMetrics?.acceptanceRate || 0) < 85 && (
+                  <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                      Expand Candidate Pool
+                    </p>
+                    <p className="text-xs text-blue-800 dark:text-blue-200 mt-1">
+                      Your acceptance rate is{" "}
+                      {recruiterMetrics?.acceptanceRate || 0}%. Broaden your
+                      criteria to improve hiring success.
+                    </p>
+                  </div>
+                )}
+              {recruiterMetrics?.avgTimeToHire &&
+                recruiterMetrics.avgTimeToHire > 14 && (
+                  <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800">
+                    <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
+                      Speed Up Hiring
+                    </p>
+                    <p className="text-xs text-purple-800 dark:text-purple-200 mt-1">
+                      Your average time-to-hire is{" "}
+                      {recruiterMetrics.avgTimeToHire} days. Batch interview
+                      scheduling can help reduce this.
+                    </p>
+                  </div>
+                )}
+              {stats && stats.likesReceived > 0 && (
+                <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
+                  <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                    Quality Focus
+                  </p>
+                  <p className="text-xs text-green-800 dark:text-green-200 mt-1">
+                    Your response rate is strong. Continue personalized outreach
+                    to top candidates.
+                  </p>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </main>
     </div>
   )
