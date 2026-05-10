@@ -5,6 +5,7 @@ import User from "@/models/user"
 import EmployeeProfile from "@/models/employee"
 import EmployerProfile from "@/models/employer"
 import Resume from "@/models/resume"
+import { getCredibilityStats } from "@/lib/interview-feedback"
 
 const normalizeRole = (value?: string | null) => {
   if (value === "job-seeker") return "employee"
@@ -68,6 +69,10 @@ export async function GET(
 
     const profile =
       activeRole === "employer" ? employerProfile : employeeProfile
+    const credibilityStats = await getCredibilityStats(
+      user._id.toString(),
+      activeRole,
+    )
 
     return NextResponse.json({
       user: {
@@ -78,6 +83,7 @@ export async function GET(
       employerProfile: employerProfile?.toObject() || null,
       resumes: resumes.map((resume) => resume.toObject()),
       profile: profile?.toObject() || null,
+      credibilityStats,
     })
   } catch (err) {
     console.error("[profile]", err)

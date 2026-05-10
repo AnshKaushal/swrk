@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/app/api/auth/[...nextauth]/route"
 import { db } from "@/lib/mongodb"
 import { emitToMatch, emitToUser, getSocketServer } from "@/lib/socket-server"
+import Interview from "@/models/interview"
 import { Match, Swipe } from "@/models/swipe"
 import Message from "@/models/message"
 import Notification from "@/models/notification"
@@ -70,11 +71,26 @@ export async function GET(req: NextRequest) {
     }
 
     const match = await getParticipantMatch(session.user.id, matchId)
-      .populate("employer", "name avatar username email role activeRole")
-      .populate("employee", "name avatar username email role activeRole")
+      .populate(
+        "employer",
+        "name avatar username email role activeRole isOnline lastSeen",
+      )
+      .populate(
+        "employee",
+        "name avatar username email role activeRole isOnline lastSeen",
+      )
+      .select("employer employee hiddenBy status")
       .lean()
 
     if (!match) {
+      return NextResponse.json({ error: "Match not found" }, { status: 404 })
+    }
+
+    if (
+      (match.hiddenBy || []).some(
+        (userId: unknown) => String(userId) === session.user.id,
+      )
+    ) {
       return NextResponse.json({ error: "Match not found" }, { status: 404 })
     }
 
@@ -89,6 +105,30 @@ export async function GET(req: NextRequest) {
       .populate("sender", "name avatar username role activeRole")
       .sort({ createdAt: 1 })
       .lean()
+
+    const interviewIds = messages
+      .filter((message) => message.type === "interview" && message.interviewId)
+      .map((message) => String(message.interviewId))
+
+    const interviews = interviewIds.length
+      ? await Interview.find({ _id: { $in: interviewIds } })
+          .select(
+            "status deniedReason confirmedAt deniedAt scheduledFor timezone duration title description interviewLink createdBy employer employee",
+          )
+          .lean()
+      : []
+
+    const interviewMap = new Map(
+      interviews.map((interview) => [String(interview._id), interview]),
+    )
+
+    const messagesWithInterviews = messages.map((message) => ({
+      ...message,
+      interview:
+        message.type === "interview" && message.interviewId
+          ? interviewMap.get(String(message.interviewId)) || null
+          : null,
+    }))
 
     await Message.updateMany(
       {
@@ -114,7 +154,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       match,
-      messages,
+      messages: messagesWithInterviews,
     })
   } catch (err) {
     console.error("[api/messages GET]", err)
@@ -146,10 +186,25 @@ export async function POST(req: NextRequest) {
     }
 
     const match = await getParticipantMatch(session.user.id, matchId)
-      .populate("employer", "name avatar username email role activeRole")
-      .populate("employee", "name avatar username email role activeRole")
+      .populate(
+        "employer",
+        "name avatar username email role activeRole isOnline lastSeen",
+      )
+      .populate(
+        "employee",
+        "name avatar username email role activeRole isOnline lastSeen",
+      )
+      .select("employer employee hiddenBy status")
 
     if (!match) {
+      return NextResponse.json({ error: "Match not found" }, { status: 404 })
+    }
+
+    if (
+      (match.hiddenBy || []).some(
+        (userId: unknown) => String(userId) === session.user.id,
+      )
+    ) {
       return NextResponse.json({ error: "Match not found" }, { status: 404 })
     }
 

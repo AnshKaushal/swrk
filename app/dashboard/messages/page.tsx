@@ -9,9 +9,34 @@ import {
   useState,
 } from "react"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { io, type Socket } from "socket.io-client"
+import type { Socket } from "socket.io-client"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
@@ -21,20 +46,24 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
+import { getSocketClient } from "@/lib/socket-client"
 import {
   ChevronLeft,
-  Circle,
+  EllipsisVertical,
   Info,
   Loader2,
   MessageSquare,
   Paperclip,
+  Flag,
+  Mail,
+  MailOpen,
   Search,
   Send,
   Smile,
   Video,
-  Phone,
   Sparkles,
   CheckCheck,
+  Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
 import { InterviewMessageComponent } from "@/components/interview-message"
@@ -48,8 +77,11 @@ type Person = {
   email?: string
   role?: string
   activeRole?: string
+  companyName?: string
+  headline?: string
+  isOnline?: boolean
+  lastSeen?: string
 }
-
 type MatchRecord = {
   _id: string
   employer: Person
@@ -60,6 +92,8 @@ type MatchRecord = {
   unreadByEmployee?: number
   status?: string
   matchedAt?: string
+  typingUsers?: string[]
+  typingUpdatedAt?: string
 }
 
 type MessageRecord = {
@@ -70,6 +104,23 @@ type MessageRecord = {
   type: "text" | "starter" | "cv-share" | "linkedin" | "interview" | "system"
   content?: string
   interviewId?: string
+  interviewMessageType?: "scheduled" | "response"
+  interview?: {
+    _id: string
+    title: string
+    description?: string
+    scheduledFor: string
+    timezone: string
+    duration: number
+    status: "scheduled" | "confirmed" | "denied" | "completed" | "cancelled"
+    interviewLink: string
+    createdBy: string
+    employer: string | Person
+    employee: string | Person
+    deniedReason?: string
+    confirmedAt?: string
+    deniedAt?: string
+  } | null
   createdAt: string
   isRead?: boolean
 }
@@ -85,6 +136,8 @@ type SocketEventPayload = {
   match?: MatchRecord
   userId?: string
   online?: boolean
+  typing?: boolean
+  userIds?: string[]
 }
 
 function getPersonLabel(person?: Person) {
@@ -146,6 +199,13 @@ function formatMessageTime(value: string) {
   })
 }
 
+function isRecentlyActive(value?: string) {
+  if (!value) return false
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return false
+  return Date.now() - date.getTime() < 90_000
+}
+
 function formatDayLabel(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return "Today"
@@ -163,6 +223,17 @@ function formatDayLabel(value: string) {
   })
 }
 
+function formatSystemPreview(content?: string, maxChars = 120) {
+  const text = content || "Match update"
+  if (text.length <= maxChars) return text
+  const slice = text.slice(0, maxChars)
+  const lastSpace = slice.lastIndexOf(" ")
+  if (lastSpace > Math.floor(maxChars * 0.4)) {
+    return slice.slice(0, lastSpace) + "..."
+  }
+  return slice + "..."
+}
+
 function getMatchUnreadCount(match: MatchRecord, userId?: string) {
   if (!userId) return 0
   const isEmployer = String(match.employer?._id) === userId
@@ -177,8 +248,17 @@ function getOtherParticipant(match: MatchRecord, userId?: string) {
 }
 
 function upsertMatch(list: MatchRecord[], match: MatchRecord) {
+  const existing = list.find((item) => item._id === match._id)
   const next = list.filter((item) => item._id !== match._id)
-  next.unshift(match)
+  const merged = existing
+    ? {
+        ...existing,
+        ...match,
+        lastMessagePreview:
+          match.lastMessagePreview ?? existing.lastMessagePreview,
+      }
+    : match
+  next.unshift(merged)
   return next.sort((a, b) => {
     const aTime = new Date(a.lastMessageAt || a.matchedAt || 0).getTime()
     const bTime = new Date(b.lastMessageAt || b.matchedAt || 0).getTime()
@@ -203,7 +283,6 @@ function notifyMessagesUpdated() {
 
 function MessagesPageContent() {
   const { data: session, status } = useSession()
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [matches, setMatches] = useState<MatchRecord[]>([])
   const [messages, setMessages] = useState<MessageRecord[]>([])
@@ -214,16 +293,46 @@ function MessagesPageContent() {
   const [sending, setSending] = useState(false)
   const [messageText, setMessageText] = useState("")
   const [socketConnected, setSocketConnected] = useState(false)
+  const [isCompactLayout, setIsCompactLayout] = useState(false)
+  const [actionBusy, setActionBusy] = useState<
+    "mark-read" | "mark-unread" | "delete" | "report" | null
+  >(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [reportDialogOpen, setReportDialogOpen] = useState(false)
+  const [reportReason, setReportReason] = useState("")
+  const [reportDescription, setReportDescription] = useState("")
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set())
+  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set())
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false)
+  const [fileUploading, setFileUploading] = useState(false)
+  const [linkedInDialogOpenLocal, setLinkedInDialogOpenLocal] = useState(false)
+  const [linkedInUrlLocal, setLinkedInUrlLocal] = useState("")
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const emojiWrapperRef = useRef<HTMLDivElement | null>(null)
   const socketRef = useRef<Socket | null>(null)
   const activeMatchIdRef = useRef("")
-  const bottomRef = useRef<HTMLDivElement | null>(null)
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const heartbeatIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  )
+  const fallbackPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  )
+  const typingPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  )
+  const messageViewportRef = useRef<HTMLDivElement | null>(null)
+  const isAtBottomRef = useRef(true)
+  const previousMatchIdRef = useRef("")
 
   const currentUserId = session?.user?.id
-  const initialMatchId = searchParams?.get("matchId") || ""
 
-  const fetchMatches = useCallback(async () => {
-    setLoadingMatches(true)
+  const fetchMatches = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setLoadingMatches(true)
+    }
     try {
       const response = await fetch("/api/matches?status=active&limit=100", {
         cache: "no-store",
@@ -235,58 +344,61 @@ function MessagesPageContent() {
 
       const nextMatches = (json.matches || []) as MatchRecord[]
       setMatches(nextMatches)
-
-      const preferredMatchId =
-        initialMatchId &&
-        nextMatches.some((match) => match._id === initialMatchId)
-          ? initialMatchId
-          : nextMatches[0]?._id || ""
-
-      setActiveMatchId((previous) => previous || preferredMatchId)
     } catch (error) {
       console.error(error)
       toast.error("Failed to load matches")
       setMatches([])
     } finally {
-      setLoadingMatches(false)
-    }
-  }, [initialMatchId])
-
-  const fetchConversation = useCallback(async (matchId: string) => {
-    if (!matchId) {
-      setMessages([])
-      return
-    }
-
-    setLoadingMessages(true)
-    try {
-      const response = await fetch(
-        `/api/messages?matchId=${encodeURIComponent(matchId)}`,
-        { cache: "no-store" },
-      )
-      const json = (await response.json()) as ConversationResponse
-
-      if (!response.ok) {
-        throw new Error(
-          (json as { error?: string })?.error || "Failed to load conversation",
-        )
+      if (!options?.silent) {
+        setLoadingMatches(false)
       }
-
-      if (json.match) {
-        setMatches((previous) =>
-          upsertMatch(previous, json.match as MatchRecord),
-        )
-      }
-      setMessages((json.messages || []) as MessageRecord[])
-      notifyMessagesUpdated()
-    } catch (error) {
-      console.error(error)
-      toast.error("Failed to load conversation")
-      setMessages([])
-    } finally {
-      setLoadingMessages(false)
     }
   }, [])
+
+  const fetchConversation = useCallback(
+    async (matchId: string, options?: { silent?: boolean }) => {
+      if (!matchId) {
+        setMessages([])
+        return
+      }
+
+      if (!options?.silent) {
+        setLoadingMessages(true)
+      }
+      try {
+        const response = await fetch(
+          `/api/messages?matchId=${encodeURIComponent(matchId)}`,
+          { cache: "no-store" },
+        )
+        const json = (await response.json()) as ConversationResponse
+
+        if (!response.ok) {
+          throw new Error(
+            (json as { error?: string })?.error ||
+              "Failed to load conversation",
+          )
+        }
+
+        if (json.match) {
+          setMatches((previous) =>
+            upsertMatch(previous, json.match as MatchRecord),
+          )
+        }
+        setShowJumpToLatest(false)
+        setMessages((json.messages || []) as MessageRecord[])
+        notifyMessagesUpdated()
+      } catch (error) {
+        console.error(error)
+        toast.error("Failed to load conversation")
+        setMessages([])
+      } finally {
+        if (!options?.silent) {
+          setLoadingMessages(false)
+        }
+      }
+    },
+    [],
+  )
 
   useEffect(() => {
     if (status === "authenticated") {
@@ -295,43 +407,205 @@ function MessagesPageContent() {
   }, [status, fetchMatches])
 
   useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const nextUrl = new URL(window.location.href)
+    if (nextUrl.searchParams.has("matchId")) {
+      nextUrl.searchParams.delete("matchId")
+      window.history.replaceState(window.history.state, "", nextUrl.toString())
+    }
+  }, [])
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 1023px)")
+
+    const updateLayout = () => {
+      setIsCompactLayout(mediaQuery.matches)
+    }
+
+    updateLayout()
+    mediaQuery.addEventListener("change", updateLayout)
+
+    return () => {
+      mediaQuery.removeEventListener("change", updateLayout)
+    }
+  }, [])
+
+  useEffect(() => {
     activeMatchIdRef.current = activeMatchId
   }, [activeMatchId])
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const nextMatchId =
+        new URL(window.location.href).searchParams.get("matchId") || ""
+      setActiveMatchId((previous) =>
+        previous === nextMatchId ? previous : nextMatchId,
+      )
+    }
+
+    window.addEventListener("popstate", handlePopState)
+    return () => window.removeEventListener("popstate", handlePopState)
+  }, [])
 
   useEffect(() => {
     void fetchConversation(activeMatchId)
   }, [activeMatchId, fetchConversation])
 
   useEffect(() => {
+    if (!activeMatchId || status !== "authenticated") return
+
+    const pollTypingState = async () => {
+      try {
+        const response = await fetch(`/api/matches/${activeMatchId}/typing`, {
+          cache: "no-store",
+        })
+        const json = await response.json()
+
+        if (!response.ok) return
+
+        setMatches((previous) =>
+          previous.map((match) =>
+            match._id === activeMatchId
+              ? {
+                  ...match,
+                  typingUsers: Array.isArray(json.typingUsers)
+                    ? json.typingUsers
+                    : [],
+                  typingUpdatedAt: json.typingUpdatedAt || undefined,
+                }
+              : match,
+          ),
+        )
+      } catch {
+        // ignore typing poll failures
+      }
+    }
+
+    void pollTypingState()
+
+    if (typingPollIntervalRef.current) {
+      clearInterval(typingPollIntervalRef.current)
+    }
+
+    typingPollIntervalRef.current = setInterval(pollTypingState, 1800)
+
+    return () => {
+      if (typingPollIntervalRef.current) {
+        clearInterval(typingPollIntervalRef.current)
+        typingPollIntervalRef.current = null
+      }
+    }
+  }, [activeMatchId, status])
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    const viewport = messageViewportRef.current
+    if (!viewport) return
+
+    window.requestAnimationFrame(() => {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior })
+    })
+  }, [])
+
+  useEffect(() => {
+    if (status !== "authenticated") return
+
+    const sendHeartbeat = async (online: boolean) => {
+      try {
+        await fetch("/api/presence/heartbeat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ online }),
+          keepalive: true,
+        })
+      } catch {
+        // ignore heartbeat failures
+      }
+    }
+
+    void sendHeartbeat(true)
+
+    if (heartbeatIntervalRef.current) {
+      clearInterval(heartbeatIntervalRef.current)
+    }
+
+    heartbeatIntervalRef.current = setInterval(() => {
+      void sendHeartbeat(true)
+    }, 30000)
+
+    const handleVisibilityChange = () => {
+      void sendHeartbeat(document.visibilityState !== "hidden")
+    }
+
+    const handleBeforeUnload = () => {
+      void sendHeartbeat(false)
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    window.addEventListener("beforeunload", handleBeforeUnload)
+
+    return () => {
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current)
+        heartbeatIntervalRef.current = null
+      }
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      window.removeEventListener("beforeunload", handleBeforeUnload)
+      void sendHeartbeat(false)
+    }
+  }, [status])
+
+  useEffect(() => {
+    const socket = socketRef.current
+    if (!socket || !activeMatchId) return
+
+    socket.emit("conversation:join", { matchId: activeMatchId })
+
+    return () => {
+      socket.emit("conversation:leave", { matchId: activeMatchId })
+    }
+  }, [activeMatchId])
+
+  useEffect(() => {
     let cancelled = false
+    let socketCleanup: (() => void) | null = null
 
     const bootstrap = async () => {
       if (status !== "authenticated") return
 
       try {
-        await fetch("/api/socket", { cache: "no-store" })
+        const socket = await getSocketClient()
         if (cancelled) return
-
-        const socket = io({
-          path: "/socket.io",
-          transports: ["websocket", "polling"],
-          withCredentials: true,
-        })
 
         socketRef.current = socket
 
-        socket.on("connect", () => {
+        const handleConnect = () => {
+          console.log("[socket] connected")
           setSocketConnected(true)
-        })
+          if (activeMatchIdRef.current) {
+            socket.emit("conversation:join", {
+              matchId: activeMatchIdRef.current,
+            })
+          }
+        }
 
-        socket.on("disconnect", () => {
+        const handleDisconnect = (reason: string) => {
+          console.log("[socket] disconnected:", reason)
           setSocketConnected(false)
-        })
+        }
 
-        socket.on("message:new", (payload: SocketEventPayload) => {
+        const handlePresenceSnapshot = (payload: SocketEventPayload) => {
+          if (!Array.isArray(payload.userIds)) return
+          setOnlineUsers(new Set(payload.userIds))
+        }
+
+        const handleMessageNew = (payload: SocketEventPayload) => {
           if (!payload.matchId || !payload.message) return
 
           if (payload.matchId === activeMatchIdRef.current) {
+            if (!isAtBottomRef.current) {
+              setShowJumpToLatest(true)
+            }
             setMessages((previous) => appendMessage(previous, payload.message!))
             notifyMessagesUpdated()
           }
@@ -342,9 +616,9 @@ function MessagesPageContent() {
             )
             notifyMessagesUpdated()
           }
-        })
+        }
 
-        socket.on("conversation:update", (payload: SocketEventPayload) => {
+        const handleConversationUpdate = (payload: SocketEventPayload) => {
           if (payload.match) {
             setMatches((previous) =>
               upsertMatch(previous, payload.match as MatchRecord),
@@ -352,11 +626,16 @@ function MessagesPageContent() {
             notifyMessagesUpdated()
           }
           if (payload.matchId === activeMatchIdRef.current) {
-            void fetchConversation(payload.matchId)
+            void fetchConversation(payload.matchId, { silent: true })
           }
-        })
+        }
 
-        socket.on("presence:update", (payload: SocketEventPayload) => {
+        const handleInterviewUpdate = (payload: SocketEventPayload) => {
+          if (payload.matchId !== activeMatchIdRef.current) return
+          void fetchConversation(payload.matchId, { silent: true })
+        }
+
+        const handlePresenceUpdate = (payload: SocketEventPayload) => {
           if (!payload.userId) return
           setOnlineUsers((previous) => {
             const next = new Set(previous)
@@ -367,7 +646,59 @@ function MessagesPageContent() {
             }
             return next
           })
-        })
+        }
+
+        const handleTypingUpdate = (payload: SocketEventPayload) => {
+          if (!payload.userId || !payload.matchId) return
+          if (payload.matchId !== activeMatchIdRef.current) return
+
+          setTypingUsers((previous) => {
+            const next = new Set(previous)
+            if (payload.typing) {
+              next.add(payload.userId!)
+            } else {
+              next.delete(payload.userId!)
+            }
+            return next
+          })
+        }
+
+        socket.off("connect", handleConnect)
+        socket.off("disconnect", handleDisconnect)
+        socket.off("presence:snapshot", handlePresenceSnapshot)
+        socket.off("message:new", handleMessageNew)
+        socket.off("conversation:update", handleConversationUpdate)
+        socket.off("interview:update", handleInterviewUpdate)
+        socket.off("presence:update", handlePresenceUpdate)
+        socket.off("typing:update", handleTypingUpdate)
+
+        socket.on("connect", handleConnect)
+        socket.on("disconnect", handleDisconnect)
+        socket.on("presence:snapshot", handlePresenceSnapshot)
+        socket.on("message:new", handleMessageNew)
+        socket.on("conversation:update", handleConversationUpdate)
+        socket.on("interview:update", handleInterviewUpdate)
+        socket.on("presence:update", handlePresenceUpdate)
+        socket.on("typing:update", handleTypingUpdate)
+
+        if (!socket.connected) {
+          console.log("[socket] calling socket.connect()")
+          socket.connect()
+        } else {
+          console.log("[socket] already connected, calling handleConnect")
+          handleConnect()
+        }
+
+        socketCleanup = () => {
+          socket.off("connect", handleConnect)
+          socket.off("disconnect", handleDisconnect)
+          socket.off("presence:snapshot", handlePresenceSnapshot)
+          socket.off("message:new", handleMessageNew)
+          socket.off("conversation:update", handleConversationUpdate)
+          socket.off("interview:update", handleInterviewUpdate)
+          socket.off("presence:update", handlePresenceUpdate)
+          socket.off("typing:update", handleTypingUpdate)
+        }
       } catch (error) {
         console.error(error)
       }
@@ -377,14 +708,107 @@ function MessagesPageContent() {
 
     return () => {
       cancelled = true
-      socketRef.current?.disconnect()
+      socketCleanup?.()
       socketRef.current = null
     }
   }, [fetchConversation, status])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, activeMatchId])
+    if (!emojiPickerOpen) return
+
+    const onPointerDown = (e: MouseEvent | TouchEvent) => {
+      const wrapper = emojiWrapperRef.current
+      if (!wrapper) return
+      const target = e.target as Node | null
+      if (!target) return
+      if (!wrapper.contains(target)) {
+        setEmojiPickerOpen(false)
+      }
+    }
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setEmojiPickerOpen(false)
+    }
+
+    document.addEventListener("mousedown", onPointerDown)
+    document.addEventListener("touchstart", onPointerDown)
+    document.addEventListener("keydown", onKey)
+
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown)
+      document.removeEventListener("touchstart", onPointerDown)
+      document.removeEventListener("keydown", onKey)
+    }
+  }, [emojiPickerOpen])
+
+  useEffect(() => {
+    if (socketConnected) {
+      if (fallbackPollIntervalRef.current) {
+        clearInterval(fallbackPollIntervalRef.current)
+        fallbackPollIntervalRef.current = null
+      }
+      return
+    }
+
+    const poll = () => {
+      if (activeMatchIdRef.current) {
+        void fetchConversation(activeMatchIdRef.current, { silent: true })
+      }
+      void fetchMatches({ silent: true })
+    }
+
+    poll()
+
+    fallbackPollIntervalRef.current = setInterval(poll, 3000)
+
+    return () => {
+      if (fallbackPollIntervalRef.current) {
+        clearInterval(fallbackPollIntervalRef.current)
+        fallbackPollIntervalRef.current = null
+      }
+    }
+  }, [fetchConversation, fetchMatches, socketConnected])
+
+  useEffect(() => {
+    if (!activeMatchId) return
+
+    if (previousMatchIdRef.current !== activeMatchId) {
+      previousMatchIdRef.current = activeMatchId
+      isAtBottomRef.current = true
+      setShowJumpToLatest(false)
+      scrollToBottom("auto")
+      return
+    }
+
+    if (isAtBottomRef.current) {
+      setShowJumpToLatest(false)
+      scrollToBottom("auto")
+    }
+  }, [messages, activeMatchId, loadingMessages, scrollToBottom])
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+        typingTimeoutRef.current = null
+      }
+      if (fallbackPollIntervalRef.current) {
+        clearInterval(fallbackPollIntervalRef.current)
+        fallbackPollIntervalRef.current = null
+      }
+      if (typingPollIntervalRef.current) {
+        clearInterval(typingPollIntervalRef.current)
+        typingPollIntervalRef.current = null
+      }
+      if (heartbeatIntervalRef.current) {
+        clearInterval(heartbeatIntervalRef.current)
+        heartbeatIntervalRef.current = null
+      }
+      socketRef.current?.emit("typing:stop", {
+        matchId: activeMatchIdRef.current,
+      })
+    }
+  }, [])
 
   const filteredMatches = useMemo(() => {
     const term = searchTerm.trim().toLowerCase()
@@ -413,6 +837,15 @@ function MessagesPageContent() {
     ? getMatchUnreadCount(activeMatch, currentUserId)
     : 0
 
+  const typingFromMatch = Boolean(
+    otherParticipant?._id &&
+    activeMatch?.typingUsers?.includes(otherParticipant._id),
+  )
+  const typingFromSocket = Boolean(
+    otherParticipant?._id ? typingUsers.has(otherParticipant._id) : false,
+  )
+  const typingNow = typingFromMatch || typingFromSocket
+
   const groupedMessages = useMemo(() => {
     const groups: Array<{
       type: "separator" | "message"
@@ -438,19 +871,139 @@ function MessagesPageContent() {
     return groups
   }, [messages])
 
-  const handleSelectMatch = (matchId: string) => {
-    setMatches((previous) =>
-      previous.map((match) => {
-        if (match._id !== matchId) return match
+  const handleSelectMatch = useCallback(
+    (matchId: string) => {
+      setMatches((previous) =>
+        previous.map((match) => {
+          if (match._id !== matchId) return match
 
-        const isEmployer = String(match.employer?._id) === currentUserId
-        return isEmployer
-          ? { ...match, unreadByEmployer: 0 }
-          : { ...match, unreadByEmployee: 0 }
-      }),
-    )
-    setActiveMatchId(matchId)
-    router.replace(`/dashboard/messages?matchId=${matchId}`)
+          const isEmployer = String(match.employer?._id) === currentUserId
+          return isEmployer
+            ? { ...match, unreadByEmployer: 0 }
+            : { ...match, unreadByEmployee: 0 }
+        }),
+      )
+      setActiveMatchId(matchId)
+      if (typeof window === "undefined") return
+
+      const nextUrl = new URL(window.location.href)
+      nextUrl.pathname = "/dashboard/messages"
+      nextUrl.searchParams.set("matchId", matchId)
+      window.history.replaceState(window.history.state, "", nextUrl.toString())
+    },
+    [currentUserId],
+  )
+
+  const handleCloseMatch = useCallback(() => {
+    setActiveMatchId("")
+
+    if (typeof window === "undefined") return
+
+    const nextUrl = new URL(window.location.href)
+    nextUrl.pathname = "/dashboard/messages"
+    nextUrl.searchParams.delete("matchId")
+    window.history.replaceState(window.history.state, "", nextUrl.toString())
+  }, [])
+
+  const runChatAction = useCallback(
+    async (
+      action: "mark-read" | "mark-unread" | "delete" | "report",
+      payload?: { reason?: string; description?: string },
+    ) => {
+      if (!activeMatchId || !activeMatch) return
+
+      setActionBusy(action)
+      try {
+        const response = await fetch(`/api/matches/${activeMatchId}/actions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action,
+            reason: payload?.reason,
+            description: payload?.description,
+          }),
+        })
+
+        const json = (await response.json()) as {
+          error?: string
+          match?: MatchRecord
+        }
+
+        if (!response.ok) {
+          throw new Error(json.error || "Failed to update chat")
+        }
+
+        if (action === "delete") {
+          setDeleteConfirmOpen(false)
+          handleCloseMatch()
+          void fetchMatches({ silent: true })
+          toast.success("Conversation deleted")
+          return
+        }
+
+        if (action === "report") {
+          setReportDialogOpen(false)
+          setReportReason("")
+          setReportDescription("")
+          toast.success("Report submitted")
+          return
+        }
+
+        if (json.match) {
+          setMatches((previous) =>
+            upsertMatch(previous, json.match as MatchRecord),
+          )
+        }
+        void fetchMatches({ silent: true })
+
+        toast.success(
+          action === "mark-read"
+            ? "Conversation marked as read"
+            : "Conversation marked as unread",
+        )
+      } catch (error) {
+        console.error(error)
+        toast.error("Failed to update chat")
+      } finally {
+        setActionBusy(null)
+      }
+    },
+    [activeMatch, activeMatchId, fetchMatches, handleCloseMatch],
+  )
+
+  const handleTypingChange = (value: string) => {
+    setMessageText(value)
+
+    const socket = socketRef.current
+    const matchId = activeMatchIdRef.current
+    if (!matchId) return
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+      typingTimeoutRef.current = null
+    }
+
+    const syncTypingState = (typing: boolean) => {
+      void fetch(`/api/matches/${matchId}/typing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ typing }),
+      })
+    }
+
+    if (!value.trim()) {
+      socket?.emit("typing:stop", { matchId })
+      syncTypingState(false)
+      return
+    }
+
+    socket?.emit("typing:start", { matchId })
+    syncTypingState(true)
+    typingTimeoutRef.current = setTimeout(() => {
+      socket?.emit("typing:stop", { matchId })
+      syncTypingState(false)
+      typingTimeoutRef.current = null
+    }, 1200)
   }
 
   const handleSendMessage = async () => {
@@ -476,12 +1029,20 @@ function MessagesPageContent() {
       }
 
       setMessageText("")
+      socketRef.current?.emit("typing:stop", { matchId: activeMatchId })
+      void fetch(`/api/matches/${activeMatchId}/typing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ typing: false }),
+      })
       if (json.message) {
         setMessages((previous) => appendMessage(previous, json.message!))
       }
       if (json.match) {
         setMatches((previous) => upsertMatch(previous, json.match!))
       }
+      isAtBottomRef.current = true
+      scrollToBottom("auto")
       notifyMessagesUpdated()
     } catch (error) {
       console.error(error)
@@ -489,6 +1050,12 @@ function MessagesPageContent() {
     } finally {
       setSending(false)
     }
+  }
+
+  const openLinkedInDialog = () => {
+    const urlFromProfile = (session as any)?.user?.linkedinUrl || ""
+    setLinkedInUrlLocal(urlFromProfile)
+    setLinkedInDialogOpenLocal(true)
   }
 
   if (status === "loading" || (status === "authenticated" && loadingMatches)) {
@@ -501,7 +1068,7 @@ function MessagesPageContent() {
 
   if (status === "authenticated" && !matches.length) {
     return (
-      <div className="flex h-full items-center justify-center p-6">
+      <div className="flex h-full items-center justify-center">
         <Card className="w-full max-w-2xl border-border/60 bg-card/95 p-8 text-center shadow-sm">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <MessageSquare className="h-7 w-7" />
@@ -518,383 +1085,917 @@ function MessagesPageContent() {
     )
   }
 
+  const showListPane = !isCompactLayout || !activeMatchId
+  const showChatPane = !isCompactLayout || Boolean(activeMatchId)
+
   return (
-    <div className="h-full p-4 sm:p-6">
-      <div className="mx-auto flex h-full max-w-[1600px] flex-col gap-4">
-        <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[380px_minmax(0,1fr)]">
-          <Card className="flex min-h-0 flex-col overflow-hidden border-border/60 bg-card/95 shadow-sm">
-            <div className="border-b border-border/60 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-semibold">Active matches</h2>
-                  <p className="text-sm text-muted-foreground">
-                    {matches.length} conversations
-                  </p>
+    <div className="h-full max-h-full overflow-hidden">
+      <div className="mx-auto flex h-full max-h-full min-h-0 max-w-[1600px] flex-col gap-4">
+        <div className="grid min-h-0 flex-1 lg:grid-cols-[296px_minmax(0,1fr)]">
+          {showListPane ? (
+            <Card
+              className={cn(
+                "flex min-h-0 max-h-full flex-col overflow-hidden rounded-none",
+                isCompactLayout ? "h-full border-0" : "",
+              )}
+            >
+              <div className="border-b border-border/60 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold">Active matches</h2>
+                    <p className="text-sm text-muted-foreground">
+                      {matches.length} conversations
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="rounded-full">
+                    {activeUnread} unread
+                  </Badge>
                 </div>
-                <Badge variant="outline" className="rounded-full">
-                  {activeUnread} unread
-                </Badge>
+
+                <div className="relative mt-4">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Search conversations"
+                    className="pl-10"
+                  />
+                </div>
               </div>
 
-              <div className="relative mt-4">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <ScrollArea className="min-h-0 flex-1">
+                <div className="space-y-1 p-4">
+                  {filteredMatches.map((match) => {
+                    const other = getOtherParticipant(match, currentUserId)
+                    const active = match._id === activeMatchId
+                    const unread = getMatchUnreadCount(match, currentUserId)
+                    const online = other?._id
+                      ? onlineUsers.has(other._id) ||
+                        other.isOnline === true ||
+                        isRecentlyActive(other.lastSeen)
+                      : false
+
+                    return (
+                      <button
+                        key={match._id}
+                        type="button"
+                        onClick={() => handleSelectMatch(match._id)}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition-colors",
+                          active
+                            ? "border border-primary/20 bg-primary/5"
+                            : "border hover:bg-muted/60",
+                        )}
+                      >
+                        <div className="relative shrink-0">
+                          <Avatar className="h-14 w-14 border border-border">
+                            <AvatarImage
+                              src={other?.avatar}
+                              alt={getPersonLabel(other)}
+                            />
+                            <AvatarFallback>
+                              {getInitials(other)}
+                            </AvatarFallback>
+                          </Avatar>
+                          {online ? (
+                            <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-card bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.15)]" />
+                          ) : null}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="truncate font-medium text-foreground">
+                              {getPersonLabel(other)}
+                            </span>
+                            <span className="shrink-0 text-xs text-muted-foreground">
+                              {formatLastActivity(
+                                match.lastMessageAt || match.matchedAt,
+                              )}
+                            </span>
+                          </div>
+
+                          <div className="mt-1 flex items-center justify-between gap-2">
+                            <p className="truncate text-sm text-muted-foreground">
+                              {match.lastMessagePreview &&
+                              match.lastMessagePreview.length > 20
+                                ? match.lastMessagePreview.slice(0, 20) + "..."
+                                : match.lastMessagePreview ||
+                                  "Say hello to start the conversation"}
+                            </p>
+                            {unread > 0 ? (
+                              <Badge className="shrink-0 rounded-full px-2 py-0.5 text-xs">
+                                {unread}
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </ScrollArea>
+            </Card>
+          ) : null}
+
+          {showChatPane ? (
+            <Card
+              className={cn(
+                "flex min-h-0 max-h-full flex-col overflow-hidden rounded-none gap-0",
+                isCompactLayout ? "md:h-full h-[95dvh] border-0" : "",
+              )}
+            >
+              {activeMatch && otherParticipant ? (
+                <>
+                  <div className="flex items-center justify-between gap-4 border-b border-border/60 px-4 py-4 sm:px-5">
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="lg:hidden"
+                        onClick={handleCloseMatch}
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </Button>
+                      <Avatar className="h-11 w-11 border border-border">
+                        <AvatarImage
+                          src={otherParticipant.avatar}
+                          alt={getPersonLabel(otherParticipant)}
+                        />
+                        <AvatarFallback>
+                          {getInitials(otherParticipant)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h2 className="font-semibold leading-none">
+                            {getPersonLabel(otherParticipant)}
+                          </h2>
+                          {onlineUsers.has(otherParticipant._id) ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">
+                              Online
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {getPersonSubtitle(otherParticipant)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <Button variant="ghost" size="icon" asChild>
+                        <Link href={`/${otherParticipant.username || ""}`}>
+                          <Info className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                      {currentUserId === activeMatch?.employer._id && (
+                        <ScheduleInterviewModal
+                          matchId={activeMatchId}
+                          employeeName={otherParticipant.name || "Candidate"}
+                          onInterviewScheduled={() => {
+                            if (activeMatchId) {
+                              void fetchConversation(activeMatchId)
+                            }
+                          }}
+                        />
+                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" type="button">
+                            <EllipsisVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                          <DropdownMenuItem
+                            onClick={() => void runChatAction("mark-read")}
+                            disabled={actionBusy !== null}
+                          >
+                            <MailOpen className="h-4 w-4" />
+                            Mark as read
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => void runChatAction("mark-unread")}
+                            disabled={actionBusy !== null}
+                          >
+                            <Mail className="h-4 w-4" />
+                            Mark as unread
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            onClick={() => setReportDialogOpen(true)}
+                            disabled={actionBusy !== null}
+                          >
+                            <Flag className="h-4 w-4" />
+                            Report conversation
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            variant="destructive"
+                            onClick={() => setDeleteConfirmOpen(true)}
+                            disabled={actionBusy !== null}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Delete conversation
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+
+                  <div className="relative min-h-0 flex-1">
+                    <ScrollArea
+                      className="min-h-0 h-full"
+                      viewportRef={messageViewportRef}
+                      onViewportScroll={(event) => {
+                        const target = event.currentTarget
+                        const distanceFromBottom =
+                          target.scrollHeight -
+                          target.scrollTop -
+                          target.clientHeight
+                        const atBottom = distanceFromBottom < 96
+                        isAtBottomRef.current = atBottom
+                        if (atBottom) {
+                          setShowJumpToLatest(false)
+                        }
+                      }}
+                    >
+                      <div className="space-y-4 p-4 sm:p-5">
+                        {loadingMessages ? (
+                          <div className="space-y-3">
+                            <Skeleton className="h-20 w-3/4 rounded-2xl" />
+                            <Skeleton className="ml-auto h-20 w-2/3 rounded-2xl" />
+                            <Skeleton className="h-20 w-3/4 rounded-2xl" />
+                          </div>
+                        ) : groupedMessages.length > 0 ? (
+                          <>
+                            {groupedMessages.map((entry) => {
+                              if (entry.type === "separator") {
+                                return (
+                                  <div
+                                    key={entry.id}
+                                    className="flex justify-center py-1"
+                                  >
+                                    <span className="rounded-full border border-border bg-background px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground shadow-sm">
+                                      {entry.label}
+                                    </span>
+                                  </div>
+                                )
+                              }
+
+                              const message = entry.message!
+                              const isOwnMessage =
+                                String(message.sender?._id) === currentUserId
+
+                              if (message.type === "system") {
+                                return (
+                                  <div
+                                    key={entry.id}
+                                    className="flex justify-center"
+                                  >
+                                    <div className="rounded-full border border-border bg-muted/70 px-4 py-2 text-sm text-muted-foreground max-w-[70%]">
+                                      {formatSystemPreview(message.content)}
+                                    </div>
+                                  </div>
+                                )
+                              }
+
+                              if (
+                                message.type === "interview" &&
+                                message.interviewId
+                              ) {
+                                const interview = message.interview
+                                const messageKind =
+                                  message.interviewMessageType ||
+                                  (interview && interview.status !== "scheduled"
+                                    ? "response"
+                                    : "scheduled")
+
+                                if (
+                                  messageKind === "scheduled" &&
+                                  interview &&
+                                  interview.status !== "scheduled"
+                                ) {
+                                  return null
+                                }
+
+                                return (
+                                  <InterviewMessageComponent
+                                    key={entry.id}
+                                    interview={{
+                                      _id: message.interviewId,
+                                      title:
+                                        interview?.title ||
+                                        message.content ||
+                                        "Interview",
+                                      description: interview?.description || "",
+                                      scheduledFor:
+                                        interview?.scheduledFor ||
+                                        new Date().toISOString(),
+                                      timezone: interview?.timezone || "UTC",
+                                      duration: interview?.duration || 60,
+                                      status: interview?.status || "scheduled",
+                                      interviewLink:
+                                        interview?.interviewLink || "",
+                                      createdBy:
+                                        interview?.createdBy ||
+                                        message.sender._id,
+                                      employer: {
+                                        _id:
+                                          typeof interview?.employer ===
+                                          "string"
+                                            ? interview.employer
+                                            : interview?.employer?._id ||
+                                              activeMatch?.employer._id ||
+                                              "",
+                                        name:
+                                          typeof interview?.employer ===
+                                          "string"
+                                            ? activeMatch?.employer.name || ""
+                                            : interview?.employer?.name ||
+                                              activeMatch?.employer.name ||
+                                              "",
+                                        companyName:
+                                          typeof interview?.employer ===
+                                          "string"
+                                            ? activeMatch?.employer.username
+                                            : interview?.employer &&
+                                                typeof interview.employer !==
+                                                  "string"
+                                              ? interview.employer
+                                                  .companyName ||
+                                                activeMatch?.employer.username
+                                              : activeMatch?.employer.username,
+                                      },
+                                      employee: {
+                                        _id:
+                                          typeof interview?.employee ===
+                                          "string"
+                                            ? interview.employee
+                                            : interview?.employee?._id ||
+                                              activeMatch?.employee._id ||
+                                              "",
+                                        name:
+                                          typeof interview?.employee ===
+                                          "string"
+                                            ? activeMatch?.employee.name || ""
+                                            : interview?.employee?.name ||
+                                              activeMatch?.employee.name ||
+                                              "",
+                                        headline:
+                                          typeof interview?.employee ===
+                                          "string"
+                                            ? activeMatch?.employee.username
+                                            : interview?.employee &&
+                                                typeof interview.employee !==
+                                                  "string"
+                                              ? interview.employee.headline ||
+                                                activeMatch?.employee.username
+                                              : activeMatch?.employee.username,
+                                      },
+                                      deniedReason: interview?.deniedReason,
+                                    }}
+                                    currentUserId={currentUserId || ""}
+                                    messageSenderId={message.sender?._id}
+                                    messageSender={message.sender}
+                                    messageCreatedAt={message.createdAt}
+                                    messageKind={messageKind}
+                                  />
+                                )
+                              }
+
+                              return (
+                                <div
+                                  key={entry.id}
+                                  className={cn(
+                                    "flex max-w-[82%] items-end gap-2 min-w-0",
+                                    isOwnMessage
+                                      ? "ml-auto flex-row-reverse"
+                                      : "",
+                                  )}
+                                >
+                                  {!isOwnMessage && (
+                                    <Avatar className="h-8 w-8 shrink-0 border border-border">
+                                      <AvatarImage
+                                        src={message.sender?.avatar}
+                                        alt={getPersonLabel(message.sender)}
+                                      />
+                                      <AvatarFallback>
+                                        {getInitials(message.sender)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                  )}
+
+                                  <div className="space-y-1 min-w-0">
+                                    <div
+                                      className={cn(
+                                        "rounded-2xl px-4 py-3 shadow-sm",
+                                        isOwnMessage
+                                          ? "rounded-br-sm bg-primary text-primary-foreground"
+                                          : "rounded-bl-sm border border-border bg-card text-foreground",
+                                      )}
+                                    >
+                                      <p className="text-sm leading-6 break-words break-all whitespace-pre-line">
+                                        {message.content}
+                                      </p>
+                                    </div>
+                                    <div
+                                      className={cn(
+                                        "flex items-center gap-1 px-1 text-[10px] text-muted-foreground",
+                                        isOwnMessage ? "justify-end" : "",
+                                      )}
+                                    >
+                                      <span>
+                                        {formatMessageTime(message.createdAt)}
+                                      </span>
+                                      {isOwnMessage ? (
+                                        <CheckCheck className="h-3.5 w-3.5 text-primary" />
+                                      ) : null}
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+
+                            {typingNow && otherParticipant ? (
+                              <div className="flex max-w-[82%] items-end gap-2">
+                                <Avatar className="h-8 w-8 shrink-0 border border-border">
+                                  <AvatarImage
+                                    src={otherParticipant.avatar}
+                                    alt={getPersonLabel(otherParticipant)}
+                                  />
+                                  <AvatarFallback>
+                                    {getInitials(otherParticipant)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="space-y-1">
+                                  <div className="rounded-2xl rounded-bl-sm border border-border bg-card px-4 py-3 shadow-sm">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.2s]" />
+                                      <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.1s]" />
+                                      <span className="h-2 w-2 animate-bounce rounded-full bg-muted-foreground" />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : null}
+                          </>
+                        ) : (
+                          <div className="flex h-full min-h-[360px] items-center justify-center">
+                            <div className="max-w-md rounded-3xl border border-dashed border-border bg-muted/20 p-8 text-center">
+                              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                                <Sparkles className="h-7 w-7" />
+                              </div>
+                              <h3 className="mt-4 text-xl font-semibold">
+                                Start the conversation
+                              </h3>
+                              <p className="mt-2 text-sm text-muted-foreground">
+                                Send a real message to open this match thread.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </ScrollArea>
+
+                    {showJumpToLatest ? (
+                      <div className="pointer-events-none absolute bottom-6 right-6 z-10">
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="pointer-events-auto rounded-full shadow-lg"
+                          onClick={() => {
+                            isAtBottomRef.current = true
+                            setShowJumpToLatest(false)
+                            scrollToBottom("smooth")
+                          }}
+                        >
+                          Jump to latest
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <footer className="border-t border-border/60 bg-background/95 pt-4 sm:pb-0 pb-4 px-4">
+                    <div className="mx-auto flex max-w-4xl items-end gap-2 rounded-3xl border border-border bg-muted/30 p-2 shadow-sm">
+                      <div className="relative">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              type="button"
+                              className="shrink-0"
+                            >
+                              <Paperclip className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent className="w-56">
+                            <DropdownMenuItem
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={fileUploading}
+                            >
+                              Upload resume / file
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => openLinkedInDialog()}
+                            >
+                              Add LinkedIn URL
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          className="hidden"
+                          accept=".pdf,.txt,.doc,.docx"
+                          onChange={async (e) => {
+                            const file = e.currentTarget.files?.[0]
+                            if (!file || !activeMatchId) return
+
+                            const allowed = [
+                              "application/pdf",
+                              "text/plain",
+                              "application/msword",
+                              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            ]
+                            if (!allowed.includes(file.type)) {
+                              toast.error("Invalid file type. Use PDF or TXT.")
+                              e.currentTarget.value = ""
+                              return
+                            }
+
+                            const maxSize = 5 * 1024 * 1024
+                            if (file.size > maxSize) {
+                              toast.error("File too large (max 5MB)")
+                              e.currentTarget.value = ""
+                              return
+                            }
+
+                            try {
+                              setFileUploading(true)
+                              const fd = new FormData()
+                              fd.append("file", file)
+                              fd.append("title", file.name)
+
+                              const res = await fetch("/api/resumes", {
+                                method: "POST",
+                                body: fd,
+                              })
+                              const json = await res.json()
+                              if (!res.ok) {
+                                throw new Error(json.error || "Upload failed")
+                              }
+
+                              const url = json.resume?.url
+                              if (!url) throw new Error("No url returned")
+
+                              // send as chat message (safe: resume was validated server-side)
+                              const sendRes = await fetch("/api/messages", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                  matchId: activeMatchId,
+                                  content: `Shared a resume: ${url}`,
+                                }),
+                              })
+                              const sendJson = await sendRes.json()
+                              if (!sendRes.ok) {
+                                throw new Error(
+                                  sendJson.error || "Failed to send message",
+                                )
+                              }
+
+                              if (sendJson.message) {
+                                setMessages((previous) =>
+                                  appendMessage(previous, sendJson.message),
+                                )
+                                isAtBottomRef.current = true
+                                scrollToBottom("auto")
+                                notifyMessagesUpdated()
+                              }
+
+                              toast.success("File shared")
+                            } catch (err) {
+                              console.error(err)
+                              toast.error("Failed to share file")
+                            } finally {
+                              setFileUploading(false)
+                              e.currentTarget.value = ""
+                            }
+                          }}
+                        />
+
+                        <Dialog
+                          open={linkedInDialogOpenLocal}
+                          onOpenChange={setLinkedInDialogOpenLocal}
+                        >
+                          <DialogContent className="sm:max-w-md">
+                            <DialogHeader>
+                              <DialogTitle>Share LinkedIn profile</DialogTitle>
+                              <DialogDescription>
+                                Paste a LinkedIn profile URL to share with this
+                                contact.
+                              </DialogDescription>
+                            </DialogHeader>
+
+                            <div className="space-y-4">
+                              <Input
+                                value={linkedInUrlLocal}
+                                onChange={(e) =>
+                                  setLinkedInUrlLocal(e.target.value)
+                                }
+                                placeholder="https://www.linkedin.com/in/your-profile"
+                              />
+                            </div>
+
+                            <DialogFooter>
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setLinkedInUrlLocal("")
+                                  setLinkedInDialogOpenLocal(false)
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                              <Button
+                                onClick={async () => {
+                                  const url = linkedInUrlLocal.trim()
+                                  if (!url) return
+                                  try {
+                                    const parsed = new URL(url)
+                                    if (
+                                      !parsed.hostname.includes("linkedin.com")
+                                    ) {
+                                      toast.error(
+                                        "Please provide a LinkedIn URL",
+                                      )
+                                      return
+                                    }
+
+                                    // send as chat message
+                                    const res = await fetch("/api/messages", {
+                                      method: "POST",
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                      },
+                                      body: JSON.stringify({
+                                        matchId: activeMatchId,
+                                        content: `LinkedIn: ${url}`,
+                                      }),
+                                    })
+                                    const json = await res.json()
+                                    if (!res.ok)
+                                      throw new Error(
+                                        json.error || "Failed to send",
+                                      )
+
+                                    if (json.message) {
+                                      setMessages((previous) =>
+                                        appendMessage(previous, json.message),
+                                      )
+                                      isAtBottomRef.current = true
+                                      scrollToBottom("auto")
+                                      notifyMessagesUpdated()
+                                    }
+
+                                    toast.success("LinkedIn shared")
+                                    setLinkedInUrlLocal("")
+                                    setLinkedInDialogOpenLocal(false)
+                                  } catch (err) {
+                                    console.error(err)
+                                    toast.error("Invalid URL")
+                                  }
+                                }}
+                              >
+                                Share
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                      </div>
+
+                      <Textarea
+                        ref={textareaRef}
+                        value={messageText}
+                        onChange={(event) =>
+                          handleTypingChange(event.target.value)
+                        }
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && !event.shiftKey) {
+                            event.preventDefault()
+                            void handleSendMessage()
+                          }
+                        }}
+                        onBlur={() => {
+                          const socket = socketRef.current
+                          const matchId = activeMatchIdRef.current
+                          if (socket && matchId) {
+                            socket.emit("typing:stop", { matchId })
+                          }
+                        }}
+                        placeholder="Type a message..."
+                        rows={1}
+                        className="min-h-[40px] flex-1 resize-none border-0 bg-transparent shadow-none focus-visible:ring-0"
+                      />
+
+                      <div className="flex items-center gap-1">
+                        <div className="relative" ref={emojiWrapperRef}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            type="button"
+                            className="shrink-0"
+                            onClick={() => setEmojiPickerOpen((s) => !s)}
+                          >
+                            <Smile className="h-4 w-4" />
+                          </Button>
+
+                          {emojiPickerOpen ? (
+                            <div className="absolute bottom-12 left-0 z-50 w-64 rounded-lg border border-border bg-card p-2 shadow-lg">
+                              <div className="grid grid-cols-6 gap-2">
+                                {[
+                                  "😀",
+                                  "😄",
+                                  "😂",
+                                  "😍",
+                                  "👍",
+                                  "🎉",
+                                  "🔥",
+                                  "🙌",
+                                  "🙈",
+                                  "🤝",
+                                  "💼",
+                                  "📄",
+                                ].map((emoji) => (
+                                  <button
+                                    key={emoji}
+                                    type="button"
+                                    onClick={() => {
+                                      const ta = textareaRef.current
+                                      if (!ta) {
+                                        setMessageText((prev) => prev + emoji)
+                                      } else {
+                                        const start =
+                                          ta.selectionStart ?? ta.value.length
+                                        const end = ta.selectionEnd ?? start
+                                        const next =
+                                          messageText.slice(0, start) +
+                                          emoji +
+                                          messageText.slice(end)
+                                        setMessageText(next)
+                                        requestAnimationFrame(() => {
+                                          ta.focus()
+                                          const pos = start + emoji.length
+                                          ta.setSelectionRange(pos, pos)
+                                        })
+                                      }
+                                      setEmojiPickerOpen(false)
+                                    }}
+                                    className="rounded-md px-2 py-1 text-lg hover:bg-muted/50"
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="mt-2 text-center text-xs text-muted-foreground">
+                                {typeof navigator !== "undefined" &&
+                                /Mac|iPhone|iPad/i.test(navigator.userAgent) ? (
+                                  <span>
+                                    Tip: press{" "}
+                                    <span className="font-semibold">
+                                      Control + Command + Space
+                                    </span>{" "}
+                                    for system emojis
+                                  </span>
+                                ) : (
+                                  <span>Use emoji picker above</span>
+                                )}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <Button
+                          type="button"
+                          onClick={() => void handleSendMessage()}
+                          disabled={sending || !messageText.trim()}
+                          className="h-11 rounded-2xl px-4"
+                        >
+                          {sending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Send className="h-4 w-4" />
+                          )}
+                          <span className="ml-2 hidden sm:inline">Send</span>
+                        </Button>
+                      </div>
+                    </div>
+                  </footer>
+                </>
+              ) : (
+                <div className="flex min-h-0 flex-1 items-center justify-center p-6">
+                  <Card className="max-w-xl border-border/60 bg-card/95 p-8 text-center shadow-sm">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      <MessageSquare className="h-7 w-7" />
+                    </div>
+                    <h2 className="mt-4 text-2xl font-semibold">
+                      Pick a match to chat
+                    </h2>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Select a real match from the left to start messaging.
+                    </p>
+                    <Button asChild className="mt-6">
+                      <Link href="/dashboard/swipe">Find more matches</Link>
+                    </Button>
+                  </Card>
+                </div>
+              )}
+            </Card>
+          ) : null}
+        </div>
+
+        <AlertDialog
+          open={deleteConfirmOpen}
+          onOpenChange={setDeleteConfirmOpen}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this conversation?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This removes the thread from your inbox. The other person can
+                still keep their copy.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={actionBusy === "delete"}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                onClick={() => void runChatAction("delete")}
+                disabled={actionBusy === "delete"}
+              >
+                {actionBusy === "delete" ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <Dialog open={reportDialogOpen} onOpenChange={setReportDialogOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Report conversation</DialogTitle>
+              <DialogDescription>
+                Send this chat to the moderation queue for review.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">Reason</p>
                 <Input
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search conversations"
-                  className="pl-10"
+                  value={reportReason}
+                  onChange={(event) => setReportReason(event.target.value)}
+                  placeholder="Spam, harassment, scam, abuse..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">Details</p>
+                <Textarea
+                  value={reportDescription}
+                  onChange={(event) => setReportDescription(event.target.value)}
+                  placeholder="Add context for the moderation team"
+                  rows={5}
                 />
               </div>
             </div>
 
-            <ScrollArea className="min-h-0 flex-1">
-              <div className="space-y-1 p-2">
-                {filteredMatches.map((match) => {
-                  const other = getOtherParticipant(match, currentUserId)
-                  const active = match._id === activeMatchId
-                  const unread = getMatchUnreadCount(match, currentUserId)
-                  const online = other?._id ? onlineUsers.has(other._id) : false
-
-                  return (
-                    <button
-                      key={match._id}
-                      type="button"
-                      onClick={() => handleSelectMatch(match._id)}
-                      className={cn(
-                        "flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition-colors",
-                        active
-                          ? "border border-primary/20 bg-primary/5"
-                          : "hover:bg-muted/60",
-                      )}
-                    >
-                      <div className="relative shrink-0">
-                        <Avatar className="h-14 w-14 border border-border">
-                          <AvatarImage
-                            src={other?.avatar}
-                            alt={getPersonLabel(other)}
-                          />
-                          <AvatarFallback>{getInitials(other)}</AvatarFallback>
-                        </Avatar>
-                        {online ? (
-                          <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-card bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.15)]" />
-                        ) : null}
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="truncate font-medium text-foreground">
-                            {getPersonLabel(other)}
-                          </span>
-                          <span className="shrink-0 text-xs text-muted-foreground">
-                            {formatLastActivity(
-                              match.lastMessageAt || match.matchedAt,
-                            )}
-                          </span>
-                        </div>
-                        <p className="truncate text-sm text-primary">
-                          {getPersonSubtitle(other)}
-                        </p>
-                        <div className="mt-1 flex items-center justify-between gap-2">
-                          <p className="truncate text-sm text-muted-foreground">
-                            {match.lastMessagePreview ||
-                              "Say hello to start the conversation"}
-                          </p>
-                          {unread > 0 ? (
-                            <Badge className="shrink-0 rounded-full px-2 py-0.5 text-xs">
-                              {unread}
-                            </Badge>
-                          ) : null}
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            </ScrollArea>
-          </Card>
-
-          <Card className="flex min-h-0 flex-col overflow-hidden border-border/60 bg-card/95 shadow-sm">
-            {activeMatch && otherParticipant ? (
-              <>
-                <div className="flex items-center justify-between gap-4 border-b border-border/60 px-4 py-4 sm:px-5">
-                  <div className="flex items-center gap-3">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="lg:hidden"
-                      onClick={() => router.push("/dashboard")}
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </Button>
-                    <Avatar className="h-11 w-11 border border-border">
-                      <AvatarImage
-                        src={otherParticipant.avatar}
-                        alt={getPersonLabel(otherParticipant)}
-                      />
-                      <AvatarFallback>
-                        {getInitials(otherParticipant)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="font-semibold leading-none">
-                          {getPersonLabel(otherParticipant)}
-                        </h2>
-                        {onlineUsers.has(otherParticipant._id) ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">
-                            Online
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {getPersonSubtitle(otherParticipant)}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 sm:gap-2">
-                    <Button variant="ghost" size="icon" asChild>
-                      <Link href={`/${otherParticipant.username || ""}`}>
-                        <Info className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                    <Button variant="ghost" size="icon" type="button">
-                      <Phone className="h-4 w-4" />
-                    </Button>
-                    {currentUserId === activeMatch?.employer._id && (
-                      <ScheduleInterviewModal
-                        matchId={activeMatchId}
-                        employeeName={otherParticipant.name || "Candidate"}
-                        onInterviewScheduled={() => {
-                          if (activeMatchId) {
-                            void fetchConversation(activeMatchId)
-                          }
-                        }}
-                      />
-                    )}
-                  </div>
-                </div>
-
-                <ScrollArea className="min-h-0 flex-1 bg-gradient-to-b from-muted/20 to-background/20">
-                  <div className="space-y-4 p-4 sm:p-5">
-                    {loadingMessages ? (
-                      <div className="space-y-3">
-                        <Skeleton className="h-20 w-3/4 rounded-2xl" />
-                        <Skeleton className="ml-auto h-20 w-2/3 rounded-2xl" />
-                        <Skeleton className="h-20 w-3/4 rounded-2xl" />
-                      </div>
-                    ) : groupedMessages.length > 0 ? (
-                      groupedMessages.map((entry) => {
-                        if (entry.type === "separator") {
-                          return (
-                            <div
-                              key={entry.id}
-                              className="flex justify-center py-1"
-                            >
-                              <span className="rounded-full border border-border bg-background px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground shadow-sm">
-                                {entry.label}
-                              </span>
-                            </div>
-                          )
-                        }
-
-                        const message = entry.message!
-                        const isOwnMessage =
-                          String(message.sender?._id) === currentUserId
-
-                        if (message.type === "system") {
-                          return (
-                            <div key={entry.id} className="flex justify-center">
-                              <div className="rounded-full border border-border bg-muted/70 px-4 py-2 text-sm text-muted-foreground">
-                                {message.content || "Match update"}
-                              </div>
-                            </div>
-                          )
-                        }
-
-                        if (
-                          message.type === "interview" &&
-                          message.interviewId
-                        ) {
-                          return (
-                            <div
-                              key={entry.id}
-                              className="flex max-w-full justify-center mb-4"
-                            >
-                              <div className="w-full max-w-2xl">
-                                <InterviewMessageComponent
-                                  interview={{
-                                    _id: message.interviewId,
-                                    title: message.content || "Interview",
-                                    description: "",
-                                    scheduledFor: new Date().toISOString(),
-                                    timezone: "UTC",
-                                    duration: 60,
-                                    status: "scheduled",
-                                    interviewLink: "",
-                                    createdBy: message.sender._id,
-                                    employer: {
-                                      _id: activeMatch?.employer._id || "",
-                                      name: activeMatch?.employer.name || "",
-                                      companyName:
-                                        activeMatch?.employer.username,
-                                    },
-                                    employee: {
-                                      _id: activeMatch?.employee._id || "",
-                                      name: activeMatch?.employee.name || "",
-                                      headline: activeMatch?.employee.username,
-                                    },
-                                  }}
-                                  currentUserId={currentUserId || ""}
-                                />
-                              </div>
-                            </div>
-                          )
-                        }
-
-                        return (
-                          <div
-                            key={entry.id}
-                            className={cn(
-                              "flex max-w-[82%] items-end gap-2",
-                              isOwnMessage ? "ml-auto flex-row-reverse" : "",
-                            )}
-                          >
-                            <Avatar className="h-8 w-8 shrink-0 border border-border">
-                              <AvatarImage
-                                src={message.sender?.avatar}
-                                alt={getPersonLabel(message.sender)}
-                              />
-                              <AvatarFallback>
-                                {getInitials(message.sender)}
-                              </AvatarFallback>
-                            </Avatar>
-
-                            <div
-                              className={cn(
-                                "space-y-1",
-                                isOwnMessage ? "items-end text-right" : "",
-                              )}
-                            >
-                              <div
-                                className={cn(
-                                  "rounded-2xl px-4 py-3 shadow-sm",
-                                  isOwnMessage
-                                    ? "rounded-br-sm bg-primary text-primary-foreground"
-                                    : "rounded-bl-sm border border-border bg-card text-foreground",
-                                )}
-                              >
-                                <p className="whitespace-pre-wrap text-sm leading-6">
-                                  {message.content}
-                                </p>
-                              </div>
-                              <div
-                                className={cn(
-                                  "flex items-center gap-1 px-1 text-[10px] text-muted-foreground",
-                                  isOwnMessage ? "justify-end" : "",
-                                )}
-                              >
-                                <span>
-                                  {formatMessageTime(message.createdAt)}
-                                </span>
-                                {isOwnMessage ? (
-                                  <CheckCheck className="h-3.5 w-3.5 text-primary" />
-                                ) : null}
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })
-                    ) : (
-                      <div className="flex h-full min-h-[360px] items-center justify-center">
-                        <div className="max-w-md rounded-3xl border border-dashed border-border bg-muted/20 p-8 text-center">
-                          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                            <Sparkles className="h-7 w-7" />
-                          </div>
-                          <h3 className="mt-4 text-xl font-semibold">
-                            Start the conversation
-                          </h3>
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            Send a real message to open this match thread.
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                    <div ref={bottomRef} />
-                  </div>
-                </ScrollArea>
-
-                <footer className="border-t border-border/60 bg-background/95 p-3 sm:p-4">
-                  <div className="mx-auto flex max-w-4xl items-end gap-2 rounded-3xl border border-border bg-muted/30 p-2 shadow-sm">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      type="button"
-                      className="shrink-0"
-                    >
-                      <Paperclip className="h-4 w-4" />
-                    </Button>
-
-                    <Textarea
-                      value={messageText}
-                      onChange={(event) => setMessageText(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" && !event.shiftKey) {
-                          event.preventDefault()
-                          void handleSendMessage()
-                        }
-                      }}
-                      placeholder="Type a message..."
-                      rows={1}
-                      className="min-h-[48px] flex-1 resize-none border-0 bg-transparent py-3 shadow-none focus-visible:ring-0"
-                    />
-
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        type="button"
-                        className="shrink-0"
-                      >
-                        <Smile className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={() => void handleSendMessage()}
-                        disabled={sending || !messageText.trim()}
-                        className="h-11 rounded-2xl px-4"
-                      >
-                        {sending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Send className="h-4 w-4" />
-                        )}
-                        <span className="ml-2 hidden sm:inline">Send</span>
-                      </Button>
-                    </div>
-                  </div>
-                </footer>
-              </>
-            ) : (
-              <div className="flex min-h-0 flex-1 items-center justify-center p-6">
-                <Card className="max-w-xl border-border/60 bg-card/95 p-8 text-center shadow-sm">
-                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <MessageSquare className="h-7 w-7" />
-                  </div>
-                  <h2 className="mt-4 text-2xl font-semibold">
-                    Pick a match to chat
-                  </h2>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Select a real match from the left to start messaging.
-                  </p>
-                  <Button asChild className="mt-6">
-                    <Link href="/dashboard/swipe">Find more matches</Link>
-                  </Button>
-                </Card>
-              </div>
-            )}
-          </Card>
-        </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => setReportDialogOpen(false)}
+                disabled={actionBusy === "report"}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() =>
+                  void runChatAction("report", {
+                    reason: reportReason,
+                    description: reportDescription,
+                  })
+                }
+                disabled={!reportReason.trim() || actionBusy === "report"}
+              >
+                {actionBusy === "report" ? "Submitting..." : "Submit report"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

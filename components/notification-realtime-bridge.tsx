@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from "react"
 import { useSession } from "next-auth/react"
-import { io, type Socket } from "socket.io-client"
+import type { Socket } from "socket.io-client"
+import { getSocketClient } from "@/lib/socket-client"
 
 export default function NotificationRealtimeBridge() {
   const { status } = useSession()
@@ -10,37 +11,42 @@ export default function NotificationRealtimeBridge() {
 
   useEffect(() => {
     let cancelled = false
+    let cleanup: (() => void) | null = null
 
     const bootstrap = async () => {
       if (status !== "authenticated") return
 
       try {
-        await fetch("/api/socket", { cache: "no-store" })
-        if (cancelled || socketRef.current) return
-
-        const socket = io({
-          path: "/socket.io",
-          transports: ["websocket", "polling"],
-          withCredentials: true,
-        })
+        const socket = await getSocketClient()
+        if (cancelled) return
 
         socketRef.current = socket
 
-        socket.on("notification:new", () => {
+        const handleNotification = () => {
           try {
             window.dispatchEvent(new Event("swrk:notifications-updated"))
           } catch {
             // ignore
           }
-        })
+        }
 
-        socket.on("disconnect", () => {
+        const handleDisconnect = () => {
           try {
             window.dispatchEvent(new Event("swrk:notifications-updated"))
           } catch {
             // ignore
           }
-        })
+        }
+
+        socket.off("notification:new", handleNotification)
+        socket.off("disconnect", handleDisconnect)
+        socket.on("notification:new", handleNotification)
+        socket.on("disconnect", handleDisconnect)
+
+        cleanup = () => {
+          socket.off("notification:new", handleNotification)
+          socket.off("disconnect", handleDisconnect)
+        }
       } catch (error) {
         console.error("notification bridge bootstrap failed", error)
       }
@@ -50,7 +56,7 @@ export default function NotificationRealtimeBridge() {
 
     return () => {
       cancelled = true
-      socketRef.current?.disconnect()
+      cleanup?.()
       socketRef.current = null
     }
   }, [status])

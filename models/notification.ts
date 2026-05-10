@@ -5,6 +5,11 @@ const NotificationSchema = new mongoose.Schema(
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     actor: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     type: { type: String, required: true },
+    status: {
+      type: String,
+      enum: ["pending", "reviewed", "dismissed"],
+      default: "pending",
+    },
     title: { type: String },
     message: { type: String },
     link: { type: String },

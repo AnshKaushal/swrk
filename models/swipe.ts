@@ -93,10 +93,17 @@ const MatchSchema = new mongoose.Schema(
     outcomeReportedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     outcomeReportedAt: Date,
 
+    // Per-user chat visibility
+    hiddenBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+
     // Last message preview (for match list UI)
     lastMessageAt: Date,
     lastMessagePreview: String,
     lastMessageBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+
+    // Typing state for socket fallback / polling updates
+    typingUsers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    typingUpdatedAt: Date,
 
     // Unread counts per side
     unreadByEmployer: { type: Number, default: 0 },

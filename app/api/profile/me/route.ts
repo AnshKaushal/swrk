@@ -8,6 +8,7 @@ import Resume from "@/models/resume"
 import Interview from "@/models/interview"
 import PositionMatch from "@/models/position-match"
 import Position from "@/models/position"
+import { getCredibilityStats } from "@/lib/interview-feedback"
 
 const normalizeRole = (value?: string | null) => {
   if (value === "job-seeker") return "employee"
@@ -64,6 +65,10 @@ export async function GET() {
       activeRole === "employer" ? employerProfile : employeeProfile
 
     let metricsData: Record<string, any> = {}
+    const credibilityStats = await getCredibilityStats(
+      user._id.toString(),
+      activeRole,
+    )
 
     if (activeRole === "employee") {
       const resumeCount = resumes.length
@@ -130,6 +135,7 @@ export async function GET() {
       employerProfile: employerProfile?.toObject() || null,
       resumes: resumes.map((resume) => resume.toObject()),
       profile: profile?.toObject() || null,
+      credibilityStats,
       ...metricsData,
     })
   } catch (err) {

@@ -1397,7 +1397,7 @@ export default function ProfileSettingsPage() {
 
             <div className="space-y-2">
               <Label>Active Role</Label>
-              {formData.role === "both" ? (
+              {false && formData.role === "both" ? (
                 <Select
                   value={formData.activeRole}
                   onValueChange={(value) =>

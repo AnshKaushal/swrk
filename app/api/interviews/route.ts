@@ -65,6 +65,7 @@ export async function POST(req: NextRequest) {
       senderRole: "employer",
       type: "interview",
       interviewId: interview._id,
+      interviewMessageType: "scheduled",
       content: `Interview scheduled: ${title}`,
     })
 
@@ -127,7 +128,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const status = searchParams.get("status")
-    const role = searchParams.get("role")
+    const matchId = searchParams.get("matchId")
 
     let query: any = {
       $or: [{ employer: session.user.id }, { employee: session.user.id }],
@@ -135,6 +136,10 @@ export async function GET(req: NextRequest) {
 
     if (status) {
       query.status = status
+    }
+
+    if (matchId) {
+      query.match = matchId
     }
 
     const interviews = await Interview.find(query)

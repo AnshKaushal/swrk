@@ -76,6 +76,14 @@ export default function JobsPage() {
   const [openDialog, setOpenDialog] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [quota, setQuota] = useState<{
+    allowed: boolean
+    used: number
+    remaining: number | null
+    limit: number | null
+    isUnlimited: boolean
+    planName: string
+  } | null>(null)
 
   const [formData, setFormData] = useState({
     title: "",
@@ -155,8 +163,21 @@ export default function JobsPage() {
   useEffect(() => {
     if (session?.user?.id && canAccessJobs) {
       loadPositions()
+      loadQuota()
     }
   }, [canAccessJobs, session?.user?.id])
+
+  async function loadQuota() {
+    try {
+      const res = await fetch("/api/positions/quota", { cache: "no-store" })
+      if (res.ok) {
+        const data = await res.json()
+        setQuota(data.quota)
+      }
+    } catch (error) {
+      console.error("Failed to load quota:", error)
+    }
+  }
 
   async function loadPositions() {
     setLoading(true)
@@ -217,8 +238,23 @@ export default function JobsPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         })
-        if (!res.ok) throw new Error("Failed to create position")
+
+        if (!res.ok) {
+          if (res.status === 429) {
+            const error = await res.json()
+            toast.error(
+              `Job posting limit reached. You've used ${error.used}/${error.limit} posts on your ${error.plan} plan.`,
+            )
+            setOpenDialog(false)
+            router.push("/subscription")
+            return
+          }
+          const error = await res.json()
+          throw new Error(error.error || "Failed to create position")
+        }
+
         toast.success("Position created")
+        await loadQuota()
       }
 
       resetForm()
@@ -335,6 +371,25 @@ export default function JobsPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Manage your job postings and view interested candidates
           </p>
+          {quota && (
+            <div className="mt-3 flex items-center gap-2">
+              {quota.isUnlimited ? (
+                <Badge variant="secondary">Unlimited job posts</Badge>
+              ) : (
+                <>
+                  <Badge variant={quota.allowed ? "default" : "destructive"}>
+                    {quota.remaining}/{quota.limit} posts available
+                  </Badge>
+                  {!quota.allowed && (
+                    <Badge variant="outline">Upgrade to post more</Badge>
+                  )}
+                </>
+              )}
+              <span className="text-xs text-muted-foreground">
+                ({quota.planName})
+              </span>
+            </div>
+          )}
         </div>
         <Dialog open={openDialog} onOpenChange={setOpenDialog}>
           <DialogTrigger asChild>
@@ -343,6 +398,7 @@ export default function JobsPage() {
                 resetForm()
                 setOpenDialog(true)
               }}
+              disabled={!!(quota && !quota.allowed)}
             >
               <Plus className="mr-2 h-4 w-4" />
               New Position

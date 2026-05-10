@@ -503,7 +503,7 @@ export default function RoleFiltersPage() {
 
   return (
     <div className="divide-y divide-border">
-      {formData.role === "both" && (
+      {false && formData.role === "both" && (
         <div className="px-4 py-6 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
             <Label className="text-base">Active Role</Label>

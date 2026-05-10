@@ -48,6 +48,7 @@ const SubscriptionPlanSchema = new mongoose.Schema(
       premiumSupport: { type: Boolean, default: false },
       hideAds: { type: Boolean, default: false },
       earlyAccess: { type: Boolean, default: false },
+      jobPostsLimit: { type: Number, default: 0 }, // 0 = unlimited
     },
     isActive: {
       type: Boolean,

@@ -1,18 +1,32 @@
 "use client"
+"use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react"
+import { format } from "date-fns"
 import {
-  Calendar,
-  Clock,
   Video,
   CheckCircle2,
   XCircle,
   MapPin,
+  Calendar,
+  Clock,
 } from "lucide-react"
-import { format } from "date-fns"
 import { toast } from "sonner"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
 
 interface InterviewMessage {
@@ -22,33 +36,52 @@ interface InterviewMessage {
   scheduledFor: string
   timezone: string
   duration: number
-  status: "scheduled" | "confirmed" | "denied" | "completed"
+  status: "scheduled" | "confirmed" | "denied" | "completed" | "cancelled"
   interviewLink: string
   createdBy: string
   employer: { _id: string; name: string; companyName?: string }
   employee: { _id: string; name: string; headline?: string }
+  deniedReason?: string
+  confirmedAt?: string
+  deniedAt?: string
 }
 
 interface InterviewMessageComponentProps {
   interview: InterviewMessage
   currentUserId: string
+  messageSenderId?: string
+  messageSender?: { name?: string; avatar?: string }
+  messageCreatedAt?: string
+  messageKind?: "scheduled" | "response"
   onStatusChange?: (interviewId: string, status: string) => void
 }
 
 export function InterviewMessageComponent({
   interview,
   currentUserId,
+  messageSenderId,
+  messageSender,
+  messageCreatedAt,
+  messageKind = "scheduled",
   onStatusChange,
 }: InterviewMessageComponentProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [localStatus, setLocalStatus] = useState<InterviewMessage["status"]>(
+    interview.status,
+  )
+  const [openDeny, setOpenDeny] = useState(false)
+  const [denyReason, setDenyReason] = useState("")
+
+  useEffect(() => {
+    setLocalStatus(interview.status)
+  }, [interview.status])
 
   const isEmployee = currentUserId === interview.employee._id
-  const isScheduled = interview.status === "scheduled"
-  const canRespond = isEmployee && isScheduled
+  const canRespond =
+    isEmployee && localStatus === "scheduled" && messageKind === "scheduled"
 
   const handleConfirm = async () => {
     setIsLoading(true)
-
     try {
       const res = await fetch(`/api/interviews/${interview._id}`, {
         method: "PUT",
@@ -59,6 +92,7 @@ export function InterviewMessageComponent({
       if (!res.ok) throw new Error("Failed to confirm")
 
       toast.success("Interview confirmed!")
+      setLocalStatus("confirmed")
       onStatusChange?.(interview._id, "confirmed")
     } catch (error) {
       console.error("Error confirming interview:", error)
@@ -68,23 +102,21 @@ export function InterviewMessageComponent({
     }
   }
 
-  const handleDeny = async () => {
-    const reason = prompt("Enter reason for declining (optional):")
-    if (reason === null) return
-
+  const submitDeny = async () => {
     setIsLoading(true)
-
     try {
       const res = await fetch(`/api/interviews/${interview._id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "denied", reason }),
+        body: JSON.stringify({ status: "denied", reason: denyReason }),
       })
 
       if (!res.ok) throw new Error("Failed to deny")
 
       toast.success("Interview declined")
+      setLocalStatus("denied")
       onStatusChange?.(interview._id, "denied")
+      setOpenDeny(false)
     } catch (error) {
       console.error("Error denying interview:", error)
       toast.error("Failed to decline interview")
@@ -117,12 +149,10 @@ END:VCALENDAR`
 
     const blob = new Blob([icsContent], { type: "text/calendar" })
     const url = URL.createObjectURL(blob)
-
     const link = document.createElement("a")
     link.href = url
     link.download = `interview-${interview._id}.ics`
     link.click()
-
     URL.revokeObjectURL(url)
 
     toast.success("Calendar file downloaded")
@@ -133,13 +163,25 @@ END:VCALENDAR`
   }
 
   const scheduledDate = new Date(interview.scheduledFor)
+  const messageDate = new Date(
+    messageCreatedAt ||
+      interview.confirmedAt ||
+      interview.deniedAt ||
+      interview.scheduledFor,
+  )
+  const isFromCurrentUser = messageSenderId
+    ? messageSenderId === currentUserId
+    : currentUserId === interview.employee._id
+  const responderName = isFromCurrentUser
+    ? "You"
+    : messageSender?.name ||
+      (messageSenderId === interview.employee._id
+        ? interview.employee.name
+        : interview.employer.companyName || interview.employer.name)
 
   const statusStyles: Record<
     InterviewMessage["status"],
-    {
-      card: string
-      badge: string
-    }
+    { card: string; badge: string }
   > = {
     scheduled: {
       card: "border-border bg-card",
@@ -159,128 +201,250 @@ END:VCALENDAR`
       card: "border-border bg-muted/40",
       badge: "bg-muted text-muted-foreground border border-border",
     },
+    cancelled: {
+      card: "border-border bg-muted/40",
+      badge: "bg-muted text-muted-foreground border border-border",
+    },
   }
 
-  const currentStatus = statusStyles[interview.status]
+  const currentStatus = statusStyles[localStatus]
+
+  if (messageKind === "scheduled" && localStatus === "scheduled") {
+    return (
+      <Card className={cn("border-2 transition-colors", currentStatus.card)}>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <CardTitle className="text-lg">{interview.title}</CardTitle>
+              {interview.description && (
+                <p className="text-sm text-muted-foreground">
+                  {interview.description}
+                </p>
+              )}
+            </div>
+
+            <span
+              className={cn(
+                "rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap",
+                currentStatus.badge,
+              )}
+            >
+              Pending Response
+            </span>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-5">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Calendar className="h-4 w-4" />
+                <span className="text-sm text-foreground">
+                  {format(scheduledDate, "EEEE, MMMM d, yyyy")}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                <span className="text-sm text-foreground">
+                  {format(scheduledDate, "h:mm a")} ({interview.timezone}) •{" "}
+                  {interview.duration} min
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <MapPin className="h-4 w-4" />
+                <span className="text-sm font-medium text-foreground">
+                  With{" "}
+                  {currentUserId === interview.employee._id
+                    ? interview.employer.companyName || interview.employer.name
+                    : interview.employee.name}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {canRespond && (
+              <>
+                <Button
+                  onClick={handleConfirm}
+                  disabled={isLoading}
+                  className="gap-2"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Confirm Interview
+                </Button>
+
+                <AlertDialog open={openDeny} onOpenChange={setOpenDeny}>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      disabled={isLoading}
+                      variant="outline"
+                      className="gap-2"
+                    >
+                      <XCircle className="h-4 w-4" />
+                      Decline
+                    </Button>
+                  </AlertDialogTrigger>
+
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Decline Interview</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Provide an optional reason for declining this interview.
+                        This will be sent to the other party.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+
+                    <div className="mt-2">
+                      <Textarea
+                        value={denyReason}
+                        onChange={(e) => setDenyReason(e.target.value)}
+                        placeholder="Optional reason"
+                        rows={4}
+                      />
+                    </div>
+
+                    <AlertDialogFooter>
+                      <AlertDialogCancel onClick={() => setOpenDeny(false)}>
+                        Cancel
+                      </AlertDialogCancel>
+                      <AlertDialogAction onClick={submitDeny}>
+                        Decline Interview
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            )}
+
+            <Button
+              onClick={handleOpenMeet}
+              variant="default"
+              className="gap-2"
+            >
+              <Video className="h-4 w-4" />
+              Join Google Meet
+            </Button>
+
+            <Button
+              onClick={handleAddToCalendar}
+              variant="outline"
+              className="gap-2"
+            >
+              <Calendar className="h-4 w-4" />
+              Add to Calendar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
-    <Card className={cn("border-2 transition-colors", currentStatus.card)}>
-      <CardHeader>
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <CardTitle className="text-lg">{interview.title}</CardTitle>
+    <div
+      className={cn(
+        "flex max-w-[82%] items-end gap-2",
+        isFromCurrentUser ? "ml-auto flex-row-reverse" : "",
+      )}
+    >
+      <Avatar className="h-8 w-8 shrink-0 border border-border">
+        <AvatarImage src={messageSender?.avatar} alt={responderName} />
+        <AvatarFallback>
+          {responderName
+            .split(" ")
+            .slice(0, 2)
+            .map((part) => part.charAt(0).toUpperCase())
+            .join("")}
+        </AvatarFallback>
+      </Avatar>
 
-            {interview.description && (
-              <p className="text-sm text-muted-foreground">
-                {interview.description}
+      <div
+        className={cn(
+          "space-y-1",
+          isFromCurrentUser ? "items-end text-right" : "",
+        )}
+      >
+        <div
+          className={cn(
+            "rounded-2xl px-4 py-3 shadow-sm",
+            currentStatus.card,
+            isFromCurrentUser ? "rounded-br-sm" : "rounded-bl-sm",
+          )}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">{responderName}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {localStatus === "confirmed"
+                  ? "Confirmed the interview"
+                  : localStatus === "denied"
+                    ? "Declined the interview"
+                    : localStatus === "cancelled"
+                      ? "Cancelled the interview"
+                      : "Completed the interview"}
+              </p>
+            </div>
+
+            <span
+              className={cn(
+                "rounded-full px-2 py-1 text-[10px] font-medium whitespace-nowrap",
+                currentStatus.badge,
+              )}
+            >
+              {localStatus === "confirmed"
+                ? "Confirmed"
+                : localStatus === "denied"
+                  ? "Declined"
+                  : localStatus === "cancelled"
+                    ? "Cancelled"
+                    : "Completed"}
+            </span>
+          </div>
+
+          {localStatus === "denied" &&
+            (denyReason || interview.deniedReason) && (
+              <p className="mt-3 rounded-lg bg-black/5 px-3 py-2 text-sm text-foreground dark:bg-white/5">
+                {denyReason || interview.deniedReason}
               </p>
             )}
-          </div>
 
-          <span
-            className={cn(
-              "rounded-full px-3 py-1 text-xs font-medium whitespace-nowrap",
-              currentStatus.badge,
-            )}
-          >
-            {interview.status === "scheduled"
-              ? "Pending Response"
-              : interview.status.charAt(0).toUpperCase() +
-                interview.status.slice(1)}
-          </span>
-        </div>
-      </CardHeader>
-
-      <CardContent className="space-y-5">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Calendar className="h-4 w-4" />
-
-              <span className="text-sm text-foreground">
-                {format(scheduledDate, "EEEE, MMMM d, yyyy")}
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="h-4 w-4" />
-
-              <span className="text-sm text-foreground">
-                {format(scheduledDate, "h:mm a")} ({interview.timezone}) •{" "}
-                {interview.duration} min
-              </span>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <MapPin className="h-4 w-4" />
-
-              <span className="text-sm font-medium text-foreground">
-                With{" "}
-                {currentUserId === interview.employee._id
-                  ? interview.employer.companyName || interview.employer.name
-                  : interview.employee.name}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {canRespond && (
-            <>
-              <Button
-                onClick={handleConfirm}
-                disabled={isLoading}
-                className="gap-2"
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                Confirm Interview
-              </Button>
-
-              <Button
-                onClick={handleDeny}
-                disabled={isLoading}
-                variant="outline"
-                className="gap-2"
-              >
-                <XCircle className="h-4 w-4" />
-                Decline
-              </Button>
-            </>
-          )}
-
-          {(interview.status === "confirmed" ||
-            interview.status === "scheduled") && (
-            <>
+          {(localStatus === "confirmed" || localStatus === "scheduled") && (
+            <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 onClick={handleOpenMeet}
+                size="sm"
                 variant="default"
                 className="gap-2"
               >
                 <Video className="h-4 w-4" />
-                Join Google Meet
+                Join Meet
               </Button>
-
               <Button
                 onClick={handleAddToCalendar}
                 variant="outline"
+                size="sm"
                 className="gap-2"
               >
                 <Calendar className="h-4 w-4" />
                 Add to Calendar
               </Button>
-            </>
+            </div>
           )}
-        </div>
 
-        {interview.status === "denied" && (
-          <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">
-            This interview has been declined
+          <div
+            className={cn(
+              "mt-2 flex items-center gap-1 px-1 text-[10px] text-muted-foreground",
+              isFromCurrentUser ? "justify-end" : "",
+            )}
+          >
+            <span>{format(messageDate, "h:mm a")}</span>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </div>
+      </div>
+    </div>
   )
 }
 

@@ -783,11 +783,6 @@ export default function OnboardingPage() {
                       label: "Hiring",
                       desc: "Post openings and find top talent",
                     },
-                    {
-                      id: "both",
-                      label: "Both",
-                      desc: "Open to work and hiring",
-                    },
                   ].map((r) => (
                     <div key={r.id}>
                       <RadioGroupItem

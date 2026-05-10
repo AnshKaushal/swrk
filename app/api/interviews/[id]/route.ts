@@ -1,9 +1,15 @@
 import { auth } from "../../auth/[...nextauth]/route"
 import Interview from "@/models/interview"
+import Message from "@/models/message"
+import { Match } from "@/models/swipe"
 import Notification from "@/models/notification"
 import { db } from "@/lib/mongodb"
 import { NextRequest, NextResponse } from "next/server"
 import { emitToUser, getSocketServer } from "@/lib/socket-server"
+
+function buildMessagePreview(content: string) {
+  return content.trim().replace(/\s+/g, " ").slice(0, 120)
+}
 
 export async function PUT(
   req: NextRequest,
@@ -51,10 +57,52 @@ export async function PUT(
 
     await interview.save()
 
-    const recipientId =
-      interview.employer.toString() === session.user.id
-        ? interview.employee.toString()
-        : interview.employer.toString()
+    const senderIsEmployer = interview.employer.toString() === session.user.id
+    const senderRole = senderIsEmployer ? "employer" : "employee"
+    const recipientId = senderIsEmployer
+      ? interview.employee.toString()
+      : interview.employer.toString()
+    const responseContent =
+      status === "confirmed"
+        ? "confirmed the interview"
+        : reason
+          ? `declined the interview: ${reason}`
+          : "declined the interview"
+
+    const responseMessage = await Message.create({
+      match: interview.match,
+      sender: session.user.id,
+      senderRole,
+      type: "interview",
+      interviewId: interview._id,
+      interviewMessageType: "response",
+      content: responseContent,
+    })
+
+    await Match.updateOne(
+      { _id: interview.match },
+      senderIsEmployer
+        ? {
+            $set: {
+              lastMessageAt: responseMessage.createdAt,
+              lastMessagePreview: buildMessagePreview(responseContent),
+              lastMessageBy: session.user.id,
+            },
+            $inc: { unreadByEmployee: 1 },
+          }
+        : {
+            $set: {
+              lastMessageAt: responseMessage.createdAt,
+              lastMessagePreview: buildMessagePreview(responseContent),
+              lastMessageBy: session.user.id,
+            },
+            $inc: { unreadByEmployer: 1 },
+          },
+    )
+
+    const populatedResponseMessage = await Message.findById(responseMessage._id)
+      .populate("sender", "name avatar username role activeRole")
+      .lean()
 
     const notificationTitle =
       status === "confirmed" ? "Interview confirmed" : "Interview declined"
@@ -74,6 +122,30 @@ export async function PUT(
     })
 
     if (getSocketServer()) {
+      emitToUser(recipientId, "message:new", {
+        matchId: String(interview.match),
+        message: {
+          ...populatedResponseMessage,
+          interview: interview.toObject(),
+        },
+      })
+
+      emitToUser(recipientId, "conversation:update", {
+        matchId: String(interview.match),
+      })
+
+      emitToUser(session.user.id, "conversation:update", {
+        matchId: String(interview.match),
+      })
+
+      emitToUser(session.user.id, "message:new", {
+        matchId: String(interview.match),
+        message: {
+          ...populatedResponseMessage,
+          interview: interview.toObject(),
+        },
+      })
+
       emitToUser(recipientId, "notification:new", {
         type: `interview_${status}`,
         title: notificationTitle,
@@ -83,11 +155,15 @@ export async function PUT(
       })
       emitToUser(recipientId, "interview:update", {
         interviewId: interview._id,
+        matchId: String(interview.match),
         status,
       })
     }
 
-    return NextResponse.json({ interview: interview.toObject() })
+    return NextResponse.json({
+      interview: interview.toObject(),
+      message: populatedResponseMessage,
+    })
   } catch (error) {
     console.error("Interview update error:", error)
     return NextResponse.json(

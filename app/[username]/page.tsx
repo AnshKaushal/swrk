@@ -141,6 +141,18 @@ interface EmployerProfile {
   }
 }
 
+interface CredibilityStats {
+  feedbackCount: number
+  overallScore: number
+  responsivenessScore: number
+  communicationScore: number
+  professionalismScore: number
+  punctualityScore: number
+  recommendationRate: number
+  completedInterviews: number
+  hiredCount: number
+}
+
 interface SubscriptionData {
   _id: string
   status: string
@@ -181,6 +193,8 @@ export default function ProfilePage() {
   const [subscription, setSubscription] = useState<SubscriptionData | null>(
     null,
   )
+  const [credibilityStats, setCredibilityStats] =
+    useState<CredibilityStats | null>(null)
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -193,6 +207,7 @@ export default function ProfilePage() {
         setEmployeeProfile(data.employeeProfile || null)
         setEmployerProfileData(data.employerProfile || null)
         setProfile(data.profile || data.employeeProfile || data.employerProfile)
+        setCredibilityStats(data.credibilityStats || null)
 
         const visibility = data.user?.privacy?.profileVisibility || "public"
         const ownsProfile = session?.user?.username === username
@@ -942,6 +957,71 @@ export default function ProfilePage() {
           </div>
 
           <div className="space-y-8 lg:col-span-1">
+            <Card className="shadow-md">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Award className="h-5 w-5" />
+                  Interview Credibility
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {credibilityStats?.feedbackCount ? (
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground">
+                          Overall score
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {credibilityStats.overallScore}/5
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground">
+                          Responsiveness
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {credibilityStats.responsivenessScore}/5
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground">
+                          Professionalism
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {credibilityStats.professionalismScore}/5
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground">
+                          Feedbacks
+                        </p>
+                        <p className="text-2xl font-bold">
+                          {credibilityStats.feedbackCount}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="secondary">
+                        Recommendation: {credibilityStats.recommendationRate}%
+                      </Badge>
+                      <Badge variant="outline">
+                        Interviews: {credibilityStats.completedInterviews}
+                      </Badge>
+                      <Badge variant="outline">
+                        Hires: {credibilityStats.hiredCount}
+                      </Badge>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    No interview feedback yet. Credibility stats will appear
+                    after interviews are reviewed.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
             {!isEmployerProfile && empProfile?.education?.length ? (
               <Card className="shadow-md">
                 <CardHeader className="pb-3">

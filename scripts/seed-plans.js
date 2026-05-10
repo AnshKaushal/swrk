@@ -57,6 +57,7 @@ const planMeta = {
       "Advanced filtering options",
       "Profile boost (2 per month)",
       "Basic analytics dashboard",
+      "10 job posts per month",
     ],
     benefits: {
       priorityMatching: true,
@@ -67,6 +68,7 @@ const planMeta = {
       premiumSupport: false,
       hideAds: false,
       earlyAccess: false,
+      jobPostsLimit: 10,
     },
   },
   pro: {
@@ -77,6 +79,7 @@ const planMeta = {
       "Early access to new features",
       "Profile boost (5 per month)",
       "Advanced analytics and insights",
+      "Unlimited job posts",
     ],
     benefits: {
       priorityMatching: true,
@@ -87,6 +90,7 @@ const planMeta = {
       premiumSupport: true,
       hideAds: true,
       earlyAccess: true,
+      jobPostsLimit: 0,
     },
   },
   enterprise: {
@@ -97,6 +101,7 @@ const planMeta = {
       "Dedicated account manager",
       "Advanced reporting",
       "Priority phone support",
+      "Unlimited job posts",
     ],
     benefits: {
       priorityMatching: true,
@@ -107,6 +112,7 @@ const planMeta = {
       premiumSupport: true,
       hideAds: true,
       earlyAccess: true,
+      jobPostsLimit: 0,
     },
   },
 }

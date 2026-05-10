@@ -213,35 +213,6 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         ) : null}
-        {session.user.role === "both" && !session.user.isAdmin ? (
-          <Card className="border-border/60 bg-card shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Current Mode</CardTitle>
-              <CardDescription>
-                Switch between Open to work and Hiring dashboard views.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant={activeRole === "employee" ? "default" : "outline"}
-                disabled={switchingRole || roleLoading}
-                onClick={() => handleSwitchRole("employee")}
-              >
-                Open to work
-              </Button>
-              <Button
-                type="button"
-                variant={activeRole === "employer" ? "default" : "outline"}
-                disabled={switchingRole || roleLoading}
-                onClick={() => handleSwitchRole("employer")}
-              >
-                Hiring
-              </Button>
-            </CardContent>
-          </Card>
-        ) : null}
-
         {roleLoading ? (
           <Card className="border-border/60 bg-card shadow-sm">
             <CardContent className="p-6 text-sm text-muted-foreground">

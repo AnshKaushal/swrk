@@ -21,14 +21,15 @@ export async function GET(req: NextRequest) {
     const query: Record<string, unknown> = {
       $or: [{ employer: session.user.id }, { employee: session.user.id }],
       status,
+      hiddenBy: { $ne: session.user.id },
     }
 
     const matches = await Match.find(query)
       .sort({ lastMessageAt: -1, matchedAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("employer", "name avatar email username")
-      .populate("employee", "name avatar email username")
+      .populate("employer", "name avatar email username isOnline lastSeen")
+      .populate("employee", "name avatar email username isOnline lastSeen")
       .lean()
 
     const mutualMatches = [] as typeof matches

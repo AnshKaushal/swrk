@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { format, isPast } from "date-fns"
 import { toast } from "sonner"
+import { InterviewFeedbackDialog } from "@/components/interview-feedback-dialog"
 
 interface Interview {
   _id: string
@@ -63,6 +64,18 @@ export default function InterviewsDashboard() {
     }
 
     fetchInterviews()
+
+    const handleUpdate = () => {
+      fetchInterviews()
+    }
+
+    window.addEventListener("swrk:interviews-updated", handleUpdate)
+    window.addEventListener("focus", handleUpdate)
+
+    return () => {
+      window.removeEventListener("swrk:interviews-updated", handleUpdate)
+      window.removeEventListener("focus", handleUpdate)
+    }
   }, [session])
 
   const getFilteredInterviews = () => {
@@ -370,6 +383,13 @@ END:VCALENDAR`
                               <Calendar className="w-4 h-4" />
                               Add to Calendar
                             </Button>
+                            {(interview.status === "completed" ||
+                              isPastInterview) && (
+                              <InterviewFeedbackDialog
+                                interview={interview}
+                                currentUserId={session?.user?.id || ""}
+                              />
+                            )}
                           </>
                         )}
                       </div>

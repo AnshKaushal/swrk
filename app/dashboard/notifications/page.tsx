@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useEffect, useState } from "react"
+import { useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { formatDistanceToNow } from "date-fns"
@@ -47,6 +48,73 @@ export default function NotificationsPage() {
       window.removeEventListener("swrk:notifications-updated", refresh)
   }, [])
 
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const autoMarked = useRef<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("IntersectionObserver" in window))
+      return
+
+    // cleanup previous observer
+    observerRef.current?.disconnect()
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return
+          const id = entry.target.getAttribute("data-id")
+          if (!id) return
+          const notif = notifications.find((n) => n._id === id)
+          if (!notif || notif.read) return
+          if (autoMarked.current.has(id)) return
+
+          // Optimistically mark as read in UI and remember we've marked it
+          autoMarked.current.add(id)
+          setNotifications((prev) =>
+            prev.map((n) => (n._id === id ? { ...n, read: true } : n)),
+          )
+
+          // Persist without toasts
+          void (async () => {
+            try {
+              const res = await fetch(`/api/notifications/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ read: true }),
+              })
+              if (!res.ok) {
+                console.error(
+                  "Failed to auto-mark notification read",
+                  await res.text(),
+                )
+                // revert optimistic update on failure
+                setNotifications((prev) =>
+                  prev.map((n) => (n._id === id ? { ...n, read: false } : n)),
+                )
+                autoMarked.current.delete(id)
+              }
+            } catch (err) {
+              console.error(err)
+              setNotifications((prev) =>
+                prev.map((n) => (n._id === id ? { ...n, read: false } : n)),
+              )
+              autoMarked.current.delete(id)
+            }
+          })()
+        })
+      },
+      { threshold: 0.6 },
+    )
+
+    // observe each notification element by data-id
+    notifications.forEach((n) => {
+      const el = document.querySelector(`[data-id="${n._id}"]`)
+      if (el) observerRef.current?.observe(el)
+    })
+
+    return () => observerRef.current?.disconnect()
+  }, [notifications])
+
   const markRead = async (id: string) => {
     try {
       const res = await fetch(`/api/notifications/${id}`, {
@@ -88,6 +156,7 @@ export default function NotificationsPage() {
         {notifications.map((n) => (
           <div
             key={n._id}
+            data-id={n._id}
             className={`flex items-start justify-between gap-4 rounded-lg border p-4 ${n.read ? "bg-background" : "bg-muted/5"}`}
           >
             <div className="flex-1">

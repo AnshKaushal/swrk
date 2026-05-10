@@ -44,6 +44,11 @@ const MessageSchema = new mongoose.Schema(
       ref: "Interview",
     },
 
+    interviewMessageType: {
+      type: String,
+      enum: ["scheduled", "response"],
+    },
+
     // Read receipts
     isRead: { type: Boolean, default: false },
     readAt: Date,

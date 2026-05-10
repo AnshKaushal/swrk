@@ -3,6 +3,7 @@ import { auth } from "@/app/api/auth/[...nextauth]/route"
 import { db } from "@/lib/mongodb"
 import Position from "@/models/position"
 import User from "@/models/user"
+import { getJobPostQuota } from "@/lib/job-posting-limits"
 
 export async function GET(req: NextRequest) {
   try {
@@ -65,6 +66,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Only employers can post positions" },
         { status: 403 },
+      )
+    }
+
+    const quota = await getJobPostQuota(session.user.id)
+    if (!quota.allowed) {
+      return NextResponse.json(
+        {
+          error: "Job posting limit reached",
+          used: quota.used,
+          limit: quota.limit,
+          plan: quota.planName,
+          isUnlimited: quota.isUnlimited,
+        },
+        { status: 429 },
       )
     }
 
