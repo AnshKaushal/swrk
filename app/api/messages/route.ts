@@ -176,14 +176,26 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const matchId = String(body.matchId || "").trim()
-    const content = String(body.content || "").trim()
+    const type = String(body.type || "text").trim()
+    const rawContent = String(body.content || "").trim()
+    const attachmentUrl = String(body.attachmentUrl || "").trim()
+    const attachmentName = String(body.attachmentName || "").trim()
+    const attachmentType = String(body.attachmentType || "").trim()
+    const content =
+      rawContent || attachmentName || attachmentUrl || "Attachment"
 
-    if (!matchId || !content) {
+    if (!matchId || (!rawContent && !attachmentUrl)) {
       return NextResponse.json(
         { error: "Missing matchId or content" },
         { status: 400 },
       )
     }
+
+    const messageType = ["cv-share", "linkedin", "starter", "system"].includes(
+      type,
+    )
+      ? type
+      : "text"
 
     const match = await getParticipantMatch(session.user.id, matchId)
       .populate(
@@ -228,8 +240,11 @@ export async function POST(req: NextRequest) {
       match: matchId,
       sender: session.user.id,
       senderRole,
-      type: "text",
+      type: messageType,
       content,
+      attachmentUrl: attachmentUrl || undefined,
+      attachmentName: attachmentName || undefined,
+      attachmentType: attachmentType || undefined,
     })
 
     await Match.updateOne(

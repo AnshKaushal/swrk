@@ -11,6 +11,20 @@ async function ensureSocketServer() {
   await fetch("/api/socket", { cache: "no-store" })
 }
 
+async function fetchSocketToken() {
+  const response = await fetch("/api/socket-token", {
+    cache: "no-store",
+    credentials: "include",
+  })
+
+  if (!response.ok) {
+    return null
+  }
+
+  const json = (await response.json()) as { token?: string }
+  return json.token || null
+}
+
 export async function getSocketClient() {
   if (globalThis.__swrkSocketClient) {
     return globalThis.__swrkSocketClient
@@ -18,9 +32,15 @@ export async function getSocketClient() {
 
   if (!globalThis.__swrkSocketInitPromise) {
     globalThis.__swrkSocketInitPromise = (async () => {
-      await ensureSocketServer()
+      const socketUrl =
+        process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin
+      if (socketUrl === window.location.origin) {
+        await ensureSocketServer()
+      }
 
-      const socket = io(window.location.origin, {
+      const token = await fetchSocketToken()
+
+      const socket = io(socketUrl, {
         path: "/socket.io",
         transports: ["websocket", "polling"],
         withCredentials: true,
@@ -29,6 +49,7 @@ export async function getSocketClient() {
         reconnectionAttempts: 8,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
+        auth: token ? { token } : undefined,
       })
 
       socket.on("connect_error", (error) => {

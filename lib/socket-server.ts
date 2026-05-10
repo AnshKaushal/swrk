@@ -1,5 +1,6 @@
 import { Server as SocketIOServer, type Socket } from "socket.io"
 import type { Server as HTTPServer } from "http"
+import crypto from "crypto"
 import { getToken } from "next-auth/jwt"
 import { db } from "@/lib/mongodb"
 import { Match, Swipe } from "@/models/swipe"
@@ -100,6 +101,39 @@ function decrementPresence(userId: string) {
   return nextCount
 }
 
+function getSessionCookieName() {
+  return process.env.NEXTAUTH_SECRET
+    ? "next-auth.session-token"
+    : "next-auth-dev.session-token"
+}
+
+function verifySocketToken(rawToken?: unknown) {
+  if (typeof rawToken !== "string" || !rawToken) return null
+
+  const parts = rawToken.split(".")
+  if (parts.length !== 3) return null
+
+  const [userId, expiresAtText, signature] = parts
+  const expiresAt = Number(expiresAtText)
+  if (!userId || !Number.isFinite(expiresAt) || Date.now() > expiresAt) {
+    return null
+  }
+
+  const secret = process.env.NEXTAUTH_SECRET || ""
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(`${userId}.${expiresAt}`)
+    .digest("hex")
+
+  if (signature.length !== expected.length) return null
+
+  if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+    return null
+  }
+
+  return userId
+}
+
 export async function ensureSocketServer(server: HTTPServer) {
   if (globalThis.__swrkSocketServer) {
     ;(server as HTTPServer & { io?: SocketIOServer }).io =
@@ -121,12 +155,19 @@ export async function ensureSocketServer(server: HTTPServer) {
 
   io.on("connection", async (socket: Socket) => {
     try {
-      const token = await getToken({
-        req: socket.request as never,
-        secret: process.env.NEXTAUTH_SECRET,
-      })
+      const authUserId = verifySocketToken(socket.handshake.auth?.token)
+      const token = authUserId
+        ? null
+        : await getToken({
+            req: socket.request as never,
+            secret: process.env.NEXTAUTH_SECRET,
+            cookieName: getSessionCookieName(),
+            secureCookie: false,
+          })
 
-      const userId = getUserIdFromToken(token as Record<string, unknown> | null)
+      const userId =
+        authUserId ||
+        getUserIdFromToken(token as Record<string, unknown> | null)
       if (!userId) {
         socket.disconnect(true)
         return

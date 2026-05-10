@@ -1054,6 +1054,14 @@ export default function OnboardingPage() {
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <Button
+                  variant="ghost"
+                  onClick={() => void handleStepSubmit(4, {}, {}, {})}
+                  className="h-12"
+                  disabled={loading}
+                >
+                  Skip
+                </Button>
+                <Button
                   onClick={onNextStep3}
                   className="h-12 flex-1 text-base font-bold"
                   disabled={loading}
@@ -1206,6 +1214,21 @@ export default function OnboardingPage() {
                   disabled={loading}
                 >
                   <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    void handleStepSubmit(
+                      role === "employer" ? 7 : 5,
+                      {},
+                      {},
+                      {},
+                    )
+                  }
+                  className="h-12"
+                  disabled={loading}
+                >
+                  Skip
                 </Button>
                 <Button
                   onClick={onNextStep4}

@@ -9,7 +9,6 @@ import {
   useState,
 } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
 import { useSession } from "next-auth/react"
 import type { Socket } from "socket.io-client"
 import {
@@ -52,15 +51,16 @@ import {
   EllipsisVertical,
   Info,
   Loader2,
+  FileText,
   MessageSquare,
   Paperclip,
   Flag,
   Mail,
   MailOpen,
+  Link2,
   Search,
   Send,
   Smile,
-  Video,
   Sparkles,
   CheckCheck,
   Trash2,
@@ -103,6 +103,9 @@ type MessageRecord = {
   senderRole: "employer" | "employee"
   type: "text" | "starter" | "cv-share" | "linkedin" | "interview" | "system"
   content?: string
+  attachmentUrl?: string
+  attachmentType?: "cv" | "portfolio" | "other"
+  attachmentName?: string
   interviewId?: string
   interviewMessageType?: "scheduled" | "response"
   interview?: {
@@ -128,6 +131,17 @@ type MessageRecord = {
 type ConversationResponse = {
   match?: MatchRecord
   messages?: MessageRecord[]
+}
+
+type ResumeItem = {
+  _id: string
+  title: string
+  url: string
+  fileName: string
+  mimeType: string
+  size: number
+  isVisibleOnProfile: boolean
+  isFeatured: boolean
 }
 
 type SocketEventPayload = {
@@ -234,6 +248,38 @@ function formatSystemPreview(content?: string, maxChars = 120) {
   return slice + "..."
 }
 
+function getMessageAttachment(message: MessageRecord) {
+  const attachmentUrl = message.attachmentUrl?.trim() || ""
+  const contentUrl = message.content?.trim() || ""
+  const href = attachmentUrl || (message.type === "linkedin" ? contentUrl : "")
+  const title =
+    message.attachmentName?.trim() || message.content?.trim() || "Attachment"
+
+  if (
+    !href &&
+    !message.attachmentName &&
+    !message.attachmentUrl &&
+    message.type !== "cv-share" &&
+    message.type !== "linkedin"
+  ) {
+    return null
+  }
+
+  const isLink =
+    Boolean(href && /^https?:\/\//i.test(href)) || message.type === "linkedin"
+
+  return {
+    href: href || undefined,
+    title,
+    subtitle: isLink
+      ? href || "Shared link"
+      : message.attachmentType === "portfolio"
+        ? "Portfolio file"
+        : "Resume file",
+    icon: isLink ? "link" : "file",
+  }
+}
+
 function getMatchUnreadCount(match: MatchRecord, userId?: string) {
   if (!userId) return 0
   const isEmployer = String(match.employer?._id) === userId
@@ -283,7 +329,6 @@ function notifyMessagesUpdated() {
 
 function MessagesPageContent() {
   const { data: session, status } = useSession()
-  const searchParams = useSearchParams()
   const [matches, setMatches] = useState<MatchRecord[]>([])
   const [messages, setMessages] = useState<MessageRecord[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -305,8 +350,11 @@ function MessagesPageContent() {
   const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set())
   const [showJumpToLatest, setShowJumpToLatest] = useState(false)
   const [fileUploading, setFileUploading] = useState(false)
-  const [linkedInDialogOpenLocal, setLinkedInDialogOpenLocal] = useState(false)
-  const [linkedInUrlLocal, setLinkedInUrlLocal] = useState("")
+  const [resumeShareDialogOpen, setResumeShareDialogOpen] = useState(false)
+  const [linkShareDialogOpen, setLinkShareDialogOpen] = useState(false)
+  const [linkShareUrl, setLinkShareUrl] = useState("")
+  const [resumes, setResumes] = useState<ResumeItem[]>([])
+  const [resumesLoading, setResumesLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -352,6 +400,26 @@ function MessagesPageContent() {
       if (!options?.silent) {
         setLoadingMatches(false)
       }
+    }
+  }, [])
+
+  const fetchResumes = useCallback(async () => {
+    setResumesLoading(true)
+    try {
+      const response = await fetch("/api/resumes", { cache: "no-store" })
+      const json = await response.json()
+
+      if (!response.ok) {
+        throw new Error(json?.error || "Failed to load resumes")
+      }
+
+      setResumes((json.resumes || []) as ResumeItem[])
+    } catch (error) {
+      console.error(error)
+      toast.error("Failed to load resumes")
+      setResumes([])
+    } finally {
+      setResumesLoading(false)
     }
   }, [])
 
@@ -402,9 +470,12 @@ function MessagesPageContent() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      void fetchMatches()
+      queueMicrotask(() => {
+        void fetchMatches()
+        void fetchResumes()
+      })
     }
-  }, [status, fetchMatches])
+  }, [status, fetchMatches, fetchResumes])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -449,7 +520,11 @@ function MessagesPageContent() {
   }, [])
 
   useEffect(() => {
-    void fetchConversation(activeMatchId)
+    if (!activeMatchId) return
+
+    queueMicrotask(() => {
+      void fetchConversation(activeMatchId)
+    })
   }, [activeMatchId, fetchConversation])
 
   useEffect(() => {
@@ -482,13 +557,8 @@ function MessagesPageContent() {
       }
     }
 
+    // perform a single fetch to populate typing state; afterwards rely on socket events for real-time updates
     void pollTypingState()
-
-    if (typingPollIntervalRef.current) {
-      clearInterval(typingPollIntervalRef.current)
-    }
-
-    typingPollIntervalRef.current = setInterval(pollTypingState, 1800)
 
     return () => {
       if (typingPollIntervalRef.current) {
@@ -506,6 +576,71 @@ function MessagesPageContent() {
       viewport.scrollTo({ top: viewport.scrollHeight, behavior })
     })
   }, [])
+
+  const sendAttachmentMessage = useCallback(
+    async (payload: {
+      type: "cv-share" | "linkedin"
+      content: string
+      attachmentUrl: string
+      attachmentName: string
+      attachmentType: "cv" | "portfolio" | "other"
+    }) => {
+      if (!activeMatchId || sending) return false
+
+      setSending(true)
+      try {
+        const response = await fetch("/api/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            matchId: activeMatchId,
+            type: payload.type,
+            content: payload.content,
+            attachmentUrl: payload.attachmentUrl,
+            attachmentName: payload.attachmentName,
+            attachmentType: payload.attachmentType,
+          }),
+        })
+
+        const json = (await response.json()) as {
+          error?: string
+          message?: MessageRecord
+          match?: MatchRecord
+        }
+
+        if (!response.ok) {
+          throw new Error(json.error || "Failed to send message")
+        }
+
+        setMessageText("")
+        socketRef.current?.emit("typing:stop", { matchId: activeMatchId })
+        void fetch(`/api/matches/${activeMatchId}/typing`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ typing: false }),
+        })
+
+        if (json.message) {
+          setMessages((previous) => appendMessage(previous, json.message!))
+        }
+        if (json.match) {
+          setMatches((previous) => upsertMatch(previous, json.match!))
+        }
+
+        isAtBottomRef.current = true
+        scrollToBottom("auto")
+        notifyMessagesUpdated()
+        return true
+      } catch (error) {
+        console.error(error)
+        toast.error("Failed to send message")
+        return false
+      } finally {
+        setSending(false)
+      }
+    },
+    [activeMatchId, scrollToBottom, sending],
+  )
 
   useEffect(() => {
     if (status !== "authenticated") return
@@ -580,17 +715,19 @@ function MessagesPageContent() {
         socketRef.current = socket
 
         const handleConnect = () => {
-          console.log("[socket] connected")
           setSocketConnected(true)
           if (activeMatchIdRef.current) {
             socket.emit("conversation:join", {
               matchId: activeMatchIdRef.current,
             })
           }
+          void fetchMatches({ silent: true })
+          if (activeMatchIdRef.current) {
+            void fetchConversation(activeMatchIdRef.current, { silent: true })
+          }
         }
 
-        const handleDisconnect = (reason: string) => {
-          console.log("[socket] disconnected:", reason)
+        const handleDisconnect = () => {
           setSocketConnected(false)
         }
 
@@ -682,10 +819,8 @@ function MessagesPageContent() {
         socket.on("typing:update", handleTypingUpdate)
 
         if (!socket.connected) {
-          console.log("[socket] calling socket.connect()")
           socket.connect()
         } else {
-          console.log("[socket] already connected, calling handleConnect")
           handleConnect()
         }
 
@@ -711,7 +846,7 @@ function MessagesPageContent() {
       socketCleanup?.()
       socketRef.current = null
     }
-  }, [fetchConversation, status])
+  }, [fetchConversation, fetchMatches, status])
 
   useEffect(() => {
     if (!emojiPickerOpen) return
@@ -742,6 +877,7 @@ function MessagesPageContent() {
   }, [emojiPickerOpen])
 
   useEffect(() => {
+    // If socket is connected, we don't need to poll.
     if (socketConnected) {
       if (fallbackPollIntervalRef.current) {
         clearInterval(fallbackPollIntervalRef.current)
@@ -750,16 +886,23 @@ function MessagesPageContent() {
       return
     }
 
-    const poll = () => {
+    const pollActive = async () => {
       if (activeMatchIdRef.current) {
-        void fetchConversation(activeMatchIdRef.current, { silent: true })
+        try {
+          await fetchConversation(activeMatchIdRef.current, { silent: true })
+        } catch {
+          // ignore
+        }
       }
-      void fetchMatches({ silent: true })
+      try {
+        await fetchMatches({ silent: true })
+      } catch {
+        // ignore
+      }
     }
 
-    poll()
-
-    fallbackPollIntervalRef.current = setInterval(poll, 3000)
+    void pollActive()
+    fallbackPollIntervalRef.current = setInterval(pollActive, 1500)
 
     return () => {
       if (fallbackPollIntervalRef.current) {
@@ -1052,10 +1195,60 @@ function MessagesPageContent() {
     }
   }
 
-  const openLinkedInDialog = () => {
-    const urlFromProfile = (session as any)?.user?.linkedinUrl || ""
-    setLinkedInUrlLocal(urlFromProfile)
-    setLinkedInDialogOpenLocal(true)
+  const openResumeShareDialog = () => {
+    void fetchResumes()
+    setResumeShareDialogOpen(true)
+  }
+
+  const openLinkShareDialog = () => {
+    const urlFromProfile =
+      (session?.user as { linkedinUrl?: string } | undefined)?.linkedinUrl || ""
+    setLinkShareUrl(urlFromProfile)
+    setLinkShareDialogOpen(true)
+  }
+
+  const handleShareExistingResume = async (resume: ResumeItem) => {
+    const title = resume.title.trim() || resume.fileName || "Resume"
+    const sent = await sendAttachmentMessage({
+      type: "cv-share",
+      content: title,
+      attachmentUrl: resume.url,
+      attachmentName: title,
+      attachmentType: "cv",
+    })
+
+    if (sent) {
+      setResumeShareDialogOpen(false)
+    }
+  }
+
+  const handleShareLinkedLink = async () => {
+    const value = linkShareUrl.trim()
+    if (!value) return
+
+    try {
+      const parsed = new URL(value)
+      if (!/^https?:$/.test(parsed.protocol)) {
+        toast.error("Please enter a valid http or https link")
+        return
+      }
+
+      const sent = await sendAttachmentMessage({
+        type: "linkedin",
+        content: parsed.toString(),
+        attachmentUrl: parsed.toString(),
+        attachmentName: parsed.hostname.replace(/^www\./, ""),
+        attachmentType: "other",
+      })
+
+      if (sent) {
+        toast.success("Link shared")
+        setLinkShareUrl("")
+        setLinkShareDialogOpen(false)
+      }
+    } catch {
+      toast.error("Please enter a valid link")
+    }
   }
 
   if (status === "loading" || (status === "authenticated" && loadingMatches)) {
@@ -1345,6 +1538,172 @@ function MessagesPageContent() {
                               const isOwnMessage =
                                 String(message.sender?._id) === currentUserId
 
+                              const attachment = getMessageAttachment(message)
+
+                              if (attachment && message.type === "cv-share") {
+                                return (
+                                  <div
+                                    key={entry.id}
+                                    className={cn(
+                                      "flex max-w-[82%] items-end gap-2 min-w-0",
+                                      isOwnMessage
+                                        ? "ml-auto flex-row-reverse"
+                                        : "",
+                                    )}
+                                  >
+                                    {!isOwnMessage && (
+                                      <Avatar className="h-8 w-8 shrink-0 border border-border">
+                                        <AvatarImage
+                                          src={message.sender?.avatar}
+                                          alt={getPersonLabel(message.sender)}
+                                        />
+                                        <AvatarFallback>
+                                          {getInitials(message.sender)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    )}
+
+                                    <div className="space-y-1 min-w-0">
+                                      {attachment.href ? (
+                                        <a
+                                          href={attachment.href}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className={cn(
+                                            "flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-sm transition-colors hover:bg-muted/50",
+                                            isOwnMessage
+                                              ? "border-primary/20 bg-primary/5 text-foreground"
+                                              : "border-border bg-card text-foreground",
+                                          )}
+                                        >
+                                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                            <FileText className="h-5 w-5" />
+                                          </div>
+                                          <div className="min-w-0">
+                                            <p className="truncate text-sm font-medium">
+                                              {attachment.title}
+                                            </p>
+                                          </div>
+                                        </a>
+                                      ) : (
+                                        <div
+                                          className={cn(
+                                            "flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-sm",
+                                            isOwnMessage
+                                              ? "border-primary/20 bg-primary/5 text-foreground"
+                                              : "border-border bg-card text-foreground",
+                                          )}
+                                        >
+                                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                            <FileText className="h-5 w-5" />
+                                          </div>
+                                          <div className="min-w-0">
+                                            <p className="truncate text-sm font-medium">
+                                              {attachment.title}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      )}
+                                      <div
+                                        className={cn(
+                                          "flex items-center gap-1 px-1 text-[10px] text-muted-foreground",
+                                          isOwnMessage ? "justify-end" : "",
+                                        )}
+                                      >
+                                        <span>
+                                          {formatMessageTime(message.createdAt)}
+                                        </span>
+                                        {isOwnMessage ? (
+                                          <CheckCheck className="h-3.5 w-3.5 text-primary" />
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              }
+
+                              if (attachment && message.type === "linkedin") {
+                                return (
+                                  <div
+                                    key={entry.id}
+                                    className={cn(
+                                      "flex max-w-[82%] items-end gap-2 min-w-0",
+                                      isOwnMessage
+                                        ? "ml-auto flex-row-reverse"
+                                        : "",
+                                    )}
+                                  >
+                                    {!isOwnMessage && (
+                                      <Avatar className="h-8 w-8 shrink-0 border border-border">
+                                        <AvatarImage
+                                          src={message.sender?.avatar}
+                                          alt={getPersonLabel(message.sender)}
+                                        />
+                                        <AvatarFallback>
+                                          {getInitials(message.sender)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                    )}
+
+                                    <div className="space-y-1 min-w-0">
+                                      {attachment.href ? (
+                                        <a
+                                          href={attachment.href}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className={cn(
+                                            "flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-sm transition-colors hover:bg-muted/50",
+                                            isOwnMessage
+                                              ? "border-primary/20 bg-primary/5 text-secondary"
+                                              : "border-border bg-card text-foreground",
+                                          )}
+                                        >
+                                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                            <Link2 className="h-5 w-5" />
+                                          </div>
+                                          <div className="min-w-0">
+                                            <p className="truncate text-sm font-medium">
+                                              {attachment.title}
+                                            </p>
+                                          </div>
+                                        </a>
+                                      ) : (
+                                        <div
+                                          className={cn(
+                                            "flex items-center gap-3 rounded-2xl border px-4 py-3 shadow-sm",
+                                            isOwnMessage
+                                              ? "border-primary/20 bg-primary/5 text-secondary"
+                                              : "border-border bg-card text-foreground",
+                                          )}
+                                        >
+                                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                            <Link2 className="h-5 w-5" />
+                                          </div>
+                                          <div className="min-w-0">
+                                            <p className="truncate text-sm font-medium">
+                                              {attachment.title}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      )}
+                                      <div
+                                        className={cn(
+                                          "flex items-center gap-1 px-1 text-[10px] text-muted-foreground",
+                                          isOwnMessage ? "justify-end" : "",
+                                        )}
+                                      >
+                                        <span>
+                                          {formatMessageTime(message.createdAt)}
+                                        </span>
+                                        {isOwnMessage ? (
+                                          <CheckCheck className="h-3.5 w-3.5 text-primary" />
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              }
+
                               if (message.type === "system") {
                                 return (
                                   <div
@@ -1590,15 +1949,20 @@ function MessagesPageContent() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent className="w-56">
                             <DropdownMenuItem
+                              onClick={() => openResumeShareDialog()}
+                            >
+                              Choose existing resume
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
                               onClick={() => fileInputRef.current?.click()}
                               disabled={fileUploading}
                             >
-                              Upload resume / file
+                              Upload new file
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => openLinkedInDialog()}
+                              onClick={() => openLinkShareDialog()}
                             >
-                              Add LinkedIn URL
+                              Share link
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -1649,32 +2013,17 @@ function MessagesPageContent() {
                               const url = json.resume?.url
                               if (!url) throw new Error("No url returned")
 
-                              // send as chat message (safe: resume was validated server-side)
-                              const sendRes = await fetch("/api/messages", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                  matchId: activeMatchId,
-                                  content: `Shared a resume: ${url}`,
-                                }),
+                              const sent = await sendAttachmentMessage({
+                                type: "cv-share",
+                                content: file.name,
+                                attachmentUrl: url,
+                                attachmentName: file.name,
+                                attachmentType: "cv",
                               })
-                              const sendJson = await sendRes.json()
-                              if (!sendRes.ok) {
-                                throw new Error(
-                                  sendJson.error || "Failed to send message",
-                                )
-                              }
 
-                              if (sendJson.message) {
-                                setMessages((previous) =>
-                                  appendMessage(previous, sendJson.message),
-                                )
-                                isAtBottomRef.current = true
-                                scrollToBottom("auto")
-                                notifyMessagesUpdated()
+                              if (sent) {
+                                toast.success("File shared")
                               }
-
-                              toast.success("File shared")
                             } catch (err) {
                               console.error(err)
                               toast.error("Failed to share file")
@@ -1686,23 +2035,85 @@ function MessagesPageContent() {
                         />
 
                         <Dialog
-                          open={linkedInDialogOpenLocal}
-                          onOpenChange={setLinkedInDialogOpenLocal}
+                          open={resumeShareDialogOpen}
+                          onOpenChange={setResumeShareDialogOpen}
+                        >
+                          <DialogContent className="sm:max-w-2xl">
+                            <DialogHeader>
+                              <DialogTitle>Share a resume</DialogTitle>
+                              <DialogDescription>
+                                Choose one of your saved resumes to share as a
+                                file card.
+                              </DialogDescription>
+                            </DialogHeader>
+
+                            <div className="max-h-[420px] space-y-3 overflow-y-auto pr-1">
+                              {resumesLoading ? (
+                                <div className="flex items-center justify-center py-8">
+                                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                </div>
+                              ) : resumes.length > 0 ? (
+                                resumes.map((resume) => (
+                                  <button
+                                    key={resume._id}
+                                    type="button"
+                                    onClick={() =>
+                                      void handleShareExistingResume(resume)
+                                    }
+                                    className="flex w-full items-center gap-3 rounded-2xl border border-border bg-background px-4 py-3 text-left transition-colors hover:bg-muted/50"
+                                  >
+                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                                      <FileText className="h-5 w-5" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate font-medium text-foreground">
+                                        {resume.title}
+                                      </p>
+                                      <p className="truncate text-sm text-muted-foreground">
+                                        {resume.fileName}
+                                      </p>
+                                    </div>
+                                  </button>
+                                ))
+                              ) : (
+                                <div className="rounded-2xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+                                  No saved resumes found. Upload one in Resume
+                                  settings first.
+                                </div>
+                              )}
+                            </div>
+
+                            <DialogFooter>
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setResumeShareDialogOpen(false)
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+
+                        <Dialog
+                          open={linkShareDialogOpen}
+                          onOpenChange={setLinkShareDialogOpen}
                         >
                           <DialogContent className="sm:max-w-md">
                             <DialogHeader>
-                              <DialogTitle>Share LinkedIn profile</DialogTitle>
+                              <DialogTitle>Share a link</DialogTitle>
                               <DialogDescription>
-                                Paste a LinkedIn profile URL to share with this
-                                contact.
+                                Paste a safe http or https URL. It will render
+                                as a clickable link.
                               </DialogDescription>
                             </DialogHeader>
 
                             <div className="space-y-4">
                               <Input
-                                value={linkedInUrlLocal}
+                                value={linkShareUrl}
                                 onChange={(e) =>
-                                  setLinkedInUrlLocal(e.target.value)
+                                  setLinkShareUrl(e.target.value)
                                 }
                                 placeholder="https://www.linkedin.com/in/your-profile"
                               />
@@ -1712,61 +2123,14 @@ function MessagesPageContent() {
                               <Button
                                 variant="outline"
                                 onClick={() => {
-                                  setLinkedInUrlLocal("")
-                                  setLinkedInDialogOpenLocal(false)
+                                  setLinkShareUrl("")
+                                  setLinkShareDialogOpen(false)
                                 }}
                               >
                                 Cancel
                               </Button>
                               <Button
-                                onClick={async () => {
-                                  const url = linkedInUrlLocal.trim()
-                                  if (!url) return
-                                  try {
-                                    const parsed = new URL(url)
-                                    if (
-                                      !parsed.hostname.includes("linkedin.com")
-                                    ) {
-                                      toast.error(
-                                        "Please provide a LinkedIn URL",
-                                      )
-                                      return
-                                    }
-
-                                    // send as chat message
-                                    const res = await fetch("/api/messages", {
-                                      method: "POST",
-                                      headers: {
-                                        "Content-Type": "application/json",
-                                      },
-                                      body: JSON.stringify({
-                                        matchId: activeMatchId,
-                                        content: `LinkedIn: ${url}`,
-                                      }),
-                                    })
-                                    const json = await res.json()
-                                    if (!res.ok)
-                                      throw new Error(
-                                        json.error || "Failed to send",
-                                      )
-
-                                    if (json.message) {
-                                      setMessages((previous) =>
-                                        appendMessage(previous, json.message),
-                                      )
-                                      isAtBottomRef.current = true
-                                      scrollToBottom("auto")
-                                      notifyMessagesUpdated()
-                                    }
-
-                                    toast.success("LinkedIn shared")
-                                    setLinkedInUrlLocal("")
-                                    setLinkedInDialogOpenLocal(false)
-                                  } catch (err) {
-                                    console.error(err)
-                                    toast.error("Invalid URL")
-                                  }
-                                }}
+                                onClick={() => void handleShareLinkedLink()}
                               >
                                 Share
                               </Button>
