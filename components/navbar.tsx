@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ModeToggle } from "@/components/theme-toggle"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import { IconDashboard } from "@tabler/icons-react"
 
 const homeHref = "/home"
@@ -41,9 +41,12 @@ const navLinks = [
 
 export default function Navbar() {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { data: session, status, update } = useSession()
   const [isOpen, setIsOpen] = React.useState(false)
   const [notifUnread, setNotifUnread] = React.useState(0)
+  const hideOnMessagesScreen =
+    pathname === "/dashboard/messages" && searchParams?.has("matchId")
 
   const loadNotifUnread = React.useCallback(async () => {
     try {
@@ -72,11 +75,15 @@ export default function Navbar() {
   }, [update])
 
   React.useEffect(() => {
-    void loadNotifUnread()
+    const timer = window.setTimeout(() => {
+      void loadNotifUnread()
+    }, 0)
     const onMessage = () => void loadNotifUnread()
     window.addEventListener("swrk:notifications-updated", onMessage)
-    return () =>
+    return () => {
+      window.clearTimeout(timer)
       window.removeEventListener("swrk:notifications-updated", onMessage)
+    }
   }, [loadNotifUnread])
 
   if (
@@ -91,7 +98,11 @@ export default function Navbar() {
 
   if (status === "loading") {
     return (
-      <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/10 backdrop-blur">
+      <nav
+        className={`sticky top-0 z-50 w-full border-b border-border/40 bg-background/10 backdrop-blur ${
+          hideOnMessagesScreen ? "hidden lg:block" : ""
+        }`}
+      >
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-2">
@@ -138,7 +149,11 @@ export default function Navbar() {
   }
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/10 backdrop-blur">
+    <nav
+      className={`sticky top-0 z-50 w-full border-b border-border/40 bg-background/10 backdrop-blur ${
+        hideOnMessagesScreen ? "hidden lg:block" : ""
+      }`}
+    >
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           <Link

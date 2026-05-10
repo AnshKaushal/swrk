@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { Suspense } from "react"
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -47,7 +48,9 @@ export default function RootLayout({
         >
           <AuthProvider>
             <NotificationRealtimeBridge />
-            <Navbar />
+            <Suspense fallback={null}>
+              <Navbar />
+            </Suspense>
             {children}
             <Footer />
             <Toaster />

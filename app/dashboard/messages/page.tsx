@@ -126,6 +126,8 @@ type MessageRecord = {
   } | null
   createdAt: string
   isRead?: boolean
+  localId?: string
+  pending?: boolean
 }
 
 type ConversationResponse = {
@@ -153,6 +155,8 @@ type SocketEventPayload = {
   typing?: boolean
   userIds?: string[]
 }
+
+const ACTIVITY_DELAY_MS = 1000
 
 function getPersonLabel(person?: Person) {
   if (!person) return "Connection"
@@ -312,11 +316,113 @@ function upsertMatch(list: MatchRecord[], match: MatchRecord) {
   })
 }
 
+function messageSignature(message: MessageRecord) {
+  return [
+    message.match,
+    String(message.sender?._id || ""),
+    message.type,
+    (message.content || "").trim(),
+    (message.attachmentUrl || "").trim(),
+    (message.attachmentName || "").trim(),
+  ].join("|")
+}
+
+function dedupeMessagesById(list: MessageRecord[]) {
+  const seen = new Set<string>()
+  const result: MessageRecord[] = []
+
+  for (const item of list) {
+    if (!item?._id) {
+      result.push(item)
+      continue
+    }
+
+    if (seen.has(item._id)) {
+      continue
+    }
+
+    seen.add(item._id)
+    result.push(item)
+  }
+
+  return result
+}
+
 function appendMessage(list: MessageRecord[], message: MessageRecord) {
   if (list.some((item) => item._id === message._id)) {
     return list
   }
+
+  if (!message.pending) {
+    const pendingIndex = list.findIndex(
+      (item) =>
+        item.pending && messageSignature(item) === messageSignature(message),
+    )
+
+    if (pendingIndex !== -1) {
+      const next = [...list]
+      next[pendingIndex] = message
+      return dedupeMessagesById(next)
+    }
+  }
+
   return [...list, message]
+}
+
+function replacePendingMessage(
+  list: MessageRecord[],
+  localId: string,
+  message: MessageRecord,
+) {
+  const index = list.findIndex(
+    (item) => item.localId === localId || item._id === message._id,
+  )
+
+  if (index === -1) {
+    return appendMessage(list, message)
+  }
+
+  const next = [...list]
+  next[index] = message
+  return dedupeMessagesById(next)
+}
+
+function removePendingMessage(list: MessageRecord[], localId: string) {
+  return list.filter((item) => item.localId !== localId)
+}
+
+function buildOptimisticMessage(params: {
+  localId: string
+  matchId: string
+  senderId: string
+  senderName?: string
+  senderAvatar?: string
+  senderRole: "employer" | "employee"
+  type: MessageRecord["type"]
+  content: string
+  attachmentUrl?: string
+  attachmentType?: MessageRecord["attachmentType"]
+  attachmentName?: string
+}) {
+  return {
+    _id: params.localId,
+    localId: params.localId,
+    pending: true,
+    match: params.matchId,
+    sender: {
+      _id: params.senderId,
+      name: params.senderName || "You",
+      avatar: params.senderAvatar,
+    },
+    senderRole: params.senderRole,
+    type: params.type,
+    content: params.content,
+    attachmentUrl: params.attachmentUrl,
+    attachmentType: params.attachmentType,
+    attachmentName: params.attachmentName,
+    createdAt: new Date().toISOString(),
+    isRead: false,
+  } satisfies MessageRecord
 }
 
 function notifyMessagesUpdated() {
@@ -371,6 +477,12 @@ function MessagesPageContent() {
   const typingPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
     null,
   )
+  const typingActivityDelayRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  )
+  const typingExpiryTimeoutsRef = useRef<
+    Map<string, ReturnType<typeof setTimeout>>
+  >(new Map())
   const messageViewportRef = useRef<HTMLDivElement | null>(null)
   const isAtBottomRef = useRef(true)
   const previousMatchIdRef = useRef("")
@@ -453,7 +565,9 @@ function MessagesPageContent() {
           )
         }
         setShowJumpToLatest(false)
-        setMessages((json.messages || []) as MessageRecord[])
+        setMessages(
+          dedupeMessagesById((json.messages || []) as MessageRecord[]),
+        )
         notifyMessagesUpdated()
       } catch (error) {
         console.error(error)
@@ -478,16 +592,6 @@ function MessagesPageContent() {
   }, [status, fetchMatches, fetchResumes])
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-
-    const nextUrl = new URL(window.location.href)
-    if (nextUrl.searchParams.has("matchId")) {
-      nextUrl.searchParams.delete("matchId")
-      window.history.replaceState(window.history.state, "", nextUrl.toString())
-    }
-  }, [])
-
-  useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 1023px)")
 
     const updateLayout = () => {
@@ -507,7 +611,20 @@ function MessagesPageContent() {
   }, [activeMatchId])
 
   useEffect(() => {
+    for (const timeout of typingExpiryTimeoutsRef.current.values()) {
+      clearTimeout(timeout)
+    }
+    typingExpiryTimeoutsRef.current.clear()
+  }, [activeMatchId])
+
+  useEffect(() => {
     const handlePopState = () => {
+      setTypingUsers(new Set())
+      for (const timeout of typingExpiryTimeoutsRef.current.values()) {
+        clearTimeout(timeout)
+      }
+      typingExpiryTimeoutsRef.current.clear()
+
       const nextMatchId =
         new URL(window.location.href).searchParams.get("matchId") || ""
       setActiveMatchId((previous) =>
@@ -517,6 +634,50 @@ function MessagesPageContent() {
 
     window.addEventListener("popstate", handlePopState)
     return () => window.removeEventListener("popstate", handlePopState)
+  }, [])
+
+  useEffect(() => {
+    const handleWindowBlur = () => {
+      const matchId = activeMatchIdRef.current
+      if (matchId) {
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current)
+          typingTimeoutRef.current = null
+        }
+        socketRef.current?.emit("typing:stop", { matchId })
+        void fetch(`/api/matches/${matchId}/typing`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ typing: false }),
+        })
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== "visible") {
+        const matchId = activeMatchIdRef.current
+        if (matchId) {
+          if (typingTimeoutRef.current) {
+            clearTimeout(typingTimeoutRef.current)
+            typingTimeoutRef.current = null
+          }
+          socketRef.current?.emit("typing:stop", { matchId })
+          void fetch(`/api/matches/${matchId}/typing`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ typing: false }),
+          })
+        }
+      }
+    }
+
+    window.addEventListener("blur", handleWindowBlur)
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener("blur", handleWindowBlur)
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
   }, [])
 
   useEffect(() => {
@@ -577,6 +738,73 @@ function MessagesPageContent() {
     })
   }, [])
 
+  const delayActivity = useCallback(
+    () =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, ACTIVITY_DELAY_MS)
+      }),
+    [],
+  )
+
+  const queueTypingActivity = useCallback(
+    (matchId: string, typing: boolean) => {
+      if (!matchId) return
+
+      if (typingActivityDelayRef.current) {
+        clearTimeout(typingActivityDelayRef.current)
+        typingActivityDelayRef.current = null
+      }
+
+      typingActivityDelayRef.current = setTimeout(() => {
+        const socket = socketRef.current
+        if (typing) {
+          socket?.emit("typing:start", { matchId })
+        } else {
+          socket?.emit("typing:stop", { matchId })
+        }
+
+        void fetch(`/api/matches/${matchId}/typing`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ typing }),
+        })
+
+        typingActivityDelayRef.current = null
+      }, ACTIVITY_DELAY_MS)
+    },
+    [],
+  )
+
+  const stopTypingNow = useCallback(
+    (matchId: string) => {
+      if (!matchId) return
+
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+        typingTimeoutRef.current = null
+      }
+
+      queueTypingActivity(matchId, false)
+
+      if (currentUserId) {
+        setMatches((previous) =>
+          previous.map((match) => {
+            if (match._id !== matchId) return match
+
+            return {
+              ...match,
+              typingUsers: (match.typingUsers || []).filter(
+                (userId) => userId !== currentUserId,
+              ),
+              typingUpdatedAt: new Date().toISOString(),
+            }
+          }),
+        )
+      }
+    },
+    [currentUserId, queueTypingActivity],
+  )
+
   const sendAttachmentMessage = useCallback(
     async (payload: {
       type: "cv-share" | "linkedin"
@@ -587,8 +815,43 @@ function MessagesPageContent() {
     }) => {
       if (!activeMatchId || sending) return false
 
+      stopTypingNow(activeMatchId)
+
+      const localId = `local-${globalThis.crypto.randomUUID()}`
+      const activeMatchForSend = matches.find(
+        (match) => match._id === activeMatchId,
+      )
+      const senderRole =
+        activeMatchForSend &&
+        currentUserId &&
+        String(activeMatchForSend.employer._id) === currentUserId
+          ? "employer"
+          : "employee"
+      const optimisticMessage = buildOptimisticMessage({
+        localId,
+        matchId: activeMatchId,
+        senderId: currentUserId || localId,
+        senderName: session?.user?.name || session?.user?.email || "You",
+        senderAvatar:
+          (session?.user as { image?: string; avatar?: string } | undefined)
+            ?.avatar ||
+          session?.user?.image ||
+          undefined,
+        senderRole,
+        type: payload.type,
+        content: payload.content,
+        attachmentUrl: payload.attachmentUrl,
+        attachmentName: payload.attachmentName,
+        attachmentType: payload.attachmentType,
+      })
+
       setSending(true)
       try {
+        setMessages((previous) => appendMessage(previous, optimisticMessage))
+        isAtBottomRef.current = true
+        scrollToBottom("auto")
+        await delayActivity()
+
         const response = await fetch("/api/messages", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -613,15 +876,11 @@ function MessagesPageContent() {
         }
 
         setMessageText("")
-        socketRef.current?.emit("typing:stop", { matchId: activeMatchId })
-        void fetch(`/api/matches/${activeMatchId}/typing`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ typing: false }),
-        })
 
         if (json.message) {
-          setMessages((previous) => appendMessage(previous, json.message!))
+          setMessages((previous) =>
+            replacePendingMessage(previous, localId, json.message!),
+          )
         }
         if (json.match) {
           setMatches((previous) => upsertMatch(previous, json.match!))
@@ -633,13 +892,23 @@ function MessagesPageContent() {
         return true
       } catch (error) {
         console.error(error)
+        setMessages((previous) => removePendingMessage(previous, localId))
         toast.error("Failed to send message")
         return false
       } finally {
         setSending(false)
       }
     },
-    [activeMatchId, scrollToBottom, sending],
+    [
+      activeMatchId,
+      currentUserId,
+      delayActivity,
+      matches,
+      scrollToBottom,
+      sending,
+      session?.user,
+      stopTypingNow,
+    ],
   )
 
   useEffect(() => {
@@ -647,6 +916,7 @@ function MessagesPageContent() {
 
     const sendHeartbeat = async (online: boolean) => {
       try {
+        await delayActivity()
         await fetch("/api/presence/heartbeat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -688,7 +958,7 @@ function MessagesPageContent() {
       window.removeEventListener("beforeunload", handleBeforeUnload)
       void sendHeartbeat(false)
     }
-  }, [status])
+  }, [delayActivity, status])
 
   useEffect(() => {
     const socket = socketRef.current
@@ -789,10 +1059,29 @@ function MessagesPageContent() {
           if (!payload.userId || !payload.matchId) return
           if (payload.matchId !== activeMatchIdRef.current) return
 
+          const timeoutKey = `${payload.matchId}:${payload.userId}`
+          const existingTimeout =
+            typingExpiryTimeoutsRef.current.get(timeoutKey)
+          if (existingTimeout) {
+            clearTimeout(existingTimeout)
+            typingExpiryTimeoutsRef.current.delete(timeoutKey)
+          }
+
           setTypingUsers((previous) => {
             const next = new Set(previous)
             if (payload.typing) {
               next.add(payload.userId!)
+
+              const timeout = setTimeout(() => {
+                setTypingUsers((current) => {
+                  const cleaned = new Set(current)
+                  cleaned.delete(payload.userId!)
+                  return cleaned
+                })
+                typingExpiryTimeoutsRef.current.delete(timeoutKey)
+              }, 2500)
+
+              typingExpiryTimeoutsRef.current.set(timeoutKey, timeout)
             } else {
               next.delete(payload.userId!)
             }
@@ -930,11 +1219,21 @@ function MessagesPageContent() {
   }, [messages, activeMatchId, loadingMessages, scrollToBottom])
 
   useEffect(() => {
+    const typingExpiryTimeouts = typingExpiryTimeoutsRef.current
+
     return () => {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current)
         typingTimeoutRef.current = null
       }
+      if (typingActivityDelayRef.current) {
+        clearTimeout(typingActivityDelayRef.current)
+        typingActivityDelayRef.current = null
+      }
+      for (const timeout of typingExpiryTimeouts.values()) {
+        clearTimeout(timeout)
+      }
+      typingExpiryTimeouts.clear()
       if (fallbackPollIntervalRef.current) {
         clearInterval(fallbackPollIntervalRef.current)
         fallbackPollIntervalRef.current = null
@@ -967,10 +1266,8 @@ function MessagesPageContent() {
     })
   }, [currentUserId, matches, searchTerm])
 
-  const activeMatch = useMemo(
-    () => matches.find((match) => match._id === activeMatchId) || null,
-    [activeMatchId, matches],
-  )
+  const activeMatch =
+    matches.find((match) => match._id === activeMatchId) || null
 
   const otherParticipant = activeMatch
     ? getOtherParticipant(activeMatch, currentUserId)
@@ -982,7 +1279,8 @@ function MessagesPageContent() {
 
   const typingFromMatch = Boolean(
     otherParticipant?._id &&
-    activeMatch?.typingUsers?.includes(otherParticipant._id),
+    activeMatch?.typingUsers?.includes(otherParticipant._id) &&
+    isRecentlyActive(activeMatch?.typingUpdatedAt),
   )
   const typingFromSocket = Boolean(
     otherParticipant?._id ? typingUsers.has(otherParticipant._id) : false,
@@ -1016,6 +1314,12 @@ function MessagesPageContent() {
 
   const handleSelectMatch = useCallback(
     (matchId: string) => {
+      setTypingUsers(new Set())
+      for (const timeout of typingExpiryTimeoutsRef.current.values()) {
+        clearTimeout(timeout)
+      }
+      typingExpiryTimeoutsRef.current.clear()
+
       setMatches((previous) =>
         previous.map((match) => {
           if (match._id !== matchId) return match
@@ -1038,6 +1342,12 @@ function MessagesPageContent() {
   )
 
   const handleCloseMatch = useCallback(() => {
+    setTypingUsers(new Set())
+    for (const timeout of typingExpiryTimeoutsRef.current.values()) {
+      clearTimeout(timeout)
+    }
+    typingExpiryTimeoutsRef.current.clear()
+
     setActiveMatchId("")
 
     if (typeof window === "undefined") return
@@ -1053,7 +1363,7 @@ function MessagesPageContent() {
       action: "mark-read" | "mark-unread" | "delete" | "report",
       payload?: { reason?: string; description?: string },
     ) => {
-      if (!activeMatchId || !activeMatch) return
+      if (!activeMatchId) return
 
       setActionBusy(action)
       try {
@@ -1111,13 +1421,12 @@ function MessagesPageContent() {
         setActionBusy(null)
       }
     },
-    [activeMatch, activeMatchId, fetchMatches, handleCloseMatch],
+    [activeMatchId, fetchMatches, handleCloseMatch],
   )
 
   const handleTypingChange = (value: string) => {
     setMessageText(value)
 
-    const socket = socketRef.current
     const matchId = activeMatchIdRef.current
     if (!matchId) return
 
@@ -1126,26 +1435,14 @@ function MessagesPageContent() {
       typingTimeoutRef.current = null
     }
 
-    const syncTypingState = (typing: boolean) => {
-      void fetch(`/api/matches/${matchId}/typing`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ typing }),
-      })
-    }
-
     if (!value.trim()) {
-      socket?.emit("typing:stop", { matchId })
-      syncTypingState(false)
+      stopTypingNow(matchId)
       return
     }
 
-    socket?.emit("typing:start", { matchId })
-    syncTypingState(true)
+    queueTypingActivity(matchId, true)
     typingTimeoutRef.current = setTimeout(() => {
-      socket?.emit("typing:stop", { matchId })
-      syncTypingState(false)
-      typingTimeoutRef.current = null
+      stopTypingNow(matchId)
     }, 1200)
   }
 
@@ -1153,8 +1450,40 @@ function MessagesPageContent() {
     const content = messageText.trim()
     if (!content || !activeMatchId || sending) return
 
+    stopTypingNow(activeMatchId)
+
+    const localId = `local-${globalThis.crypto.randomUUID()}`
+    const activeMatchForSend = matches.find(
+      (match) => match._id === activeMatchId,
+    )
+    const senderRole =
+      activeMatchForSend &&
+      currentUserId &&
+      String(activeMatchForSend.employer._id) === currentUserId
+        ? "employer"
+        : "employee"
+    const optimisticMessage = buildOptimisticMessage({
+      localId,
+      matchId: activeMatchId,
+      senderId: currentUserId || localId,
+      senderName: session?.user?.name || session?.user?.email || "You",
+      senderAvatar:
+        (session?.user as { image?: string; avatar?: string } | undefined)
+          ?.avatar ||
+        session?.user?.image ||
+        undefined,
+      senderRole,
+      type: "text",
+      content,
+    })
+
     try {
       setSending(true)
+      setMessageText("")
+      setMessages((previous) => appendMessage(previous, optimisticMessage))
+      isAtBottomRef.current = true
+      scrollToBottom("auto")
+      await delayActivity()
       const response = await fetch("/api/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1168,18 +1497,14 @@ function MessagesPageContent() {
 
       if (!response.ok) {
         toast.error(json.error || "Failed to send message")
+        setMessages((previous) => removePendingMessage(previous, localId))
         return
       }
 
-      setMessageText("")
-      socketRef.current?.emit("typing:stop", { matchId: activeMatchId })
-      void fetch(`/api/matches/${activeMatchId}/typing`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ typing: false }),
-      })
       if (json.message) {
-        setMessages((previous) => appendMessage(previous, json.message!))
+        setMessages((previous) =>
+          replacePendingMessage(previous, localId, json.message!),
+        )
       }
       if (json.match) {
         setMatches((previous) => upsertMatch(previous, json.match!))
@@ -1189,6 +1514,8 @@ function MessagesPageContent() {
       notifyMessagesUpdated()
     } catch (error) {
       console.error(error)
+      setMessages((previous) => removePendingMessage(previous, localId))
+      setMessageText(content)
       toast.error("Failed to send message")
     } finally {
       setSending(false)
@@ -1511,7 +1838,7 @@ function MessagesPageContent() {
                         }
                       }}
                     >
-                      <div className="space-y-4 p-4 sm:p-5">
+                      <div className="space-y-4 p-4 pb-24 sm:p-5 sm:pb-6">
                         {loadingMessages ? (
                           <div className="space-y-3">
                             <Skeleton className="h-20 w-3/4 rounded-2xl" />
@@ -2152,10 +2479,9 @@ function MessagesPageContent() {
                           }
                         }}
                         onBlur={() => {
-                          const socket = socketRef.current
                           const matchId = activeMatchIdRef.current
-                          if (socket && matchId) {
-                            socket.emit("typing:stop", { matchId })
+                          if (matchId) {
+                            stopTypingNow(matchId)
                           }
                         }}
                         placeholder="Type a message..."

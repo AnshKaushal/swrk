@@ -268,21 +268,24 @@ export async function POST(req: NextRequest) {
           },
     )
 
-    const populatedMessage = await Message.findById(message._id)
-      .populate("sender", "name avatar username role activeRole")
-      .lean()
-
-    const updatedMatch = await Match.findById(matchId)
-      .populate("employer", "name avatar username email role activeRole")
-      .populate("employee", "name avatar username email role activeRole")
-      .lean()
+    const [populatedMessage, updatedMatch] = await Promise.all([
+      Message.findById(message._id)
+        .populate("sender", "name avatar username role activeRole")
+        .lean(),
+      Match.findById(matchId)
+        .populate("employer", "name avatar username email role activeRole")
+        .populate("employee", "name avatar username email role activeRole")
+        .lean(),
+    ])
 
     if (getSocketServer()) {
       emitToMatch(matchId, "message:new", {
         matchId,
         message: populatedMessage,
       })
+    }
 
+    if (getSocketServer()) {
       emitToUser(extractObjectId(match.employer), "conversation:update", {
         matchId,
         match: updatedMatch,
@@ -294,7 +297,7 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    await Notification.create({
+    void Notification.create({
       user: recipientId,
       actor: session.user.id,
       type: "message",
@@ -302,6 +305,8 @@ export async function POST(req: NextRequest) {
       message: `${senderName} sent you a message.`,
       link: `/dashboard/messages?matchId=${matchId}`,
       data: { matchId, messageId: message._id },
+    }).catch((error) => {
+      console.error("[api/messages notification]", error)
     })
 
     if (getSocketServer()) {
