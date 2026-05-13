@@ -11,6 +11,10 @@
   --foreground: oklch(0.145 0 0);
   --card: oklch(0.9818 0.0054 95.0986);
   --card-foreground: #oklch(0.145 0 0);
+  --card-border: oklch(0.869 0.005 56.366);
+  --card-shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.1);
+  --card-hover: oklch(0.97 0.0054 95.0986);
+  --card-accent: oklch(0.704 0.04 256.788);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.2671 0.0196 98.939);
   --primary: oklch(0.704 0.04 256.788);
@@ -75,6 +79,10 @@
   --foreground: oklch(0.8074 0.0142 93.0137);
   --card: oklch(0.2679 0.0036 106.6427);
   --card-foreground: oklch(0.9818 0.0054 95.0986);
+  --card-border: oklch(0.3618 0.0101 106.8928);
+  --card-shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.3);
+  --card-hover: oklch(0.32 0.0036 106.6427);
+  --card-accent: oklch(0.901 0.058 230.902);
   --popover: oklch(0.3085 0.0035 106.6039);
   --popover-foreground: oklch(0.9211 0.004 106.4781);
   --primary: oklch(0.901 0.058 230.902);
@@ -132,11 +140,35 @@
   --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
 }
 
+:root {
+  --card-radius-sm: calc(var(--radius) - 2px);
+  --card-radius-md: var(--radius);
+  --card-radius-lg: calc(var(--radius) + 4px);
+  --card-shadow-subtle: 0 1px 2px 0px hsl(0 0% 0% / 0.05);
+  --card-shadow-medium: var(--shadow-md);
+  --card-shadow-prominent: var(--shadow-lg);
+  --card-transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --card-padding-sm: 0.75rem;
+  --card-padding-md: 1rem;
+  --card-padding-lg: 1.5rem;
+  --card-gap: 0.75rem;
+}
+
+.dark {
+  --card-shadow-subtle: 0 1px 2px 0px hsl(0 0% 0% / 0.2);
+  --card-shadow-medium: var(--shadow-md);
+  --card-shadow-prominent: var(--shadow-lg);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+  --color-card-border: var(--card-border);
+  --color-card-shadow: var(--card-shadow);
+  --color-card-hover: var(--card-hover);
+  --color-card-accent: var(--card-accent);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
@@ -175,6 +207,10 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
+  --card-radius-sm: var(--card-radius-sm);
+  --card-radius-md: var(--card-radius-md);
+  --card-radius-lg: var(--card-radius-lg);
+
   --shadow-2xs: var(--shadow-2xs);
   --shadow-xs: var(--shadow-xs);
   --shadow-sm: var(--shadow-sm);
@@ -183,6 +219,17 @@
   --shadow-lg: var(--shadow-lg);
   --shadow-xl: var(--shadow-xl);
   --shadow-2xl: var(--shadow-2xl);
+
+  --card-shadow-subtle: var(--card-shadow-subtle);
+  --card-shadow-medium: var(--card-shadow-medium);
+  --card-shadow-prominent: var(--card-shadow-prominent);
+
+  --spacing-card-sm: var(--card-padding-sm);
+  --spacing-card-md: var(--card-padding-md);
+  --spacing-card-lg: var(--card-padding-lg);
+  --spacing-card-gap: var(--card-gap);
+
+  --transition-card: var(--card-transition);
 }
 
 @layer base {

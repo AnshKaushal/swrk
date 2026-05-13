@@ -31,8 +31,6 @@ export async function POST(req: NextRequest) {
     const event = JSON.parse(body)
     await db()
 
-    console.log("Razorpay webhook event:", event.event)
-
     switch (event.event) {
       case "subscription.activated":
         await handleSubscriptionActivated(event.payload.subscription)
@@ -82,15 +80,49 @@ export async function POST(req: NextRequest) {
 
 async function handleSubscriptionActivated(subscription: any) {
   try {
-    // Update subscription status
-    const updatedSubscription = await UserSubscription.findOneAndUpdate(
-      { razorpaySubscriptionId: subscription.id },
+    const subscriptionRecord = await UserSubscription.findOne({
+      $or: [
+        { razorpaySubscriptionId: subscription.id },
+        { "metadata.pendingRazorpaySubscriptionId": subscription.id },
+      ],
+    }).populate("user plan")
+
+    if (!subscriptionRecord) {
+      return
+    }
+
+    const pendingPlanId = subscriptionRecord.metadata?.pendingPlanId
+    const isPendingSwitch =
+      pendingPlanId &&
+      subscriptionRecord.metadata?.pendingRazorpaySubscriptionId ===
+        subscription.id
+
+    const metadata = { ...(subscriptionRecord.metadata || {}) }
+    delete metadata.pendingPlanId
+    delete metadata.pendingPlanName
+    delete metadata.pendingPlanDisplayName
+    delete metadata.pendingPlanPrice
+    delete metadata.pendingPlanCurrency
+    delete metadata.pendingPlanInterval
+    delete metadata.pendingRazorpaySubscriptionId
+    delete metadata.pendingCreatedAt
+
+    const updatedSubscription = await UserSubscription.findByIdAndUpdate(
+      subscriptionRecord._id,
       {
-        status: "active",
-        razorpayCustomerId: subscription.customer_id,
-        currentPeriodStart: new Date(subscription.current_start * 1000),
-        currentPeriodEnd: new Date(subscription.current_end * 1000),
-        nextPaymentDate: new Date(subscription.charge_at * 1000),
+        $set: {
+          plan: isPendingSwitch ? pendingPlanId : subscriptionRecord.plan,
+          razorpaySubscriptionId: subscription.id,
+          status: "active",
+          razorpayCustomerId: subscription.customer_id,
+          currentPeriodStart: new Date(subscription.current_start * 1000),
+          currentPeriodEnd: new Date(subscription.current_end * 1000),
+          nextPaymentDate: new Date(subscription.charge_at * 1000),
+          cancelAtPeriodEnd: false,
+          canceledAt: null,
+          endedAt: null,
+          metadata,
+        },
       },
       { returnDocument: "after" },
     ).populate("user plan")
@@ -119,8 +151,6 @@ async function handleSubscriptionActivated(subscription: any) {
             nextBillingDate,
           ),
         })
-
-        console.log(`Confirmation email sent to ${user.email}`)
       }
     }
   } catch (error) {

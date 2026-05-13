@@ -4,6 +4,14 @@ import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Loader2, Crown, Check } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
@@ -29,6 +37,7 @@ export default function SubscriptionSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [subscription, setSubscription] = useState<Subscription | null>(null)
+  const [showReactivateDialog, setShowReactivateDialog] = useState(false)
 
   useEffect(() => {
     if (sessionStatus === "authenticated") {
@@ -77,6 +86,7 @@ export default function SubscriptionSettingsPage() {
   }
 
   const handleReactivate = async () => {
+    setShowReactivateDialog(false)
     try {
       setSaving(true)
       const response = await fetch("/api/subscriptions/manage", {
@@ -110,7 +120,7 @@ export default function SubscriptionSettingsPage() {
 
   return (
     <div className="divide-y divide-border">
-      {subscription ? (
+      {subscription && subscription.plan ? (
         <>
           <div className="grid max-w-7xl grid-cols-1 gap-x-8 gap-y-10 px-4 py-16 sm:px-6 md:grid-cols-3 lg:px-8">
             <div>
@@ -213,7 +223,10 @@ export default function SubscriptionSettingsPage() {
 
               <div className="flex gap-2 pt-2">
                 {subscription.cancelAtPeriodEnd ? (
-                  <Button onClick={handleReactivate} disabled={saving}>
+                  <Button
+                    onClick={() => setShowReactivateDialog(true)}
+                    disabled={saving}
+                  >
                     {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                     Reactivate Subscription
                   </Button>
@@ -256,6 +269,54 @@ export default function SubscriptionSettingsPage() {
           </div>
         </div>
       )}
+
+      <Dialog
+        open={showReactivateDialog}
+        onOpenChange={setShowReactivateDialog}
+      >
+        <DialogContent className="w-full max-w-md mx-auto">
+          <DialogHeader>
+            <DialogTitle>Reactivate Subscription?</DialogTitle>
+            <DialogDescription>
+              Your subscription will be reactivated and you'll regain access to
+              all premium features.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            {subscription && (
+              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <p className="text-sm text-blue-900 dark:text-blue-100">
+                  Plan:{" "}
+                  <span className="font-semibold">
+                    {subscription.plan?.displayName}
+                  </span>
+                </p>
+                <p className="text-sm text-blue-900 dark:text-blue-100 mt-1">
+                  Amount:{" "}
+                  <span className="font-semibold">
+                    ₹{subscription.amount}/{subscription.interval}
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowReactivateDialog(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleReactivate} disabled={saving}>
+              {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              Confirm Reactivation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

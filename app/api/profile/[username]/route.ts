@@ -58,13 +58,13 @@ export async function GET(
     }).select("-stats.totalLeftSwipes -stats.totalRightSwipes")
     const employerProfile = await EmployerProfile.findOne({ user: user._id })
     let resumes = []
-    // respect user's resume privacy setting for non-owners
     const allowResumes = isOwner || user.privacy?.showResumes !== false
     if (allowResumes) {
-      resumes = await Resume.find({
-        user: user._id,
-        isVisibleOnProfile: true,
-      }).sort({ isFeatured: -1, createdAt: -1 })
+      resumes = await Resume.find(
+        isOwner
+          ? { user: user._id }
+          : { user: user._id, isVisibleOnProfile: true },
+      ).sort({ isFeatured: -1, createdAt: -1 })
     }
 
     const profile =

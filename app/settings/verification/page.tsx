@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
 export default function VerificationSettings() {
   const { status } = useSession()
@@ -217,11 +218,10 @@ export default function VerificationSettings() {
                   type="button"
                   variant="outline"
                   onClick={() => setType("identity")}
-                  className={
-                    type === "identity"
-                      ? "px-3 py-1 bg-primary! text-secondary!"
-                      : "px-3 py-1"
-                  }
+                  className={cn(
+                    "px-3 py-1",
+                    type === "identity" && "bg-primary! text-background!",
+                  )}
                 >
                   Identity
                 </Button>
@@ -229,11 +229,10 @@ export default function VerificationSettings() {
                   type="button"
                   variant="outline"
                   onClick={() => setType("company")}
-                  className={
-                    type === "company"
-                      ? "px-3 py-1 bg-primary! text-secondary!"
-                      : "px-3 py-1"
-                  }
+                  className={cn(
+                    "px-3 py-1",
+                    type === "company" && "bg-primary! text-background!",
+                  )}
                 >
                   Company
                 </Button>

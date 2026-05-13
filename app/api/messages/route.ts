@@ -229,12 +229,6 @@ export async function POST(req: NextRequest) {
 
     const senderIsEmployer = extractObjectId(match.employer) === session.user.id
     const senderRole = senderIsEmployer ? "employer" : "employee"
-    const recipientId = senderIsEmployer
-      ? extractObjectId(match.employee)
-      : extractObjectId(match.employer)
-    const senderName = senderIsEmployer
-      ? (match.employer as { name?: string } | undefined)?.name || "Someone"
-      : (match.employee as { name?: string } | undefined)?.name || "Someone"
 
     const message = await Message.create({
       match: matchId,
@@ -283,9 +277,7 @@ export async function POST(req: NextRequest) {
         matchId,
         message: populatedMessage,
       })
-    }
 
-    if (getSocketServer()) {
       emitToUser(extractObjectId(match.employer), "conversation:update", {
         matchId,
         match: updatedMatch,
@@ -294,28 +286,6 @@ export async function POST(req: NextRequest) {
       emitToUser(extractObjectId(match.employee), "conversation:update", {
         matchId,
         match: updatedMatch,
-      })
-    }
-
-    void Notification.create({
-      user: recipientId,
-      actor: session.user.id,
-      type: "message",
-      title: "New message",
-      message: `${senderName} sent you a message.`,
-      link: `/dashboard/messages?matchId=${matchId}`,
-      data: { matchId, messageId: message._id },
-    }).catch((error) => {
-      console.error("[api/messages notification]", error)
-    })
-
-    if (getSocketServer()) {
-      emitToUser(recipientId, "notification:new", {
-        type: "message",
-        title: "New message",
-        message: `${senderName} sent you a message.`,
-        link: `/dashboard/messages?matchId=${matchId}`,
-        matchId,
       })
     }
 

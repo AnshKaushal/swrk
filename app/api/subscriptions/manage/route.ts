@@ -46,7 +46,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { planId } = await req.json()
+    const body = await req.json()
+    const { planId } = body
 
     if (!planId) {
       return NextResponse.json(
@@ -68,7 +69,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid plan" }, { status: 400 })
     }
 
-    // If switching plans and user has an active subscription, compute proration
     let proration = {
       credit: 0,
       charge: 0,
@@ -138,42 +138,70 @@ export async function POST(req: NextRequest) {
     let userSubscription
 
     if (existingSubscription && existingSubscription._id) {
-      // Update existing subscription
-      // Apply proration adjustments
-      const update: any = {
-        plan: planId,
-        razorpaySubscriptionId: razorpaySubscription.id,
-        razorpayCustomerId: razorpaySubscription.customer_id || null,
-        status: razorpaySubscription.status,
-        currentPeriodStart: razorpaySubscription.current_start
-          ? new Date(razorpaySubscription.current_start * 1000)
-          : new Date(),
-        currentPeriodEnd: razorpaySubscription.current_end
-          ? new Date(razorpaySubscription.current_end * 1000)
-          : new Date(),
-        amount: plan.price,
-        currency: plan.currency,
-        interval: plan.interval,
-        nextPaymentDate: razorpaySubscription.charge_at
-          ? new Date(razorpaySubscription.charge_at * 1000)
-          : new Date(),
-        cancelAtPeriodEnd: false,
-      }
+      const isDifferentPlan =
+        String(existingSubscription.plan._id) !== String(planId)
+      const isAlreadyActiveOnSamePlan =
+        existingSubscription.status === "active" && !isDifferentPlan
 
-      if (proration.credit && proration.credit > 0) {
-        update.$inc = { credit: proration.credit }
-      }
+      if (!isAlreadyActiveOnSamePlan) {
+        const metadata = {
+          ...(existingSubscription.metadata || {}),
+          pendingPlanId: String(plan._id),
+          pendingPlanName: plan.name,
+          pendingPlanDisplayName: plan.displayName,
+          pendingPlanPrice: plan.price,
+          pendingPlanCurrency: plan.currency,
+          pendingPlanInterval: plan.interval,
+          pendingRazorpaySubscriptionId: razorpaySubscription.id,
+          pendingCreatedAt: new Date().toISOString(),
+        }
 
-      if (proration.charge && proration.charge > 0) {
-        // Record charge due; we'll store it in balanceDue and return to client for collection
-        update.$inc = { ...(update.$inc || {}), balanceDue: proration.charge }
-      }
+        userSubscription = await UserSubscription.findByIdAndUpdate(
+          existingSubscription._id,
+          {
+            $set: {
+              metadata,
+            },
+          },
+          { returnDocument: "after" },
+        ).populate("plan")
+      } else {
+        // Update existing subscription
+        // Apply proration adjustments
+        const update: any = {
+          plan: planId,
+          razorpaySubscriptionId: razorpaySubscription.id,
+          razorpayCustomerId: razorpaySubscription.customer_id || null,
+          status: razorpaySubscription.status,
+          currentPeriodStart: razorpaySubscription.current_start
+            ? new Date(razorpaySubscription.current_start * 1000)
+            : new Date(),
+          currentPeriodEnd: razorpaySubscription.current_end
+            ? new Date(razorpaySubscription.current_end * 1000)
+            : new Date(),
+          amount: plan.price,
+          currency: plan.currency,
+          interval: plan.interval,
+          nextPaymentDate: razorpaySubscription.charge_at
+            ? new Date(razorpaySubscription.charge_at * 1000)
+            : new Date(),
+          cancelAtPeriodEnd: false,
+        }
 
-      userSubscription = await UserSubscription.findByIdAndUpdate(
-        existingSubscription._id,
-        update,
-        { returnDocument: "after" },
-      ).populate("plan")
+        if (proration.credit && proration.credit > 0) {
+          update.$inc = { credit: proration.credit }
+        }
+
+        if (proration.charge && proration.charge > 0) {
+          update.$inc = { ...(update.$inc || {}), balanceDue: proration.charge }
+        }
+
+        userSubscription = await UserSubscription.findByIdAndUpdate(
+          existingSubscription._id,
+          update,
+          { returnDocument: "after" },
+        ).populate("plan")
+      }
     } else {
       // Create new subscription
       userSubscription = new UserSubscription({
@@ -226,7 +254,8 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const { action } = await req.json()
+    const body = await req.json()
+    const { action } = body
 
     await db()
 
@@ -242,6 +271,30 @@ export async function PUT(req: NextRequest) {
     }
 
     if (action === "cancel") {
+      const pendingRazorpaySubscriptionId =
+        subscription.metadata?.pendingRazorpaySubscriptionId
+
+      if (pendingRazorpaySubscriptionId) {
+        try {
+          await razorpay.subscriptions.cancel(pendingRazorpaySubscriptionId)
+        } catch (rzError: any) {}
+
+        const metadata = { ...(subscription.metadata || {}) }
+        delete metadata.pendingPlanId
+        delete metadata.pendingPlanName
+        delete metadata.pendingPlanDisplayName
+        delete metadata.pendingPlanPrice
+        delete metadata.pendingPlanCurrency
+        delete metadata.pendingPlanInterval
+        delete metadata.pendingRazorpaySubscriptionId
+        delete metadata.pendingCreatedAt
+
+        subscription.metadata = metadata
+        await subscription.save()
+
+        return NextResponse.json({ message: "Pending subscription cancelled" })
+      }
+
       try {
         // If subscription is active, attempt to cancel at period end
         if (subscription.status === "active") {
@@ -301,18 +354,82 @@ export async function PUT(req: NextRequest) {
     }
 
     if (action === "reactivate") {
-      // Reactivate subscription
-      await razorpay.subscriptions.resume(subscription.razorpaySubscriptionId, {
-        resume_at: "now",
-      })
+      const currentPlan = await SubscriptionPlan.findById(subscription.plan)
 
-      subscription.cancelAtPeriodEnd = false
-      subscription.canceledAt = null
-      await subscription.save()
+      try {
+        // Try to resume the subscription
+        await razorpay.subscriptions.resume(
+          subscription.razorpaySubscriptionId,
+          {
+            resume_at: "now",
+          },
+        )
 
-      return NextResponse.json({
-        message: "Subscription reactivated successfully",
-      })
+        subscription.cancelAtPeriodEnd = false
+        subscription.canceledAt = null
+        await subscription.save()
+
+        return NextResponse.json({
+          message: "Subscription reactivated successfully",
+        })
+      } catch (resumeError: any) {
+        // If resume fails because subscription is cancelled, create a new one
+        if (
+          resumeError?.error?.description &&
+          String(resumeError.error.description).includes("cancelled state")
+        ) {
+          console.warn(
+            "Subscription is in cancelled state, creating new subscription:",
+            resumeError.error,
+          )
+
+          if (!currentPlan || !currentPlan.isActive) {
+            return NextResponse.json(
+              { error: "Plan is no longer available" },
+              { status: 400 },
+            )
+          }
+
+          // Create new subscription
+          const newRazorpaySubscription = await razorpay.subscriptions.create({
+            plan_id: currentPlan.razorpayPlanId,
+            customer_notify: 1,
+            quantity: 1,
+            total_count: 12,
+            expire_by: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
+            addons: [],
+            notes: {
+              userId: session.user.id,
+              planName: currentPlan.name,
+            },
+          })
+
+          subscription.razorpaySubscriptionId = newRazorpaySubscription.id
+          subscription.razorpayCustomerId =
+            newRazorpaySubscription.customer_id || null
+          subscription.status = newRazorpaySubscription.status
+          subscription.currentPeriodStart =
+            newRazorpaySubscription.current_start
+              ? new Date(newRazorpaySubscription.current_start * 1000)
+              : new Date()
+          subscription.currentPeriodEnd = newRazorpaySubscription.current_end
+            ? new Date(newRazorpaySubscription.current_end * 1000)
+            : new Date()
+          subscription.nextPaymentDate = newRazorpaySubscription.charge_at
+            ? new Date(newRazorpaySubscription.charge_at * 1000)
+            : new Date()
+          subscription.cancelAtPeriodEnd = false
+          subscription.canceledAt = null
+          subscription.endedAt = null
+          await subscription.save()
+
+          return NextResponse.json({
+            message: "Subscription reactivated successfully",
+          })
+        }
+
+        throw resumeError
+      }
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 })

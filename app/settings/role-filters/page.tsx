@@ -122,6 +122,60 @@ const splitCsv = (value: string) =>
 const joinCsv = (values: unknown) =>
   Array.isArray(values) ? values.join(", ") : ""
 
+function SingleListInput({
+  valueCsv,
+  onChange,
+  placeholder,
+}: {
+  valueCsv: string
+  onChange: (next: string) => void
+  placeholder?: string
+}) {
+  const [input, setInput] = useState("")
+  const items = splitCsv(String(valueCsv || ""))
+
+  const add = () => {
+    const v = input.trim()
+    if (!v) return
+    if (!items.includes(v)) {
+      onChange([...items, v].join(", "))
+    }
+    setInput("")
+  }
+
+  const remove = (it: string) => {
+    onChange(items.filter((i) => i !== it).join(", "))
+  }
+
+  return (
+    <div>
+      <div className="flex gap-2">
+        <Input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={placeholder}
+        />
+        <Button type="button" onClick={add} size="sm">
+          Add
+        </Button>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {items.map((it) => (
+          <Button
+            key={it}
+            size="sm"
+            type="button"
+            variant="outline"
+            onClick={() => remove(it)}
+          >
+            {it}
+          </Button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 const createEmployeeFilters = (): EmployeeFiltersForm => ({
   experienceLevel: "",
   totalExperienceYears: "",
@@ -200,6 +254,14 @@ const PREFERRED_BENEFITS_OPTIONS = [
   "childcare",
 ]
 
+const EMPLOYER_WORK_PREFERENCE_OPTIONS = ["remote", "onsite", "hybrid", "any"]
+
+const CANDIDATE_STATUS_OPTIONS = [
+  "actively-looking",
+  "open-to-offers",
+  "not-looking",
+]
+
 const EXPERIENCE_LEVEL_OPTIONS = [
   "fresher",
   "junior",
@@ -209,6 +271,17 @@ const EXPERIENCE_LEVEL_OPTIONS = [
   "principal",
   "executive",
 ]
+
+const formatEnumLabel = (value: string) =>
+  value
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+
+const sanitizeSelections = (values: unknown, allowed: string[]) =>
+  splitCsv(typeof values === "string" ? values : joinCsv(values)).filter(
+    (value) => allowed.includes(value),
+  )
 
 const normalizeEmployeeFilters = (
   profile?: ProfileApiResponse["employeeProfile"],
@@ -389,11 +462,13 @@ export default function RoleFiltersPage() {
 
       const payload = {
         employeeProfile: {
-          experienceLevel: formData.employeeFilters.experienceLevel,
+          experienceLevel:
+            formData.employeeFilters.experienceLevel || undefined,
           totalExperienceYears: formData.employeeFilters.totalExperienceYears
             ? parseInt(formData.employeeFilters.totalExperienceYears)
             : undefined,
-          highestQualification: formData.employeeFilters.highestQualification,
+          highestQualification:
+            formData.employeeFilters.highestQualification || undefined,
           desiredRoles: splitCsv(formData.employeeFilters.desiredRoles),
           desiredIndustries: splitCsv(
             formData.employeeFilters.desiredIndustries,
@@ -455,9 +530,16 @@ export default function RoleFiltersPage() {
             experienceMax: formData.employerFilters.experienceMax
               ? parseInt(formData.employerFilters.experienceMax)
               : undefined,
-            qualification: formData.employerFilters.qualification,
+            qualification:
+              formData.employerFilters.qualification &&
+              formData.employerFilters.qualification !== "any"
+                ? formData.employerFilters.qualification
+                : undefined,
             locations: splitCsv(formData.employerFilters.locations),
-            workPreference: splitCsv(formData.employerFilters.workPreference),
+            workPreference: sanitizeSelections(
+              formData.employerFilters.workPreference,
+              EMPLOYER_WORK_PREFERENCE_OPTIONS,
+            ),
             ctcBudgetMin: formData.employerFilters.ctcBudgetMin
               ? parseInt(formData.employerFilters.ctcBudgetMin)
               : undefined,
@@ -465,8 +547,14 @@ export default function RoleFiltersPage() {
               ? parseInt(formData.employerFilters.ctcBudgetMax)
               : undefined,
             currency: formData.employerFilters.currency,
-            employmentTypes: splitCsv(formData.employerFilters.employmentTypes),
-            candidateStatus: splitCsv(formData.employerFilters.candidateStatus),
+            employmentTypes: sanitizeSelections(
+              formData.employerFilters.employmentTypes,
+              EMPLOYMENT_TYPE_OPTIONS,
+            ),
+            candidateStatus: sanitizeSelections(
+              formData.employerFilters.candidateStatus,
+              CANDIDATE_STATUS_OPTIONS,
+            ),
           },
         },
         user: {
@@ -643,13 +731,12 @@ export default function RoleFiltersPage() {
                     </div>
                     <div className="space-y-2 sm:col-span-2">
                       <Label>Desired Roles</Label>
-                      <Textarea
-                        value={formData.employeeFilters.desiredRoles}
-                        onChange={(e) =>
-                          updateEmployeeFilters("desiredRoles", e.target.value)
+                      <SingleListInput
+                        valueCsv={formData.employeeFilters.desiredRoles}
+                        onChange={(v) =>
+                          updateEmployeeFilters("desiredRoles", v)
                         }
                         placeholder="Frontend Developer, Product Designer"
-                        rows={2}
                       />
                     </div>
                     <div className="space-y-2 sm:col-span-2">
@@ -691,16 +778,12 @@ export default function RoleFiltersPage() {
                     </div>
                     <div className="space-y-2 sm:col-span-2">
                       <Label>Preferred Locations</Label>
-                      <Textarea
-                        value={formData.employeeFilters.preferredLocations}
-                        onChange={(e) =>
-                          updateEmployeeFilters(
-                            "preferredLocations",
-                            e.target.value,
-                          )
+                      <SingleListInput
+                        valueCsv={formData.employeeFilters.preferredLocations}
+                        onChange={(v) =>
+                          updateEmployeeFilters("preferredLocations", v)
                         }
                         placeholder="Bengaluru, Remote, London"
-                        rows={2}
                       />
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2 sm:col-span-2">
@@ -925,24 +1008,18 @@ export default function RoleFiltersPage() {
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div className="space-y-2 sm:col-span-2">
                       <Label>Roles Looking For</Label>
-                      <Textarea
-                        value={formData.employerFilters.roles}
-                        onChange={(e) =>
-                          updateEmployerFilters("roles", e.target.value)
-                        }
+                      <SingleListInput
+                        valueCsv={formData.employerFilters.roles}
+                        onChange={(v) => updateEmployerFilters("roles", v)}
                         placeholder="Frontend Developer, HR Generalist"
-                        rows={2}
                       />
                     </div>
                     <div className="space-y-2 sm:col-span-2">
                       <Label>Skills</Label>
-                      <Textarea
-                        value={formData.employerFilters.skills}
-                        onChange={(e) =>
-                          updateEmployerFilters("skills", e.target.value)
-                        }
+                      <SingleListInput
+                        valueCsv={formData.employerFilters.skills}
+                        onChange={(v) => updateEmployerFilters("skills", v)}
                         placeholder="React, MongoDB, Figma"
-                        rows={2}
                       />
                     </div>
                     <div className="space-y-2">
@@ -1013,28 +1090,34 @@ export default function RoleFiltersPage() {
                     </div>
                     <div className="space-y-2">
                       <Label>Locations</Label>
-                      <Textarea
-                        value={formData.employerFilters.locations}
-                        onChange={(e) =>
-                          updateEmployerFilters("locations", e.target.value)
-                        }
+                      <SingleListInput
+                        valueCsv={formData.employerFilters.locations}
+                        onChange={(v) => updateEmployerFilters("locations", v)}
                         placeholder="Remote, Bengaluru, Hyderabad"
-                        rows={2}
                       />
                     </div>
                     <div className="space-y-2 sm:col-span-2">
                       <Label>Work Preference</Label>
-                      <Textarea
-                        value={formData.employerFilters.workPreference}
-                        onChange={(e) =>
-                          updateEmployerFilters(
-                            "workPreference",
-                            e.target.value,
+                      <div className="flex flex-wrap gap-2">
+                        {EMPLOYER_WORK_PREFERENCE_OPTIONS.map((opt) => {
+                          const selected = splitCsv(
+                            formData.employerFilters.workPreference,
+                          ).includes(opt)
+                          return (
+                            <Button
+                              key={opt}
+                              type="button"
+                              variant={selected ? "default" : "outline"}
+                              size="sm"
+                              onClick={() =>
+                                toggleCsvChoice("workPreference", opt, true)
+                              }
+                            >
+                              {formatEnumLabel(opt)}
+                            </Button>
                           )
-                        }
-                        placeholder="remote, hybrid"
-                        rows={2}
-                      />
+                        })}
+                      </div>
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2 sm:col-span-2">
                       <div className="space-y-2">
@@ -1075,31 +1158,49 @@ export default function RoleFiltersPage() {
                     </div>
                     <div className="space-y-2 sm:col-span-2">
                       <Label>Employment Types</Label>
-                      <Textarea
-                        value={formData.employerFilters.employmentTypes}
-                        onChange={(e) =>
-                          updateEmployerFilters(
-                            "employmentTypes",
-                            e.target.value,
+                      <div className="flex flex-wrap gap-2">
+                        {EMPLOYMENT_TYPE_OPTIONS.map((opt) => {
+                          const selected = splitCsv(
+                            formData.employerFilters.employmentTypes,
+                          ).includes(opt)
+                          return (
+                            <Button
+                              key={opt}
+                              type="button"
+                              variant={selected ? "default" : "outline"}
+                              size="sm"
+                              onClick={() =>
+                                toggleCsvChoice("employmentTypes", opt, true)
+                              }
+                            >
+                              {formatEnumLabel(opt)}
+                            </Button>
                           )
-                        }
-                        placeholder="full-time, contract"
-                        rows={2}
-                      />
+                        })}
+                      </div>
                     </div>
                     <div className="space-y-2 sm:col-span-2">
                       <Label>Candidate Status</Label>
-                      <Textarea
-                        value={formData.employerFilters.candidateStatus}
-                        onChange={(e) =>
-                          updateEmployerFilters(
-                            "candidateStatus",
-                            e.target.value,
+                      <div className="flex flex-wrap gap-2">
+                        {CANDIDATE_STATUS_OPTIONS.map((opt) => {
+                          const selected = splitCsv(
+                            formData.employerFilters.candidateStatus,
+                          ).includes(opt)
+                          return (
+                            <Button
+                              key={opt}
+                              type="button"
+                              variant={selected ? "default" : "outline"}
+                              size="sm"
+                              onClick={() =>
+                                toggleCsvChoice("candidateStatus", opt, true)
+                              }
+                            >
+                              {formatEnumLabel(opt)}
+                            </Button>
                           )
-                        }
-                        placeholder="actively-looking, open-to-offers"
-                        rows={2}
-                      />
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>

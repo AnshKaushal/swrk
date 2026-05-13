@@ -11,7 +11,6 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card"
 import {
   Dialog,
@@ -55,6 +54,7 @@ interface SubscriptionPlan {
     hideAds: boolean
     earlyAccess: boolean
   }
+  userType: string
 }
 
 interface UserSubscription {
@@ -87,6 +87,9 @@ export default function SubscriptionPage() {
     toPlan: null,
   })
   const [interval, setInterval] = useState<"month" | "year">("month")
+  const [userType, setUserType] = useState<"employee" | "employer" | "both">(
+    "employee",
+  )
   const [showDowngradeDialog, setShowDowngradeDialog] = useState(false)
 
   useEffect(() => {
@@ -99,11 +102,13 @@ export default function SubscriptionPage() {
       fetchPlans()
       fetchUserSubscription()
     }
-  }, [status, router])
+  }, [status, router, userType])
 
   const fetchPlans = async () => {
     try {
-      const response = await fetch("/api/subscriptions/plans")
+      const response = await fetch(
+        `/api/subscriptions/plans?userType=${userType}`,
+      )
       if (response.ok) {
         const data = await response.json()
 
@@ -158,10 +163,11 @@ export default function SubscriptionPage() {
       return
     }
 
-    await proceedWithSubscription(planId)
+    await proceedWithSubscription(selectedPlan)
   }
 
-  const proceedWithSubscription = async (planId: string) => {
+  const proceedWithSubscription = async (selectedPlan: SubscriptionPlan) => {
+    const planId = selectedPlan._id
     setSubscribing(planId)
     try {
       const response = await fetch("/api/subscriptions/manage", {
@@ -370,16 +376,48 @@ export default function SubscriptionPage() {
             </p>
           </div>
         </div>
-
-        {/* Background decoration */}
-        <div className="absolute inset-0 -z-10">
-          <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-primary/5 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-primary/3 rounded-full blur-3xl" />
-        </div>
       </section>
 
       <section className="pb-12 sm:pb-16 md:pb-20 lg:pb-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-center mb-8">
+            <div className="inline-flex rounded-lg border bg-background/70 backdrop-blur overflow-hidden gap-2 sm:gap-0 flex-wrap sm:flex-nowrap justify-center">
+              <button
+                className={cn(
+                  "px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition",
+                  userType === "employee"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted",
+                )}
+                onClick={() => setUserType("employee")}
+              >
+                For Candidates
+              </button>
+              <button
+                className={cn(
+                  "px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition",
+                  userType === "employer"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted",
+                )}
+                onClick={() => setUserType("employer")}
+              >
+                For Employers
+              </button>
+              <button
+                className={cn(
+                  "px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium transition",
+                  userType === "both"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted",
+                )}
+                onClick={() => setUserType("both")}
+              >
+                For Both
+              </button>
+            </div>
+          </div>
+
           <div className="flex justify-center mb-8">
             <div className="inline-flex rounded-lg border bg-background/70 backdrop-blur overflow-hidden">
               <button
@@ -575,72 +613,6 @@ export default function SubscriptionPage() {
                 ))
             )}
           </div>
-          <Card className="mt-8 sm:mt-10 md:mt-12 lg:mt-14 border-foreground/10 supports-[backdrop-filter]:bg-background/10 backdrop-blur col-span-1 sm:col-span-2 lg:col-span-1">
-            <CardHeader className="text-center pb-3 sm:pb-4 px-4 sm:px-6 pt-4 sm:pt-6">
-              <div className="flex items-center justify-center gap-2 mb-3 sm:mb-4">
-                <Badge variant="secondary" className="text-xs">
-                  FREE PLAN
-                </Badge>
-              </div>
-              <div className="flex items-baseline justify-center gap-1">
-                <span className="font-mono text-3xl sm:text-4xl font-bold tracking-tight">
-                  ₹0
-                </span>
-                <span className="text-muted-foreground text-xs sm:text-sm">
-                  /mo
-                </span>
-              </div>
-              <CardDescription className="mt-2 sm:mt-3 text-center text-xs sm:text-sm">
-                Get started with basic features and upgrade anytime
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 sm:space-y-5 md:space-y-6 px-4 sm:px-6">
-              <div className="space-y-2 sm:space-y-3">
-                <h4 className="font-medium text-xs sm:text-sm text-muted-foreground">
-                  Everything you get:
-                </h4>
-                <ul className="space-y-1.5 sm:space-y-2">
-                  <li className="flex items-start gap-2 sm:gap-3 text-xs sm:text-sm">
-                    <div className="bg-primary text-primary-foreground rounded-full p-0.5 flex-shrink-0 mt-0.5">
-                      <Check className="h-2.5 sm:h-3 w-2.5 sm:w-3" />
-                    </div>
-                    <span className="leading-snug">Basic profile creation</span>
-                  </li>
-                  <li className="flex items-start gap-2 sm:gap-3 text-xs sm:text-sm">
-                    <div className="bg-primary text-primary-foreground rounded-full p-0.5 flex-shrink-0 mt-0.5">
-                      <Check className="h-2.5 sm:h-3 w-2.5 sm:w-3" />
-                    </div>
-                    <span className="leading-snug">Limited daily swipes</span>
-                  </li>
-                  <li className="flex items-start gap-2 sm:gap-3 text-xs sm:text-sm">
-                    <div className="bg-primary text-primary-foreground rounded-full p-0.5 flex-shrink-0 mt-0.5">
-                      <Check className="h-2.5 sm:h-3 w-2.5 sm:w-3" />
-                    </div>
-                    <span className="leading-snug">
-                      Basic matching algorithm
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2 sm:gap-3 text-xs sm:text-sm">
-                    <div className="bg-primary text-primary-foreground rounded-full p-0.5 flex-shrink-0 mt-0.5">
-                      <Check className="h-2.5 sm:h-3 w-2.5 sm:w-3" />
-                    </div>
-                    <span className="leading-snug">Email notifications</span>
-                  </li>
-                </ul>
-              </div>
-            </CardContent>
-            <CardFooter className="pt-4 sm:pt-5 md:pt-6 px-4 sm:px-6 pb-4 sm:pb-6">
-              <Button
-                variant="outline"
-                className="w-full text-xs sm:text-sm"
-                disabled={isFreeCurrentPlan()}
-                size="sm"
-                onClick={() => setShowDowngradeDialog(true)}
-              >
-                {isFreeCurrentPlan() ? "Current Plan" : "Downgrade to Free"}
-              </Button>
-            </CardFooter>
-          </Card>
         </div>
       </section>
 
@@ -657,7 +629,7 @@ export default function SubscriptionPage() {
             </DialogDescription>
           </DialogHeader>
 
-          {userSubscription && (
+          {userSubscription && userSubscription.plan && (
             <div className="space-y-3 sm:space-y-4">
               <div className="bg-green-50 border border-green-200 rounded-lg p-3 sm:p-4">
                 <div className="flex items-center gap-2 mb-2">
@@ -833,7 +805,9 @@ export default function SubscriptionPage() {
             </Button>
             <Button
               onClick={() => {
-                proceedWithSubscription(switchConfirmation.toPlan?._id || "")
+                if (switchConfirmation.toPlan) {
+                  proceedWithSubscription(switchConfirmation.toPlan)
+                }
                 setSwitchConfirmation({
                   show: false,
                   fromPlan: null,
@@ -866,7 +840,7 @@ export default function SubscriptionPage() {
           </DialogHeader>
 
           <div className="space-y-4">
-            {userSubscription ? (
+            {userSubscription && userSubscription.plan ? (
               <div className="bg-background/50 border rounded-lg p-3">
                 <div className="flex items-center justify-between mb-2">
                   <div>

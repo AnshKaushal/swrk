@@ -28,6 +28,12 @@ const SubscriptionPlanSchema = new mongoose.Schema(
       enum: ["month", "year"],
       required: true,
     },
+    userType: {
+      type: String,
+      enum: ["employee", "employer", "both"],
+      required: true,
+      default: "employee",
+    },
     razorpayPlanId: {
       type: String,
       required: true,
@@ -43,12 +49,19 @@ const SubscriptionPlanSchema = new mongoose.Schema(
       priorityMatching: { type: Boolean, default: false },
       unlimitedSwipes: { type: Boolean, default: false },
       advancedFilters: { type: Boolean, default: false },
-      profileBoost: { type: Number, default: 0 }, // Number of boosts per month
+      profileBoost: { type: Number, default: 0 },
       analytics: { type: Boolean, default: false },
       premiumSupport: { type: Boolean, default: false },
       hideAds: { type: Boolean, default: false },
       earlyAccess: { type: Boolean, default: false },
-      jobPostsLimit: { type: Number, default: 0 }, // 0 = unlimited
+      jobPostsLimit: { type: Number, default: 0 },
+      candidateLikesLimit: { type: Number, default: 0 },
+      dailySwipesLimit: { type: Number, default: 10 },
+      reachLevel: {
+        type: String,
+        enum: ["basic", "standard", "premium"],
+        default: "basic",
+      },
     },
     isActive: {
       type: Boolean,
@@ -65,7 +78,11 @@ const SubscriptionPlanSchema = new mongoose.Schema(
 )
 
 SubscriptionPlanSchema.index({ isActive: 1, sortOrder: 1 })
-SubscriptionPlanSchema.index({ name: 1, interval: 1 }, { unique: true })
+SubscriptionPlanSchema.index({ userType: 1, isActive: 1 })
+SubscriptionPlanSchema.index(
+  { name: 1, userType: 1, interval: 1 },
+  { unique: true },
+)
 
 export default mongoose.models.SubscriptionPlan ||
   mongoose.model("SubscriptionPlan", SubscriptionPlanSchema)

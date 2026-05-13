@@ -203,7 +203,7 @@ export default function ProfilePage() {
         if (!response.ok) throw new Error("Profile not found")
 
         const data = await response.json()
-        setUser(data.user)
+        setUser({ ...(data.user || {}), resumes: data.resumes || [] })
         setEmployeeProfile(data.employeeProfile || null)
         setEmployerProfileData(data.employerProfile || null)
         setProfile(data.profile || data.employeeProfile || data.employerProfile)
@@ -297,7 +297,9 @@ export default function ProfilePage() {
     return Math.round((completed / total) * 100)
   }, [empProfile, employerProfile, isEmployerProfile, user])
 
-  const canShowResumes = user?.privacy?.showResumes !== false
+  const canShowResumes = Boolean(
+    isOwnProfile || user?.privacy?.showResumes !== false,
+  )
 
   if (loading) {
     return (
@@ -383,7 +385,7 @@ export default function ProfilePage() {
           )}
         </div>
 
-        <Card className="overflow-hidden pt-0 shadow-lg">
+        <Card className="overflow-hidden pt-0">
           {user.banner ? (
             <div className="relative">
               <img
@@ -394,11 +396,11 @@ export default function ProfilePage() {
               <div className="absolute inset-0 bg-gradient-to-t from-card via-card/20 to-transparent" />
             </div>
           ) : (
-            <div className="h-40 bg-secondary sm:h-48" />
+            <div className="h-40 bg-primary bg-gradient-to-t from-card via-card/30 to-transparent sm:h-48" />
           )}
 
           <CardContent className="pb-8 pt-0 sm:pb-10">
-            <div className="relative z-10 -mt-20 flex flex-col gap-4 px-4 sm:flex-row sm:gap-8 sm:px-6">
+            <div className="relative z-10 -mt-24 flex flex-col gap-4 px-4 sm:flex-row sm:gap-8 sm:px-6">
               {user.avatar ? (
                 <img
                   src={user.avatar}
@@ -551,7 +553,7 @@ export default function ProfilePage() {
           <div className="space-y-8 lg:col-span-2">
             {isEmployerProfile ? (
               <>
-                <Card className="shadow-md">
+                <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-xl">
                       <BookOpen className="h-5 w-5" />
@@ -663,7 +665,7 @@ export default function ProfilePage() {
                   </CardContent>
                 </Card>
 
-                <Card className="shadow-md">
+                <Card className="">
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-xl">
                       <Briefcase className="h-5 w-5" />
@@ -804,7 +806,7 @@ export default function ProfilePage() {
                   </CardContent>
                 </Card>
 
-                <Card className="shadow-md">
+                <Card className="">
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-xl">
                       <Briefcase className="h-5 w-5" />
@@ -867,7 +869,7 @@ export default function ProfilePage() {
             ) : (
               <>
                 {empProfile?.bio && (
-                  <Card className="shadow-md">
+                  <Card className="">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-xl">About</CardTitle>
                     </CardHeader>
@@ -880,7 +882,7 @@ export default function ProfilePage() {
                 )}
 
                 {empProfile?.primarySkills?.length ? (
-                  <Card className="shadow-md">
+                  <Card className="">
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-xl">
                         <Briefcase className="h-5 w-5" />
@@ -919,7 +921,7 @@ export default function ProfilePage() {
                 ) : null}
 
                 {empProfile?.workHistory?.length ? (
-                  <Card className="shadow-md">
+                  <Card className="">
                     <CardHeader className="pb-3">
                       <CardTitle className="flex items-center gap-2 text-xl">
                         <Briefcase className="h-5 w-5" />
@@ -957,7 +959,7 @@ export default function ProfilePage() {
           </div>
 
           <div className="space-y-8 lg:col-span-1">
-            <Card className="shadow-md">
+            <Card className="">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Award className="h-5 w-5" />
@@ -1023,7 +1025,7 @@ export default function ProfilePage() {
             </Card>
 
             {!isEmployerProfile && empProfile?.education?.length ? (
-              <Card className="shadow-md">
+              <Card className="">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <BookOpen className="h-5 w-5" />
@@ -1060,7 +1062,7 @@ export default function ProfilePage() {
             ) : null}
 
             {!isEmployerProfile && empProfile?.projects?.length ? (
-              <Card className="shadow-md">
+              <Card className="">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <Rocket className="h-5 w-5" />
@@ -1112,7 +1114,7 @@ export default function ProfilePage() {
             ) : null}
 
             {!isEmployerProfile && empProfile?.certifications?.length ? (
-              <Card className="shadow-md">
+              <Card className="">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <Award className="h-5 w-5" />
@@ -1139,8 +1141,10 @@ export default function ProfilePage() {
               </Card>
             ) : null}
 
-            {!isEmployerProfile && canShowResumes && user.resumes?.length ? (
-              <Card className="shadow-md">
+            {(!isEmployerProfile || isOwnProfile) &&
+            canShowResumes &&
+            user.resumes?.length ? (
+              <Card className="">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <FileText className="h-5 w-5" />
@@ -1190,7 +1194,7 @@ export default function ProfilePage() {
             ) : null}
 
             {isEmployerProfile && (
-              <Card className="shadow-md">
+              <Card className="">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <Award className="h-5 w-5" />
@@ -1232,7 +1236,7 @@ export default function ProfilePage() {
               user.privacy?.showLinkedin &&
               user.githubUrl &&
               user.portfolioUrl && (
-                <Card className="shadow-md">
+                <Card className="">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg">Connect</CardTitle>
                   </CardHeader>

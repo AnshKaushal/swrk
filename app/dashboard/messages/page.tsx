@@ -297,6 +297,13 @@ function getOtherParticipant(match: MatchRecord, userId?: string) {
     : match.employer
 }
 
+function isParticipantOnline(
+  participant: Person | undefined,
+  onlineUsers: Set<string>,
+) {
+  return participant?._id ? onlineUsers.has(participant._id) : false
+}
+
 function upsertMatch(list: MatchRecord[], match: MatchRecord) {
   const existing = list.find((item) => item._id === match._id)
   const next = list.filter((item) => item._id !== match._id)
@@ -1649,11 +1656,7 @@ function MessagesPageContent() {
                     const other = getOtherParticipant(match, currentUserId)
                     const active = match._id === activeMatchId
                     const unread = getMatchUnreadCount(match, currentUserId)
-                    const online = other?._id
-                      ? onlineUsers.has(other._id) ||
-                        other.isOnline === true ||
-                        isRecentlyActive(other.lastSeen)
-                      : false
+                    const online = isParticipantOnline(other, onlineUsers)
 
                     return (
                       <button
@@ -1750,7 +1753,10 @@ function MessagesPageContent() {
                           <h2 className="font-semibold leading-none">
                             {getPersonLabel(otherParticipant)}
                           </h2>
-                          {onlineUsers.has(otherParticipant._id) ? (
+                          {isParticipantOnline(
+                            otherParticipant,
+                            onlineUsers,
+                          ) ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">
                               Online
                             </span>

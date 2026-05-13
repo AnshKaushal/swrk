@@ -153,7 +153,17 @@ export function InterviewFeedbackDialog({
       const res = await fetch(`/api/interviews/${interview._id}/feedback`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ratings: {
+            responsiveness: formData.responsiveness,
+            communication: formData.communication,
+            professionalism: formData.professionalism,
+            punctuality: formData.punctuality,
+            overall: formData.overall,
+          },
+          wouldWorkAgain: formData.wouldWorkAgain,
+          notes: formData.notes,
+        }),
       })
       const json = await res.json()
       if (!res.ok) {

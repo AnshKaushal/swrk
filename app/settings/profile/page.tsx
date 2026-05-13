@@ -1426,7 +1426,8 @@ export default function ProfileSettingsPage() {
                 <div>
                   <Label>Professional Links</Label>
                   <p className="text-xs text-muted-foreground">
-                    Add up to 5 links that represent your professional presence.
+                    LinkedIn, GitHub, and Portfolio are pre-filled. Add up to 2
+                    more custom links.
                   </p>
                 </div>
                 <Button
@@ -1441,35 +1442,68 @@ export default function ProfileSettingsPage() {
                 </Button>
               </div>
               <div className="space-y-3">
-                {formData.professionalLinks.map((link, index) => (
-                  <div
-                    key={`${link.label}-${index}`}
-                    className="grid gap-3 sm:grid-cols-[1fr_1.4fr_auto]"
-                  >
-                    <Input
-                      placeholder="Label"
-                      value={link.label}
-                      onChange={(e) =>
-                        updateProfessionalLink(index, "label", e.target.value)
-                      }
-                    />
-                    <Input
-                      placeholder="https://"
-                      value={link.url}
-                      onChange={(e) =>
-                        updateProfessionalLink(index, "url", e.target.value)
-                      }
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeProfessionalLink(index)}
+                {formData.professionalLinks.map((link, index) => {
+                  const isGithub = link.label.toLowerCase() === "github"
+                  const githubUsername = isGithub
+                    ? link.url
+                        .replace("https://github.com/", "")
+                        .replace("/", "")
+                    : ""
+
+                  return (
+                    <div
+                      key={`${link.label}-${index}`}
+                      className="grid gap-3 sm:grid-cols-[1fr_1.4fr_auto]"
                     >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
+                      <Input
+                        placeholder="Label"
+                        value={link.label}
+                        onChange={(e) =>
+                          updateProfessionalLink(index, "label", e.target.value)
+                        }
+                        disabled={
+                          link.label.toLowerCase() === "linkedin" ||
+                          link.label.toLowerCase() === "github" ||
+                          link.label.toLowerCase() === "portfolio"
+                        }
+                      />
+                      {isGithub ? (
+                        <Input
+                          placeholder="GitHub username (without url)"
+                          value={githubUsername}
+                          onChange={(e) => {
+                            const username = e.target.value.trim()
+                            const fullUrl = username
+                              ? `https://github.com/${username}`
+                              : ""
+                            updateProfessionalLink(index, "url", fullUrl)
+                          }}
+                        />
+                      ) : (
+                        <Input
+                          placeholder="https://"
+                          value={link.url}
+                          onChange={(e) =>
+                            updateProfessionalLink(index, "url", e.target.value)
+                          }
+                        />
+                      )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeProfessionalLink(index)}
+                        disabled={
+                          link.label.toLowerCase() === "linkedin" ||
+                          link.label.toLowerCase() === "github" ||
+                          link.label.toLowerCase() === "portfolio"
+                        }
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
