@@ -46,7 +46,8 @@ export default function Navbar() {
   const [isOpen, setIsOpen] = React.useState(false)
   const [notifUnread, setNotifUnread] = React.useState(0)
   const hideOnMessagesScreen =
-    pathname === "/dashboard/messages" && searchParams?.has("matchId")
+    (pathname === "/dashboard/messages" && searchParams?.has("matchId")) ||
+    /^\/dashboard\/messages\/[^/]+$/.test(pathname!)
 
   const loadNotifUnread = React.useCallback(async () => {
     try {

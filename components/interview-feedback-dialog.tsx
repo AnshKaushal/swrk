@@ -103,7 +103,7 @@ export function InterviewFeedbackDialog({
   }, [interview.scheduledFor, interview.status])
 
   useEffect(() => {
-    if (!open) return
+    if (!canOpen) return
 
     const loadFeedback = async () => {
       setLoading(true)
@@ -129,6 +129,10 @@ export function InterviewFeedbackDialog({
             notes: json.existingFeedback.notes || "",
           })
         }
+
+        if (json.existingFeedback) {
+          setOpen(false)
+        }
       } catch (error) {
         console.error(error)
         toast.error("Failed to load feedback form")
@@ -138,7 +142,7 @@ export function InterviewFeedbackDialog({
     }
 
     void loadFeedback()
-  }, [interview._id, open])
+  }, [canOpen, interview._id])
 
   const updateRating = (field: RatingField, value: number) => {
     setFormData((previous) => ({
@@ -190,14 +194,11 @@ export function InterviewFeedbackDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <Button
-        type="button"
-        variant="outline"
-        onClick={() => setOpen(true)}
-        disabled={!canOpen}
-      >
-        {existingFeedback ? "Edit feedback" : "Leave feedback"}
-      </Button>
+      {canOpen && !existingFeedback && (
+        <Button type="button" variant="outline" onClick={() => setOpen(true)}>
+          Leave feedback
+        </Button>
+      )}
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{promptTitle}</DialogTitle>

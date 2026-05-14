@@ -176,6 +176,13 @@ END:VCALENDAR`
     window.open(interviewLink, "_blank", "noopener,noreferrer")
   }
 
+  const hasInterviewEnded = (interview: Interview) => {
+    const scheduledDate = new Date(interview.scheduledFor)
+    return (
+      interview.status === "completed" || scheduledDate.getTime() <= Date.now()
+    )
+  }
+
   const filteredInterviews = getFilteredInterviews().sort(
     (a, b) =>
       new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime(),
@@ -268,6 +275,7 @@ END:VCALENDAR`
             {filteredInterviews.map((interview) => {
               const scheduledDate = new Date(interview.scheduledFor)
               const isPastInterview = isPast(scheduledDate)
+              const interviewEnded = hasInterviewEnded(interview)
 
               return (
                 <Card
@@ -363,34 +371,34 @@ END:VCALENDAR`
                             </>
                           )}
 
-                        {(interview.status === "confirmed" ||
-                          interview.status === "scheduled" ||
-                          isPastInterview) && (
-                          <>
-                            <Button
-                              onClick={() =>
-                                handleOpenMeet(interview.interviewLink)
-                              }
-                              variant="default"
-                            >
-                              <Video className="w-4 h-4" />
-                              Join Google Meet
-                            </Button>
-                            <Button
-                              variant="outline"
-                              onClick={() => handleAddToCalendar(interview)}
-                            >
-                              <Calendar className="w-4 h-4" />
-                              Add to Calendar
-                            </Button>
-                            {(interview.status === "completed" ||
-                              isPastInterview) && (
-                              <InterviewFeedbackDialog
-                                interview={interview}
-                                currentUserId={session?.user?.id || ""}
-                              />
-                            )}
-                          </>
+                        {!interviewEnded &&
+                          (interview.status === "confirmed" ||
+                            interview.status === "scheduled") && (
+                            <>
+                              <Button
+                                onClick={() =>
+                                  handleOpenMeet(interview.interviewLink)
+                                }
+                                variant="default"
+                              >
+                                <Video className="w-4 h-4" />
+                                Join Google Meet
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => handleAddToCalendar(interview)}
+                              >
+                                <Calendar className="w-4 h-4" />
+                                Add to Calendar
+                              </Button>
+                            </>
+                          )}
+
+                        {interviewEnded && (
+                          <InterviewFeedbackDialog
+                            interview={interview}
+                            currentUserId={session?.user?.id || ""}
+                          />
                         )}
                       </div>
                     </div>

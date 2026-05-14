@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect, useState, Suspense } from "react"
 import { Menu } from "lucide-react"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, usePathname } from "next/navigation"
 
 import { DashboardSidebar } from "@/components/dashboard-sidebar"
 import { DashboardProvider } from "@/components/dashboard-context"
@@ -11,7 +11,10 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 
 function DashboardMobileHeader({ children }: { children: ReactNode }) {
   const searchParams = useSearchParams()
-  const isActiveChatOpen = searchParams?.has("matchId") ?? false
+  const pathname = usePathname()
+  const isActiveChatOpen =
+    (searchParams?.has("matchId") && pathname === "/dashboard/messages") ||
+    /^\/dashboard\/messages\/[^/]+$/.test(pathname!)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (

@@ -79,18 +79,12 @@ export async function GET(req: NextRequest) {
         "employee",
         "name avatar username email role activeRole isOnline lastSeen",
       )
-      .select("employer employee hiddenBy status")
+      .select(
+        "employer employee hiddenBy status clearedAtByEmployer clearedAtByEmployee",
+      )
       .lean()
 
     if (!match) {
-      return NextResponse.json({ error: "Match not found" }, { status: 404 })
-    }
-
-    if (
-      (match.hiddenBy || []).some(
-        (userId: unknown) => String(userId) === session.user.id,
-      )
-    ) {
       return NextResponse.json({ error: "Match not found" }, { status: 404 })
     }
 
@@ -101,7 +95,17 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    const messages = await Message.find({ match: matchId })
+    const isEmployer = extractObjectId(match.employer) === session.user.id
+    const clearCursor = isEmployer
+      ? match.clearedAtByEmployer
+      : match.clearedAtByEmployee
+
+    const messageQuery: Record<string, unknown> = { match: matchId }
+    if (clearCursor) {
+      messageQuery.createdAt = { $gt: clearCursor }
+    }
+
+    const messages = await Message.find(messageQuery)
       .populate("sender", "name avatar username role activeRole")
       .sort({ createdAt: 1 })
       .lean()
@@ -144,7 +148,6 @@ export async function GET(req: NextRequest) {
       },
     )
 
-    const isEmployer = extractObjectId(match.employer) === session.user.id
     await Match.updateOne(
       { _id: matchId },
       isEmployer
@@ -206,17 +209,11 @@ export async function POST(req: NextRequest) {
         "employee",
         "name avatar username email role activeRole isOnline lastSeen",
       )
-      .select("employer employee hiddenBy status")
+      .select(
+        "employer employee hiddenBy status clearedAtByEmployer clearedAtByEmployee",
+      )
 
     if (!match) {
-      return NextResponse.json({ error: "Match not found" }, { status: 404 })
-    }
-
-    if (
-      (match.hiddenBy || []).some(
-        (userId: unknown) => String(userId) === session.user.id,
-      )
-    ) {
       return NextResponse.json({ error: "Match not found" }, { status: 404 })
     }
 
@@ -229,6 +226,9 @@ export async function POST(req: NextRequest) {
 
     const senderIsEmployer = extractObjectId(match.employer) === session.user.id
     const senderRole = senderIsEmployer ? "employer" : "employee"
+    const recipientId = senderIsEmployer
+      ? extractObjectId(match.employee)
+      : extractObjectId(match.employer)
 
     const message = await Message.create({
       match: matchId,
@@ -251,6 +251,7 @@ export async function POST(req: NextRequest) {
               lastMessageBy: session.user.id,
             },
             $inc: { unreadByEmployee: 1 },
+            $pull: { hiddenBy: recipientId },
           }
         : {
             $set: {
@@ -259,6 +260,7 @@ export async function POST(req: NextRequest) {
               lastMessageBy: session.user.id,
             },
             $inc: { unreadByEmployer: 1 },
+            $pull: { hiddenBy: recipientId },
           },
     )
 

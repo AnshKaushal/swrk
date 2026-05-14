@@ -146,10 +146,39 @@ export async function POST(
           ? { $set: { unreadByEmployer: unreadCount } }
           : { $set: { unreadByEmployee: unreadCount } },
       )
+    } else if (action === "clear") {
+      await Match.updateOne(
+        { _id: id },
+        isEmployer
+          ? {
+              $set: {
+                clearedAtByEmployer: new Date(),
+                unreadByEmployer: 0,
+              },
+            }
+          : {
+              $set: {
+                clearedAtByEmployee: new Date(),
+                unreadByEmployee: 0,
+              },
+            },
+      )
     } else if (action === "delete") {
       await Match.updateOne(
         { _id: id },
-        { $addToSet: { hiddenBy: currentUserId } },
+        isEmployer
+          ? {
+              $set: {
+                clearedAtByEmployer: new Date(),
+                unreadByEmployer: 0,
+              },
+            }
+          : {
+              $set: {
+                clearedAtByEmployee: new Date(),
+                unreadByEmployee: 0,
+              },
+            },
       )
     } else if (action === "report") {
       const reportedUser = await User.findById(otherUserId)

@@ -64,6 +64,7 @@ import {
   Sparkles,
   CheckCheck,
   Trash2,
+  Eraser,
 } from "lucide-react"
 import { toast } from "sonner"
 import { InterviewMessageComponent } from "@/components/interview-message"
@@ -453,9 +454,10 @@ function MessagesPageContent() {
   const [socketConnected, setSocketConnected] = useState(false)
   const [isCompactLayout, setIsCompactLayout] = useState(false)
   const [actionBusy, setActionBusy] = useState<
-    "mark-read" | "mark-unread" | "delete" | "report" | null
+    "mark-read" | "mark-unread" | "delete" | "clear" | "report" | null
   >(null)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
   const [reportDialogOpen, setReportDialogOpen] = useState(false)
   const [reportReason, setReportReason] = useState("")
   const [reportDescription, setReportDescription] = useState("")
@@ -1367,7 +1369,7 @@ function MessagesPageContent() {
 
   const runChatAction = useCallback(
     async (
-      action: "mark-read" | "mark-unread" | "delete" | "report",
+      action: "mark-read" | "mark-unread" | "delete" | "clear" | "report",
       payload?: { reason?: string; description?: string },
     ) => {
       if (!activeMatchId) return
@@ -1398,6 +1400,13 @@ function MessagesPageContent() {
           handleCloseMatch()
           void fetchMatches({ silent: true })
           toast.success("Conversation deleted")
+          return
+        }
+
+        if (action === "clear") {
+          setClearConfirmOpen(false)
+          void fetchConversation(activeMatchId)
+          toast.success("Conversation cleared")
           return
         }
 
@@ -1595,8 +1604,8 @@ function MessagesPageContent() {
 
   if (status === "authenticated" && !matches.length) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <Card className="w-full max-w-2xl border-border/60 bg-card/95 p-8 text-center shadow-sm">
+      <div className="flex h-full items-center justify-center px-4">
+        <Card className="border-border/60 bg-card/95 p-8 text-center shadow-sm">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
             <MessageSquare className="h-7 w-7" />
           </div>
@@ -1813,6 +1822,13 @@ function MessagesPageContent() {
                           >
                             <Flag className="h-4 w-4" />
                             Report conversation
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => setClearConfirmOpen(true)}
+                            disabled={actionBusy !== null}
+                          >
+                            <Eraser className="h-4 w-4" />
+                            Clear conversation
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             variant="destructive"
@@ -2633,6 +2649,29 @@ function MessagesPageContent() {
                 disabled={actionBusy === "delete"}
               >
                 {actionBusy === "delete" ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={clearConfirmOpen} onOpenChange={setClearConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clear this conversation?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This removes all messages from this conversation. Both you and
+                the other person can still see that you matched.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={actionBusy === "clear"}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => void runChatAction("clear")}
+                disabled={actionBusy === "clear"}
+              >
+                {actionBusy === "clear" ? "Clearing..." : "Clear"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

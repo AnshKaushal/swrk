@@ -96,6 +96,10 @@ const MatchSchema = new mongoose.Schema(
     // Per-user chat visibility
     hiddenBy: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
 
+    // Per-user clear history cursors. Messages before this timestamp are hidden for that side.
+    clearedAtByEmployer: Date,
+    clearedAtByEmployee: Date,
+
     // Last message preview (for match list UI)
     lastMessageAt: Date,
     lastMessagePreview: String,

@@ -17,12 +17,8 @@ import { Badge } from "@/components/ui/badge"
 import {
   Briefcase,
   MessageCircle,
-  Calendar,
-  CheckCircle2,
   TrendingUp,
   Users,
-  Star,
-  Eye,
   Zap,
   Clock,
   AlertCircle,
@@ -73,7 +69,6 @@ export function RecruiterDashboard({ name }: { name: string }) {
   const [stats, setStats] = useState<StatsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [chartData, setChartData] = useState<ActivityPoint[]>([])
-  const [activityLoading, setActivityLoading] = useState(false)
   const [range, setRange] = useState<number>(7)
   const [upcomingInterviews, setUpcomingInterviews] = useState<InterviewData[]>(
     [],
@@ -102,9 +97,32 @@ export function RecruiterDashboard({ name }: { name: string }) {
   }, [])
 
   useEffect(() => {
+    const fetchInterviews = async () => {
+      try {
+        const response = await fetch("/api/interviews?status=scheduled")
+        if (response.ok) {
+          const data = await response.json()
+          const now = new Date()
+          const futureInterviews = (data.interviews || []).filter(
+            (interview: InterviewData) => {
+              return new Date(interview.scheduledFor) > now
+            },
+          )
+          setUpcomingInterviews(futureInterviews.slice(0, 3))
+        }
+      } catch (error) {
+        console.error("Failed to fetch interviews:", error)
+      } finally {
+        setInterviewsLoading(false)
+      }
+    }
+
+    fetchInterviews()
+  }, [])
+
+  useEffect(() => {
     let mounted = true
     const fetchActivity = async () => {
-      setActivityLoading(true)
       try {
         const res = await fetch(
           `/api/swipe/activity?range=${range}&type=received`,
@@ -122,8 +140,6 @@ export function RecruiterDashboard({ name }: { name: string }) {
         setChartData(mapped)
       } catch (err) {
         console.error("Failed to fetch activity:", err)
-      } finally {
-        setActivityLoading(false)
       }
     }
 
@@ -326,7 +342,15 @@ export function RecruiterDashboard({ name }: { name: string }) {
                             {new Date(match.matchedAt).toLocaleDateString()}
                           </p>
                         </div>
-                        <Button variant="ghost" size="sm">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            router.push(
+                              `/dashboard/messages?matchId=${match._id}`,
+                            )
+                          }
+                        >
                           <MessageCircle className="w-4 h-4" />
                         </Button>
                       </div>
@@ -407,8 +431,8 @@ export function RecruiterDashboard({ name }: { name: string }) {
                     </h3>
                   </div>
                   <p className="text-sm text-muted-foreground mb-6">
-                    Start a velocity session and discover top talent matching
-                    your criteria in minutes.
+                    Swipe through potential candidates and discover your next
+                    great hire with Swrk™
                   </p>
                 </div>
                 <Button
@@ -417,7 +441,7 @@ export function RecruiterDashboard({ name }: { name: string }) {
                   className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
                 >
                   <Zap className="w-4 h-4" />
-                  Start Velocity Session
+                  See Candidates
                 </Button>
               </div>
             </CardContent>

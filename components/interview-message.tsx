@@ -10,6 +10,8 @@ import {
   MapPin,
   Calendar,
   Clock,
+  Copy,
+  Check,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -28,6 +30,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+import { InterviewFeedbackDialog } from "@/components/interview-feedback-dialog"
 
 interface InterviewMessage {
   _id: string
@@ -71,6 +74,7 @@ export function InterviewMessageComponent({
   )
   const [openDeny, setOpenDeny] = useState(false)
   const [denyReason, setDenyReason] = useState("")
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     setLocalStatus(interview.status)
@@ -162,7 +166,21 @@ END:VCALENDAR`
     window.open(interview.interviewLink, "_blank", "noopener,noreferrer")
   }
 
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(interview.interviewLink)
+      setCopied(true)
+      toast.success("Google Meet link copied to clipboard")
+      setTimeout(() => setCopied(false), 2000)
+    } catch (error) {
+      console.error("Failed to copy link:", error)
+      toast.error("Failed to copy link")
+    }
+  }
+
   const scheduledDate = new Date(interview.scheduledFor)
+  const interviewEnded =
+    localStatus === "completed" || scheduledDate.getTime() <= Date.now()
   const messageDate = new Date(
     messageCreatedAt ||
       interview.confirmedAt ||
@@ -330,6 +348,24 @@ END:VCALENDAR`
             </Button>
 
             <Button
+              onClick={handleCopyLink}
+              variant="outline"
+              className="gap-2"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" />
+                  Copy Link
+                </>
+              )}
+            </Button>
+
+            <Button
               onClick={handleAddToCalendar}
               variant="outline"
               className="gap-2"
@@ -411,26 +447,54 @@ END:VCALENDAR`
               </p>
             )}
 
-          {(localStatus === "confirmed" || localStatus === "scheduled") && (
+          {!interviewEnded &&
+            (localStatus === "confirmed" || localStatus === "scheduled") && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  onClick={handleOpenMeet}
+                  size="sm"
+                  variant="default"
+                  className="gap-2"
+                >
+                  <Video className="h-4 w-4" />
+                  Join Meet
+                </Button>
+                <Button
+                  onClick={handleCopyLink}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      Copy Link
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={handleAddToCalendar}
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                >
+                  <Calendar className="h-4 w-4" />
+                  Add to Calendar
+                </Button>
+              </div>
+            )}
+
+          {interviewEnded && (
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button
-                onClick={handleOpenMeet}
-                size="sm"
-                variant="default"
-                className="gap-2"
-              >
-                <Video className="h-4 w-4" />
-                Join Meet
-              </Button>
-              <Button
-                onClick={handleAddToCalendar}
-                variant="outline"
-                size="sm"
-                className="gap-2"
-              >
-                <Calendar className="h-4 w-4" />
-                Add to Calendar
-              </Button>
+              <InterviewFeedbackDialog
+                interview={interview}
+                currentUserId={currentUserId}
+              />
             </div>
           )}
 

@@ -75,7 +75,6 @@ export function CandidateDashboard({ name }: { name: string }) {
   const [stats, setStats] = useState<StatsData | null>(null)
   const [loading, setLoading] = useState(true)
   const [chartData, setChartData] = useState<ActivityPoint[]>([])
-  const [activityLoading, setActivityLoading] = useState(false)
   const [range, setRange] = useState<number>(7)
   const [upcomingInterviews, setUpcomingInterviews] = useState<InterviewData[]>(
     [],
@@ -129,7 +128,6 @@ export function CandidateDashboard({ name }: { name: string }) {
   useEffect(() => {
     let mounted = true
     const fetchActivity = async () => {
-      setActivityLoading(true)
       try {
         const res = await fetch(`/api/swipe/activity?range=${range}&type=given`)
         if (!res.ok) return
@@ -145,8 +143,6 @@ export function CandidateDashboard({ name }: { name: string }) {
         setChartData(mapped)
       } catch (err) {
         console.error("Failed to fetch activity:", err)
-      } finally {
-        setActivityLoading(false)
       }
     }
 
@@ -343,7 +339,15 @@ export function CandidateDashboard({ name }: { name: string }) {
                             {new Date(match.matchedAt).toLocaleDateString()}
                           </p>
                         </div>
-                        <Button variant="ghost" size="sm">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            router.push(
+                              `/dashboard/messages?matchId=${match._id}`,
+                            )
+                          }
+                        >
                           <MessageCircle className="w-4 h-4" />
                         </Button>
                       </div>
