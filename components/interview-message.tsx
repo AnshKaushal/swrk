@@ -141,7 +141,7 @@ CALSCALE:GREGORIAN
 METHOD:PUBLISH
 X-WR-TIMEZONE:${timeZone}
 BEGIN:VEVENT
-UID:${interview._id}@swrk.com
+UID:${interview._id}@mutch.com
 DTSTAMP:${formatICSUTC(new Date())}
 DTSTART;TZID=${timeZone}:${formatICSDateTime(startDate, timeZone)}
 DTEND;TZID=${timeZone}:${formatICSDateTime(endDate, timeZone)}

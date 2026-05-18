@@ -17,6 +17,12 @@ import {
   MessageSquare,
   Calendar,
   Briefcase,
+  Users,
+  AlertCircle,
+  Activity,
+  DollarSign,
+  MapPin,
+  BarChart3,
 } from "lucide-react"
 import { ModeToggle } from "@/components/theme-toggle"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -32,6 +38,7 @@ import { cn } from "@/lib/utils"
 import { IconDashboard } from "@tabler/icons-react"
 import { Badge } from "@/components/ui/badge"
 import React, { useEffect } from "react"
+import { BrandLogo } from "@/components/brand-logo"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: IconDashboard },
@@ -39,14 +46,32 @@ const navigation = [
   { name: "Interviews", href: "/dashboard/interviews", icon: Calendar },
   { name: "Swipe", href: "/dashboard/swipe", icon: Zap },
   { name: "Jobs", href: "/dashboard/jobs", icon: Briefcase },
-  { name: "Profile", href: "/settings/profile", icon: User },
-  { name: "Verification", href: "/settings/verification", icon: Shield },
-  { name: "Filters", href: "/settings/role-filters", icon: Filter },
-  { name: "Resumes", href: "/settings/resume", icon: FileText },
-  { name: "Privacy", href: "/settings/privacy", icon: Shield },
-  { name: "Notifications", href: "/dashboard/notifications", icon: Bell },
-  { name: "Subscription", href: "/settings/subscription", icon: Crown },
-  { name: "Account", href: "/settings/account", icon: Settings },
+]
+
+const adminNavigation = [
+  { name: "Overview", href: "/dashboard", icon: IconDashboard },
+  { name: "Users", href: "/dashboard/admin/users", icon: Users },
+  { name: "Reports", href: "/dashboard/admin/reports", icon: AlertCircle },
+  {
+    name: "Verifications",
+    href: "/dashboard/admin/verifications",
+    icon: Shield,
+  },
+  {
+    name: "Subscriptions",
+    href: "/dashboard/admin/subscriptions",
+    icon: Crown,
+  },
+  { name: "Activity", href: "/dashboard/admin/activity", icon: Activity },
+  { name: "Matches", href: "/dashboard/admin/matches", icon: Users },
+  { name: "Swipes", href: "/dashboard/admin/swipes", icon: Zap },
+  { name: "Boosts", href: "/dashboard/admin/boosts", icon: Crown },
+  { name: "Messages", href: "/dashboard/admin/messages", icon: MessageSquare },
+  { name: "Payments", href: "/dashboard/admin/payments", icon: DollarSign },
+  { name: "Locations", href: "/dashboard/admin/locations", icon: MapPin },
+  { name: "Analytics", href: "/dashboard/admin/analytics", icon: BarChart3 },
+  { name: "Content", href: "/dashboard/admin/content", icon: FileText },
+  { name: "Settings", href: "/settings/account", icon: Settings },
 ]
 
 import { useDashboard } from "@/components/dashboard-context"
@@ -69,8 +94,8 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
         console.warn("session update listener failed", error)
       }
     }
-    window.addEventListener("swrk:session-updated", handler)
-    return () => window.removeEventListener("swrk:session-updated", handler)
+    window.addEventListener("mutch:session-updated", handler)
+    return () => window.removeEventListener("mutch:session-updated", handler)
   }, [update])
 
   const getAvatarUrl = () => {
@@ -94,19 +119,15 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
     return "U"
   }
 
-  const canShowJobs =
-    session?.user?.role === "employer" ||
-    (session?.user?.role === "both" && activeRole === "employer")
-  const visibleNavigation = navigation.filter(
-    (item) => item.href !== "/dashboard/jobs" || canShowJobs,
-  )
+  const visibleNavigation = session?.user?.isAdmin
+    ? adminNavigation
+    : navigation
 
   return (
     <nav className="flex h-full flex-col">
       <div className="flex items-center justify-between p-4 pt-6">
         <Link href="/home" className="flex items-center gap-3">
-          <img src="/swrk.svg" alt="Swrk" className="h-8 w-8 object-contain" />
-          <span className="font-semibold">Swrk</span>
+          <BrandLogo className="h-8 w-8 md:h-8 md:w-[116px]" alt="Mutch" />
         </Link>
       </div>
 

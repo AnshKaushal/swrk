@@ -163,21 +163,38 @@ export async function POST(
               },
             },
       )
+
+      const updatedClearState = await Match.findById(id)
+        .select("clearedAtByEmployer clearedAtByEmployee lastMessagePreview")
+        .lean()
+
+      if (
+        updatedClearState?.clearedAtByEmployer &&
+        updatedClearState?.clearedAtByEmployee &&
+        updatedClearState.lastMessagePreview
+      ) {
+        await Match.updateOne(
+          { _id: id },
+          { $unset: { lastMessagePreview: 1 } },
+        )
+      }
     } else if (action === "delete") {
       await Match.updateOne(
         { _id: id },
         isEmployer
           ? {
               $set: {
-                clearedAtByEmployer: new Date(),
+                deletedAtByEmployer: new Date(),
                 unreadByEmployer: 0,
               },
+              $unset: { lastMessagePreview: 1 },
             }
           : {
               $set: {
-                clearedAtByEmployee: new Date(),
+                deletedAtByEmployee: new Date(),
                 unreadByEmployee: 0,
               },
+              $unset: { lastMessagePreview: 1 },
             },
       )
     } else if (action === "report") {
@@ -272,7 +289,7 @@ export async function POST(
       )
       .lean()
 
-    if (action !== "delete" && getSocketServer()) {
+    if (getSocketServer()) {
       emitToMatch(id, "conversation:update", {
         matchId: id,
         match: updatedMatch,

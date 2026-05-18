@@ -16,7 +16,13 @@ export async function POST(req: NextRequest) {
 
     await db()
 
-    const { positionId, direction } = await req.json()
+    const body = await req.json()
+    const positionId = String(body.positionId || "").trim()
+    const direction = String(body.direction || "").trim()
+    const applicationData =
+      body.applicationData && typeof body.applicationData === "object"
+        ? body.applicationData
+        : {}
 
     if (!positionId || !direction) {
       return NextResponse.json(
@@ -52,6 +58,14 @@ export async function POST(req: NextRequest) {
       positionId,
       employerId: position.employerId,
       direction,
+      applicationData,
+      applicationStatus: direction === "right" ? "submitted" : undefined,
+      applicationSubmittedAt:
+        direction === "right" && Object.keys(applicationData).length > 0
+          ? new Date()
+          : undefined,
+      applicationStatusUpdatedAt:
+        direction === "right" ? new Date() : undefined,
     })
 
     await swipe.save()

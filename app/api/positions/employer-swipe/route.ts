@@ -28,6 +28,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid direction" }, { status: 400 })
     }
 
+    const position = await Position.findById(positionId)
+      .select("employerId")
+      .lean()
+    if (!position) {
+      return NextResponse.json({ error: "Position not found" }, { status: 404 })
+    }
+
+    if (String(position.employerId) !== session.user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
     // Check if employer already swiped on this candidate for this position
     const existingSwipe = await EmployerPositionSwipe.findOne({
       employerId: session.user.id,

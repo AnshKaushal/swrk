@@ -1,7 +1,7 @@
 import mongoose from "mongoose"
 
 async function wipeDatabase() {
-  await mongoose.connect("mongodb://localhost:27017/swrk")
+  await mongoose.connect("mongodb://localhost:27017/mutch")
 
   console.log("💣 Dropping entire database...")
   await mongoose.connection.dropDatabase()

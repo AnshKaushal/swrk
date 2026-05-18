@@ -627,7 +627,7 @@ export default function ProfileSettingsPage() {
       }
       // dispatch event for navbar/sidebar refresh
       try {
-        window.dispatchEvent(new Event("swrk:session-updated"))
+        window.dispatchEvent(new Event("mutch:session-updated"))
       } catch {
         // non-fatal
       }
@@ -1040,8 +1040,8 @@ export default function ProfileSettingsPage() {
         toast.success("Profile updated successfully!")
         try {
           // Let other UI refresh session/profile data
-          window.dispatchEvent(new Event("swrk:session-updated"))
-          window.dispatchEvent(new Event("swrk:notifications-updated"))
+          window.dispatchEvent(new Event("mutch:session-updated"))
+          window.dispatchEvent(new Event("mutch:notifications-updated"))
         } catch (e) {}
       } else {
         const error = await response.json()

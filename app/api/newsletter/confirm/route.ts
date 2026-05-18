@@ -47,12 +47,12 @@ export async function GET(req: NextRequest) {
     const baseUrl = `${req.nextUrl.protocol}//${req.nextUrl.host}`
     const unsubscribeUrl = `${baseUrl}/newsletter/unsubscribe?token=${subscriber.unsubscribeToken}`
 
-    const subject = "You are subscribed to Swrk"
-    const text = `You are subscribed to Swrk updates. Unsubscribe: ${unsubscribeUrl}`
+    const subject = "You are subscribed to Mutch"
+    const text = `You are subscribed to Mutch updates. Unsubscribe: ${unsubscribeUrl}`
     const html = `
       <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <h2>Subscription confirmed</h2>
-        <p>You are now subscribed to Swrk updates.</p>
+        <p>You are now subscribed to Mutch updates.</p>
         <p><a href="${unsubscribeUrl}" style="color: #2563eb;">Unsubscribe</a></p>
       </div>
     `

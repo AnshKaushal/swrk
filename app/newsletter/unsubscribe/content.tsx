@@ -153,7 +153,7 @@ export default function UnsubscribeContent() {
               Unsubscribe?
             </h1>
             <p className="text-lg text-muted-foreground">
-              Are you sure you want to unsubscribe from Swrk updates? You won't
+              Are you sure you want to unsubscribe from Mutch updates? You won't
               receive any more emails from us.
             </p>
           </motion.div>

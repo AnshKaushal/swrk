@@ -26,6 +26,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { BrandLogo } from "@/components/brand-logo"
 import { ModeToggle } from "@/components/theme-toggle"
 import { usePathname, useSearchParams } from "next/navigation"
 import { IconDashboard } from "@tabler/icons-react"
@@ -43,6 +44,7 @@ export default function Navbar() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { data: session, status, update } = useSession()
+  const [mounted, setMounted] = React.useState(false)
   const [isOpen, setIsOpen] = React.useState(false)
   const [notifUnread, setNotifUnread] = React.useState(0)
   const hideOnMessagesScreen =
@@ -63,6 +65,10 @@ export default function Navbar() {
   }, [])
 
   React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  React.useEffect(() => {
     if (!update) return
     const handler = () => {
       try {
@@ -71,8 +77,8 @@ export default function Navbar() {
         console.warn("session update listener failed", err)
       }
     }
-    window.addEventListener("swrk:session-updated", handler)
-    return () => window.removeEventListener("swrk:session-updated", handler)
+    window.addEventListener("mutch:session-updated", handler)
+    return () => window.removeEventListener("mutch:session-updated", handler)
   }, [update])
 
   React.useEffect(() => {
@@ -80,10 +86,10 @@ export default function Navbar() {
       void loadNotifUnread()
     }, 0)
     const onMessage = () => void loadNotifUnread()
-    window.addEventListener("swrk:notifications-updated", onMessage)
+    window.addEventListener("mutch:notifications-updated", onMessage)
     return () => {
       window.clearTimeout(timer)
-      window.removeEventListener("swrk:notifications-updated", onMessage)
+      window.removeEventListener("mutch:notifications-updated", onMessage)
     }
   }, [loadNotifUnread])
 
@@ -97,35 +103,7 @@ export default function Navbar() {
     return null
   }
 
-  if (status === "loading") {
-    return (
-      <nav
-        className={`sticky top-0 z-50 w-full border-b border-border/40 bg-background/10 backdrop-blur ${
-          hideOnMessagesScreen ? "hidden lg:block" : ""
-        }`}
-      >
-        <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="h-10 w-10 rounded-full bg-muted/40" />
-            </div>
-            <div className="hidden md:flex flex-1 justify-center items-center gap-8">
-              {navLinks.map((link) => (
-                <div
-                  key={link.href}
-                  className="h-4 w-16 rounded-full bg-muted/40"
-                />
-              ))}
-            </div>
-            <div className="flex items-center gap-4 flex-shrink-0">
-              <div className="h-9 w-9 rounded-full bg-muted/40" />
-              <div className="h-10 w-10 rounded-full bg-muted/40" />
-            </div>
-          </div>
-        </div>
-      </nav>
-    )
-  }
+  const showResolvedSession = mounted && status !== "loading"
 
   const handleSignOut = () => {
     signOut({ callbackUrl: "/" })
@@ -161,11 +139,7 @@ export default function Navbar() {
             href={homeHref}
             className="flex items-center gap-2 font-bold text-xl flex-shrink-0"
           >
-            <img
-              src="/swrk.svg"
-              alt="Swrk Logo"
-              className="h-10 w-10 object-contain"
-            />
+            <BrandLogo className="h-10 w-10 md:h-10 md:w-[145px]" alt="Mutch" />
           </Link>
 
           <div className="hidden md:flex flex-1 justify-center items-center gap-8">
@@ -186,7 +160,9 @@ export default function Navbar() {
             </div>
 
             <div className="hidden md:block">
-              {status === "authenticated" && session?.user ? (
+              {showResolvedSession &&
+              status === "authenticated" &&
+              session?.user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button className="relative h-10 w-10 rounded-full">
@@ -258,10 +234,12 @@ export default function Navbar() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              ) : (
+              ) : showResolvedSession ? (
                 <Button size="lg" variant="outline" asChild>
                   <Link href="/signin">Sign In</Link>
                 </Button>
+              ) : (
+                <div className="h-10 w-10 rounded-full bg-muted/40" />
               )}
             </div>
 
@@ -292,7 +270,9 @@ export default function Navbar() {
                     ))}
                   </div>
                   <div className="flex flex-col gap-2 py-4 border-t">
-                    {status === "authenticated" && session?.user ? (
+                    {showResolvedSession &&
+                    status === "authenticated" &&
+                    session?.user ? (
                       <div className="flex items-center justify-between md:hidden px-4">
                         <ModeToggle />
                         <DropdownMenu>
@@ -368,6 +348,11 @@ export default function Navbar() {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
+                      </div>
+                    ) : !showResolvedSession ? (
+                      <div className="px-4 flex items-center justify-between md:hidden">
+                        <div className="h-9 w-9 rounded-full bg-muted/40" />
+                        <div className="h-10 w-24 rounded-full bg-muted/40" />
                       </div>
                     ) : (
                       <div className="px-4 flex flex-col gap-2">

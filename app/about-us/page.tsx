@@ -45,7 +45,7 @@ export default function AboutPage() {
             transition={{ duration: 0.6 }}
           >
             <p className="text-sm font-semibold uppercase tracking-[0.15em] text-primary/80">
-              About Swrk
+              About Mutch
             </p>
             <h1 className="text-5xl font-bold tracking-tight text-foreground sm:text-6xl">
               Reimagining the job market
@@ -245,8 +245,8 @@ export default function AboutPage() {
               Ready to find your perfect fit?
             </h2>
             <p className="text-lg text-muted-foreground">
-              Join thousands of professionals who are already using Swrk to make
-              meaningful career connections.
+              Join thousands of professionals who are already using Mutch to
+              make meaningful career connections.
             </p>
           </motion.div>
 
@@ -259,7 +259,7 @@ export default function AboutPage() {
           >
             <Link href="/signup">
               <Button size="lg">
-                Join Swrk Today
+                Join Mutch Today
                 <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/app/api/auth/[...nextauth]/route"
 import { db } from "@/lib/mongodb"
-import { User, Notification, Interview, UserSubscription } from "@/models"
+import mongoose from "mongoose"
+import { User, Notification, UserSubscription } from "@/models"
+import VerificationRequest from "@/models/verification-request"
+import os from "os"
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,8 +17,11 @@ export async function GET(req: NextRequest) {
     await db()
 
     const totalUsers = await User.countDocuments()
+
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
     const activeUsers = await User.countDocuments({
-      lastActive: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+      lastSeen: { $gte: thirtyDaysAgo },
     })
 
     const pendingReports = await Notification.countDocuments({
@@ -23,21 +29,57 @@ export async function GET(req: NextRequest) {
       status: "pending",
     })
 
-    const pendingVerifications = await User.countDocuments({
-      verificationStatus: "pending",
+    const pendingVerifications = await VerificationRequest.countDocuments({
+      status: "pending",
     })
 
     const activeSubscriptions = await UserSubscription.countDocuments({
       status: "active",
     })
 
-    const databaseHealth = 98.5
-    const apiUptime = 99.8
-    const serverLoad = 45
-    const monthlyRevenue = 24500
-    const avgSessionTime = "12m 34s"
-    const bounceRate = 24
-    const supportTickets = 18
+    // Database health: ping
+    let databaseHealth = 0
+    try {
+      await db()
+      const adminDb = mongoose.connection.db?.admin()
+      if (adminDb) {
+        const ping = await adminDb.ping()
+        databaseHealth = ping?.ok ? 100 : 0
+      }
+    } catch (e) {
+      databaseHealth = 0
+    }
+
+    // API uptime in seconds (raw)
+    const apiUptimeSeconds = Math.floor(process.uptime())
+    // Convert uptime to a percentage of a 24h window (cap at 100%) for UI progress bars
+    const apiUptime = Math.min(
+      100,
+      Math.round((apiUptimeSeconds / (24 * 60 * 60)) * 100),
+    )
+
+    // server load (1m avg)
+    const load = os.loadavg()[0]
+    const cpus = os.cpus().length || 1
+    const serverLoad = Math.round((load / cpus) * 100)
+
+    // monthly revenue: sum of subscription amounts with lastPaymentDate this month
+    const startOfMonth = new Date()
+    startOfMonth.setDate(1)
+    startOfMonth.setHours(0, 0, 0, 0)
+    const revRes = await UserSubscription.aggregate([
+      { $match: { lastPaymentDate: { $gte: startOfMonth }, status: "active" } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ])
+    const monthlyRevenue = (revRes && revRes[0] && revRes[0].total) || 0
+
+    const avgSessionTime = null
+    const bounceRate = null
+
+    const supportTickets = await Notification.countDocuments({
+      type: "support",
+      status: "pending",
+    })
 
     return NextResponse.json({
       totalUsers,
@@ -47,6 +89,7 @@ export async function GET(req: NextRequest) {
       activeSubscriptions,
       databaseHealth,
       apiUptime,
+      apiUptimeSeconds,
       serverLoad,
       monthlyRevenue,
       avgSessionTime,

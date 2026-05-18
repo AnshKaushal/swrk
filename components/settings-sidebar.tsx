@@ -28,6 +28,7 @@ import {
 import { cn } from "@/lib/utils"
 import { IconDashboard } from "@tabler/icons-react"
 import React from "react"
+import { BrandLogo } from "@/components/brand-logo"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: IconDashboard },
@@ -59,8 +60,8 @@ export function SettingsSidebar({ onClose }: { onClose?: () => void }) {
         console.warn("session update listener failed", err)
       }
     }
-    window.addEventListener("swrk:session-updated", handler)
-    return () => window.removeEventListener("swrk:session-updated", handler)
+    window.addEventListener("mutch:session-updated", handler)
+    return () => window.removeEventListener("mutch:session-updated", handler)
   }, [update])
 
   const getAvatarUrl = () => {
@@ -88,8 +89,7 @@ export function SettingsSidebar({ onClose }: { onClose?: () => void }) {
     <nav className="flex h-full flex-col">
       <div className="flex items-center justify-between p-4 pt-6">
         <Link href="/" className="flex items-center gap-3">
-          <img src="/swrk.svg" alt="Swrk" className="h-8 w-8 object-contain" />
-          <span className="font-semibold">Swrk</span>
+          <BrandLogo className="h-8 w-8 md:h-8 md:w-[116px]" alt="Mutch" />
         </Link>
       </div>
 

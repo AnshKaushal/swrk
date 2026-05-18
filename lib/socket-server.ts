@@ -6,8 +6,8 @@ import { db } from "@/lib/mongodb"
 import { Match, Swipe } from "@/models/swipe"
 
 declare global {
-  var __swrkSocketServer: SocketIOServer | undefined
-  var __swrkPresenceCounts: Map<string, number> | undefined
+  var __mutchSocketServer: SocketIOServer | undefined
+  var __mutchPresenceCounts: Map<string, number> | undefined
 }
 
 function getUserIdFromToken(token: Record<string, unknown> | null) {
@@ -66,11 +66,11 @@ async function canJoinMatch(userId: string, matchId: string) {
 }
 
 function getPresenceCounts() {
-  if (!globalThis.__swrkPresenceCounts) {
-    globalThis.__swrkPresenceCounts = new Map<string, number>()
+  if (!globalThis.__mutchPresenceCounts) {
+    globalThis.__mutchPresenceCounts = new Map<string, number>()
   }
 
-  return globalThis.__swrkPresenceCounts
+  return globalThis.__mutchPresenceCounts
 }
 
 function getOnlineUserIds(excludeUserId?: string) {
@@ -135,10 +135,10 @@ function verifySocketToken(rawToken?: unknown) {
 }
 
 export async function ensureSocketServer(server: HTTPServer) {
-  if (globalThis.__swrkSocketServer) {
+  if (globalThis.__mutchSocketServer) {
     ;(server as HTTPServer & { io?: SocketIOServer }).io =
-      globalThis.__swrkSocketServer
-    return globalThis.__swrkSocketServer
+      globalThis.__mutchSocketServer
+    return globalThis.__mutchSocketServer
   }
 
   const io = new SocketIOServer(server, {
@@ -150,7 +150,7 @@ export async function ensureSocketServer(server: HTTPServer) {
     },
   })
 
-  globalThis.__swrkSocketServer = io
+  globalThis.__mutchSocketServer = io
   ;(server as HTTPServer & { io?: SocketIOServer }).io = io
 
   io.on("connection", async (socket: Socket) => {
@@ -271,13 +271,13 @@ export async function ensureSocketServer(server: HTTPServer) {
 }
 
 export function getSocketServer() {
-  return globalThis.__swrkSocketServer ?? null
+  return globalThis.__mutchSocketServer ?? null
 }
 
 export function emitToUser(userId: string, event: string, payload: unknown) {
-  globalThis.__swrkSocketServer?.to(`user:${userId}`).emit(event, payload)
+  globalThis.__mutchSocketServer?.to(`user:${userId}`).emit(event, payload)
 }
 
 export function emitToMatch(matchId: string, event: string, payload: unknown) {
-  globalThis.__swrkSocketServer?.to(`match:${matchId}`).emit(event, payload)
+  globalThis.__mutchSocketServer?.to(`match:${matchId}`).emit(event, payload)
 }

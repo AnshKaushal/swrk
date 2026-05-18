@@ -26,6 +26,7 @@ import {
   Plus,
 } from "lucide-react"
 import Link from "next/link"
+import { BrandLogo } from "@/components/brand-logo"
 import { toast } from "sonner"
 import Cropper, { Area } from "react-easy-crop"
 
@@ -198,7 +199,7 @@ export default function OnboardingPage() {
     let redirectTimer: number | undefined
     if (status === "authenticated" && session?.user) {
       if (!hasHydratedRef.current) {
-        const storageKey = `swrk:onboarding-step:${session.user.id || session.user.username || "guest"}`
+        const storageKey = `mutch:onboarding-step:${session.user.id || session.user.username || "guest"}`
         const savedStep = Number(window.localStorage.getItem(storageKey) || "0")
         const initialStep = Math.max(
           session.user.onboardingStep || 1,
@@ -231,7 +232,7 @@ export default function OnboardingPage() {
       return
     }
 
-    const storageKey = `swrk:onboarding-step:${session.user.id || session.user.username || "guest"}`
+    const storageKey = `mutch:onboarding-step:${session.user.id || session.user.username || "guest"}`
     if (step >= 1 && step <= TOTAL_STEPS) {
       window.localStorage.setItem(storageKey, String(step))
     }
@@ -379,8 +380,8 @@ export default function OnboardingPage() {
 
       // If targetStep is beyond the UI steps, finalize onboarding
       if (targetStep === TOTAL_STEPS + 1) {
-        toast.success("Profile completed successfully! Welcome to Swrk!")
-        const storageKey = `swrk:onboarding-step:${session?.user?.id || session?.user?.username || "guest"}`
+        toast.success("Profile completed successfully! Welcome to Mutch!")
+        const storageKey = `mutch:onboarding-step:${session?.user?.id || session?.user?.username || "guest"}`
         window.localStorage.removeItem(storageKey)
         await update({
           ...sessionUpdates,
@@ -688,7 +689,10 @@ export default function OnboardingPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
         <div className="relative z-10 flex flex-col justify-between p-12 text-white h-full w-full">
           <Link href="/">
-            <img src="/swrk.svg" alt="Swrk Logo" className="h-10 opacity-90" />
+            <BrandLogo
+              className="h-10 w-10 md:h-10 md:w-[145px] opacity-90"
+              alt="Mutch"
+            />
           </Link>
           <div className="space-y-4">
             <h1 className="text-5xl font-black tracking-tight">
@@ -696,7 +700,7 @@ export default function OnboardingPage() {
               Starts Here.
             </h1>
             <p className="text-xl text-white/80 max-w-md">
-              Join Swrk and connect with hiring teams and people open to work
+              Join Mutch and connect with hiring teams and people open to work
               seamlessly through a profile that truly represents you.
             </p>
           </div>
@@ -735,7 +739,7 @@ export default function OnboardingPage() {
             </h2>
             <p className="text-muted-foreground">
               {step === 1 &&
-                "Select how you'll use Swrk, then share the basics."}
+                "Select how you'll use Mutch, then share the basics."}
               {step === 2 && "Tell us about your professional background."}
               {step === 3 &&
                 "Add your education history so teams know your background."}
@@ -765,7 +769,7 @@ export default function OnboardingPage() {
             <div className="space-y-6">
               <div className="space-y-3">
                 <Label className="text-base font-semibold">
-                  How will you be using Swrk?
+                  How will you be using Mutch?
                 </Label>
                 <RadioGroup
                   value={role}

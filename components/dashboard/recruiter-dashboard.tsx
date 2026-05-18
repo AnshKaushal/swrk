@@ -432,7 +432,7 @@ export function RecruiterDashboard({ name }: { name: string }) {
                   </div>
                   <p className="text-sm text-muted-foreground mb-6">
                     Swipe through potential candidates and discover your next
-                    great hire with Swrk™
+                    great hire with Mutch™
                   </p>
                 </div>
                 <Button

@@ -42,7 +42,7 @@ export default function Features() {
             </div>
           </div>
         </div>
-        <div className="overflow-hidden border-t bg-zinc-50 p-6 sm:p-8 lg:p-10 md:border-0 md:border-l dark:bg-transparent">
+        <div className="overflow-hidden border-t bg-zinc-50 p-6 sm:p-8 lg:p-10 md:border-0 md:border-l dark:bg-card">
           <div className="relative z-10">
             <span className="text-muted-foreground flex items-center gap-2">
               <MessageCircle className="size-4" />
@@ -67,7 +67,7 @@ export default function Features() {
             </div>
 
             <div>
-              <div className="rounded-[var(--radius)] mb-1 ml-auto w-3/5 dark:bg-secondary bg-primary p-3 text-xs text-white">
+              <div className="rounded-[var(--radius)] mb-1 ml-auto w-3/5 dark:bg-primary bg-primary p-3 text-xs text-background">
                 Yes, I'd love to learn more about the position.
               </div>
               <span className="text-muted-foreground block text-right text-xs">

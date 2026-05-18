@@ -1,5 +1,62 @@
 import mongoose from "mongoose"
 
+const ApplicationFormFieldSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    label: { type: String, required: true, trim: true },
+    type: {
+      type: String,
+      enum: [
+        "short-text",
+        "long-text",
+        "email",
+        "number",
+        "select",
+        "multiselect",
+        "url",
+        "phone",
+        "date",
+      ],
+      default: "short-text",
+    },
+    required: { type: Boolean, default: false },
+    placeholder: { type: String, default: "" },
+    options: [{ type: String, trim: true }],
+    autofillSource: {
+      type: String,
+      enum: [
+        "none",
+        "name",
+        "email",
+        "phone",
+        "headline",
+        "bio",
+        "location",
+        "skills",
+        "experienceYears",
+        "resumeUrl",
+        "linkedin",
+        "github",
+        "portfolio",
+      ],
+      default: "none",
+    },
+  },
+  { _id: false },
+)
+
+const ApplicationFormSchema = new mongoose.Schema(
+  {
+    title: { type: String, default: "Application form" },
+    description: {
+      type: String,
+      default: "Tell us a bit more about yourself.",
+    },
+    fields: { type: [ApplicationFormFieldSchema], default: [] },
+  },
+  { _id: false },
+)
+
 const PositionSchema = new mongoose.Schema(
   {
     employerId: {
@@ -56,7 +113,7 @@ const PositionSchema = new mongoose.Schema(
       max: Number,
       currency: {
         type: String,
-        default: "USD",
+        default: "INR",
       },
     },
 
@@ -80,6 +137,11 @@ const PositionSchema = new mongoose.Schema(
     matchCount: {
       type: Number,
       default: 0,
+    },
+
+    applicationForm: {
+      type: ApplicationFormSchema,
+      default: undefined,
     },
   },
   { timestamps: true },

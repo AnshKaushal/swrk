@@ -91,28 +91,24 @@ export function AdminDashboard({ name }: { name: string }) {
     {
       label: "Total Users",
       value: stats?.totalUsers || 0,
-      trend: "+8%",
       icon: Users,
       color: "bg-blue-100 text-blue-700",
     },
     {
-      label: "Active Users",
+      label: "Active Users (30d)",
       value: stats?.activeUsers || 0,
-      trend: "+12%",
       icon: Activity,
       color: "bg-green-100 text-green-700",
     },
     {
       label: "Pending Reports",
       value: stats?.pendingReports || 0,
-      trend: "Action",
       icon: AlertCircle,
       color: "bg-red-100 text-red-700",
     },
     {
       label: "Active Subscriptions",
       value: stats?.activeSubscriptions || 0,
-      trend: "+6%",
       icon: DollarSign,
       color: "bg-purple-100 text-purple-700",
     },
@@ -125,15 +121,14 @@ export function AdminDashboard({ name }: { name: string }) {
       icon: ShieldAlert,
     },
     {
-      label: "System Health",
-      value: 98.5,
+      label: "Database Health",
+      value: stats?.databaseHealth ?? 0,
       suffix: "%",
       icon: Server,
     },
     {
-      label: "API Response Time",
-      value: 125,
-      suffix: "ms",
+      label: "API Uptime (s)",
+      value: stats?.apiUptime ?? 0,
       icon: TrendingUp,
     },
   ]
@@ -157,19 +152,21 @@ export function AdminDashboard({ name }: { name: string }) {
             return (
               <Card
                 key={idx}
-                className={`border ${isAlert ? "border-red-200/50 bg-red-50/30" : "border-border/50"} hover:shadow-md transition-shadow`}
+                className={`border border-border/50 bg-card hover:shadow-md transition-shadow ${isAlert ? "ring-1 ring-red-100/60" : ""}`}
               >
-                <CardContent className="pt-6">
+                <CardContent>
                   <div className="flex justify-between items-start mb-4">
                     <div className={`p-2 rounded-lg ${metric.color}`}>
                       <Icon className="w-5 h-5" />
                     </div>
-                    <Badge
-                      variant={isAlert ? "destructive" : "default"}
-                      className="text-xs"
-                    >
-                      {metric.trend}
-                    </Badge>
+                    {(metric as any).trend ? (
+                      <Badge
+                        variant={isAlert ? "destructive" : "default"}
+                        className="text-xs"
+                      >
+                        {(metric as any).trend}
+                      </Badge>
+                    ) : null}
                   </div>
                   <p className="text-sm text-muted-foreground uppercase tracking-wide font-medium mb-2">
                     {metric.label}
@@ -184,7 +181,7 @@ export function AdminDashboard({ name }: { name: string }) {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          <Card className="lg:col-span-2 border border-border/50">
+          <Card className="lg:col-span-2 border border-border/50 bg-card hover:shadow-md">
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle>Platform Activity</CardTitle>
               <select className="text-sm border border-border rounded-md bg-background px-3 py-1">
@@ -223,7 +220,7 @@ export function AdminDashboard({ name }: { name: string }) {
             </CardContent>
           </Card>
 
-          <Card className="border border-border/50">
+          <Card className="border border-border/50 bg-card hover:shadow-md">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span className="flex items-center gap-2">
@@ -290,7 +287,7 @@ export function AdminDashboard({ name }: { name: string }) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="border border-border/50">
+          <Card className="border border-border/50 bg-card hover:shadow-md">
             <CardHeader>
               <CardTitle>Moderation Queue</CardTitle>
             </CardHeader>
@@ -369,7 +366,7 @@ export function AdminDashboard({ name }: { name: string }) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="border border-border/50">
+          <Card className="border border-border/50 bg-card hover:shadow-md">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="w-5 h-5 text-blue-500" />
@@ -424,7 +421,7 @@ export function AdminDashboard({ name }: { name: string }) {
             </CardContent>
           </Card>
 
-          <Card className="border border-border/50">
+          <Card className="border border-border/50 bg-card hover:shadow-md">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-purple-500" />
@@ -440,7 +437,7 @@ export function AdminDashboard({ name }: { name: string }) {
                   <p className="text-lg font-bold">
                     {loading
                       ? "-"
-                      : `$${(stats?.monthlyRevenue || 0).toLocaleString()}`}
+                      : `₹${(stats?.monthlyRevenue || 0).toLocaleString("en-IN")}`}
                   </p>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/50">
@@ -471,7 +468,7 @@ export function AdminDashboard({ name }: { name: string }) {
             </CardContent>
           </Card>
 
-          <Card className="border border-border/50">
+          <Card className="border border-border/50 bg-card hover:shadow-md">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="w-5 h-5 text-orange-500" />
@@ -512,7 +509,7 @@ export function AdminDashboard({ name }: { name: string }) {
           </Card>
         </div>
 
-        <Card className="border border-border/50">
+        <Card className="border border-border/50 bg-card hover:shadow-md">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-yellow-500" />

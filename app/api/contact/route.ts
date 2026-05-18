@@ -22,10 +22,10 @@ const contactEmailTemplate = (
           <p style="color: #666; margin: 0 0 8px 0;"><strong>Subject:</strong> ${subject}</p>
           <p style="color: #666; margin: 0;"><strong>Your Email:</strong> ${email}</p>
         </div>
-        <p style="color: #999; font-size: 14px; margin-top: 32px; border-top: 1px solid #eee; padding-top: 16px;">Best regards,<br/>The Swrk Team</p>
+        <p style="color: #999; font-size: 14px; margin-top: 32px; border-top: 1px solid #eee; padding-top: 16px;">Best regards,<br/>The Mutch Team</p>
       </div>
     `,
-    userText: `Thank you for reaching out!\n\nHi ${name},\n\nWe've received your message and appreciate you taking the time to contact us. Our team will review your inquiry and get back to you as soon as possible.\n\nSubject: ${subject}\nYour Email: ${email}\n\nBest regards,\nThe Swrk Team`,
+    userText: `Thank you for reaching out!\n\nHi ${name},\n\nWe've received your message and appreciate you taking the time to contact us. Our team will review your inquiry and get back to you as soon as possible.\n\nSubject: ${subject}\nYour Email: ${email}\n\nBest regards,\nThe Mutch Team`,
     adminSubject: `New Contact Inquiry - ${subject}`,
     adminHtml: `
       <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">

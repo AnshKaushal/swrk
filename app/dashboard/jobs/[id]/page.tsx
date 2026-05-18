@@ -5,18 +5,10 @@ import { useSession } from "next-auth/react"
 import { useRouter, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
-import {
-  MapPin,
-  DollarSign,
-  Briefcase,
-  Users,
-  Loader2,
-  Heart,
-  X,
-  MessageCircle,
-} from "lucide-react"
+import { MapPin, DollarSign, Briefcase, Users, Loader2 } from "lucide-react"
 import Link from "next/link"
 
 interface Position {
@@ -52,6 +44,29 @@ interface Candidate {
   desiredRoles?: string[]
   employmentType?: string[]
   alreadySwiped?: boolean
+  applicationData?: Record<string, string>
+  applicationSubmittedAt?: string | null
+  applicationStatus?: string
+  applicationStatusUpdatedAt?: string | null
+}
+
+function getApplicationStatusLabel(status?: string) {
+  switch (status) {
+    case "viewed":
+      return "Viewed"
+    case "shortlisted":
+      return "Shortlisted"
+    case "interview":
+      return "Interview"
+    case "rejected":
+      return "Rejected"
+    case "hired":
+      return "Hired"
+    case "withdrawn":
+      return "Withdrawn"
+    default:
+      return "Submitted"
+  }
 }
 
 export default function JobDetailPage() {
@@ -63,7 +78,9 @@ export default function JobDetailPage() {
   const [position, setPosition] = useState<Position | null>(null)
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(false)
-  const [swiping, setSwiping] = useState(false)
+  const [updatingCandidateId, setUpdatingCandidateId] = useState<string | null>(
+    null,
+  )
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -93,12 +110,18 @@ export default function JobDetailPage() {
   async function loadCandidates() {
     setLoading(true)
     try {
-      const res = await fetch(
-        `/api/positions/interested?positionId=${positionId}`,
-      )
+      const res = await fetch(`/api/positions/${positionId}/applications`)
       if (!res.ok) throw new Error("Failed to load candidates")
       const data = await res.json()
-      setCandidates(data.candidates || [])
+      setCandidates(
+        (data.applications || []).map((application: any) => ({
+          ...application.candidate,
+          applicationData: application.applicationData || {},
+          applicationSubmittedAt: application.applicationSubmittedAt,
+          applicationStatus: application.applicationStatus,
+          applicationStatusUpdatedAt: application.applicationStatusUpdatedAt,
+        })),
+      )
     } catch (error) {
       console.error(error)
       toast.error("Failed to load candidates")
@@ -107,40 +130,32 @@ export default function JobDetailPage() {
     }
   }
 
-  async function handleSwipe(candidateId: string, direction: "left" | "right") {
-    setSwiping(true)
+  async function handleApplicationStatusChange(
+    candidateId: string,
+    status: "viewed" | "shortlisted" | "interview" | "rejected" | "hired",
+  ) {
+    setUpdatingCandidateId(candidateId)
     try {
-      const res = await fetch("/api/positions/employer-swipe", {
-        method: "POST",
+      const res = await fetch(`/api/positions/${positionId}/applications`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          positionId,
-          candidateId,
-          direction,
-        }),
+        body: JSON.stringify({ candidateId, status }),
       })
 
-      if (!res.ok) throw new Error("Failed to swipe")
+      if (!res.ok) throw new Error("Failed to update application")
 
       const data = await res.json()
 
-      if (data.matched) {
-        toast.success("It's a match! You can now message this candidate.")
-      } else if (direction === "right") {
-        toast.success("Candidate saved")
-      }
+      toast.success(
+        `Application marked as ${getApplicationStatusLabel(data.applicationStatus).toLowerCase()}`,
+      )
 
-      // Remove from list
-      setCandidates((prev) => prev.filter((c) => c._id !== candidateId))
-
-      if (candidates.length <= 1) {
-        await loadCandidates()
-      }
+      await loadCandidates()
     } catch (error) {
       console.error(error)
-      toast.error("Failed to swipe")
+      toast.error("Failed to update application")
     } finally {
-      setSwiping(false)
+      setUpdatingCandidateId(null)
     }
   }
 
@@ -174,8 +189,8 @@ export default function JobDetailPage() {
 
               {position.salaryRange?.min && (
                 <div className="flex items-center gap-1">
-                  <DollarSign className="h-4 w-4" />$
-                  {position.salaryRange.min.toLocaleString()} - $
+                  <DollarSign className="h-4 w-4" />₹
+                  {position.salaryRange.min.toLocaleString()} - ₹
                   {position.salaryRange.max?.toLocaleString() || "Open"}
                 </div>
               )}
@@ -237,22 +252,65 @@ export default function JobDetailPage() {
                   </div>
                 </Link>
 
-                <div className="ml-3 flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleSwipe(candidate._id, "left")}
-                    disabled={swiping || candidate.alreadySwiped}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => handleSwipe(candidate._id, "right")}
-                    disabled={swiping || candidate.alreadySwiped}
-                  >
-                    <Heart className="h-4 w-4" />
-                  </Button>
+                {candidate.applicationData &&
+                Object.keys(candidate.applicationData).length > 0 ? (
+                  <div className="mr-3 hidden max-w-[260px] rounded-lg border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground md:block">
+                    <p className="mb-2 font-medium text-foreground">
+                      Application answers
+                    </p>
+                    <div className="space-y-1">
+                      {Object.entries(candidate.applicationData).map(
+                        ([key, value]) => (
+                          <p key={key} className="truncate">
+                            <span className="font-medium text-foreground">
+                              {key}:
+                            </span>{" "}
+                            {value || "-"}
+                          </p>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="ml-3 flex flex-col items-end gap-2">
+                  <Badge variant="secondary">
+                    {getApplicationStatusLabel(candidate.applicationStatus)}
+                  </Badge>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        handleApplicationStatusChange(candidate._id, "viewed")
+                      }
+                      disabled={updatingCandidateId === candidate._id}
+                    >
+                      Viewed
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        handleApplicationStatusChange(
+                          candidate._id,
+                          "shortlisted",
+                        )
+                      }
+                      disabled={updatingCandidateId === candidate._id}
+                    >
+                      Shortlist
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() =>
+                        handleApplicationStatusChange(candidate._id, "rejected")
+                      }
+                      disabled={updatingCandidateId === candidate._id}
+                    >
+                      Reject
+                    </Button>
+                  </div>
                 </div>
               </div>
             ))}

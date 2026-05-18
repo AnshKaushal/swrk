@@ -374,7 +374,7 @@ export const LogoLoop = React.memo<LogoLoopProps>(
         ) : (
           <img
             className={cx(
-              "h-[var(--logoloop-logoHeight)] w-auto block object-contain bg-white p-1.5 rounded-xl",
+              "h-[var(--logoloop-logoHeight)] w-auto block object-contain bg-background p-1.5 rounded-xl",
               "[-webkit-user-drag:none] pointer-events-none",
               "[image-rendering:-webkit-optimize-contrast]",
               "motion-reduce:transition-none",

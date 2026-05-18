@@ -43,9 +43,9 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     const refresh = () => void load()
-    window.addEventListener("swrk:notifications-updated", refresh)
+    window.addEventListener("mutch:notifications-updated", refresh)
     return () =>
-      window.removeEventListener("swrk:notifications-updated", refresh)
+      window.removeEventListener("mutch:notifications-updated", refresh)
   }, [])
 
   const observerRef = useRef<IntersectionObserver | null>(null)

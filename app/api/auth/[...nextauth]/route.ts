@@ -69,7 +69,7 @@ const authOptions = {
             name: user.name,
             username: user.username,
             image: user.avatar,
-            role: user.role,
+            role: user.isAdmin ? "admin" : user.role,
             onboardingStep: user.onboardingStep,
             onboardingCompleted: user.onboardingCompleted,
             isAdmin: user.isAdmin,
@@ -127,7 +127,7 @@ const authOptions = {
             name: user.name,
             username: user.username,
             image: user.avatar,
-            role: user.role,
+            role: user.isAdmin ? "admin" : user.role,
             onboardingStep: user.onboardingStep,
             onboardingCompleted: user.onboardingCompleted,
             isAdmin: user.isAdmin,
@@ -182,7 +182,7 @@ const authOptions = {
           )
 
           user.id = existingUser._id.toString()
-          user.role = existingUser.role
+          user.role = existingUser.isAdmin ? "admin" : existingUser.role
           user.username = existingUser.username
           user.onboardingStep = existingUser.onboardingStep
           user.onboardingCompleted = existingUser.onboardingCompleted
@@ -221,7 +221,7 @@ const authOptions = {
     }) {
       if (user) {
         token.id = user.id
-        token.role = user.role
+        token.role = user.isAdmin ? "admin" : user.role
         token.username = user.username
         token.onboardingStep = user.onboardingStep
         token.onboardingCompleted = user.onboardingCompleted
@@ -249,7 +249,7 @@ const authOptions = {
 
     async session({ session, token }: { session: any; token: any }) {
       session.user.id = token.id
-      session.user.role = token.role
+      session.user.role = token.isAdmin ? "admin" : token.role
       session.user.username = token.username
       session.user.onboardingStep = token.onboardingStep
       session.user.onboardingCompleted = token.onboardingCompleted

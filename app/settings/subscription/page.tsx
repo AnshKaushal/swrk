@@ -311,7 +311,7 @@ export default function SubscriptionSettingsPage() {
               Cancel
             </Button>
             <Button onClick={handleReactivate} disabled={saving}>
-              {saving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
               Confirm Reactivation
             </Button>
           </DialogFooter>

@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
       experience,
       salaryRange,
       employmentType,
+      applicationForm,
     } = body
 
     if (!title || !description) {
@@ -115,6 +116,7 @@ export async function POST(req: NextRequest) {
       salaryRange: salaryRange || {},
       employmentType: employmentType || "full-time",
       status: "draft",
+      applicationForm,
     })
 
     await position.save()

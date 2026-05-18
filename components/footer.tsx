@@ -8,6 +8,7 @@ import { Mail, MapPin, ArrowRight, Heart } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
+import { BrandLogo } from "@/components/brand-logo"
 
 export default function Footer() {
   const pathname = usePathname()
@@ -65,15 +66,7 @@ export default function Footer() {
             transition={{ duration: 0.6 }}
             viewport={{ once: true }}
           >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center">
-                <img
-                  src="/swrk.svg"
-                  className="w-8 h-8 text-primary-foreground"
-                />
-              </div>
-              <span className="text-2xl font-bold tracking-tight">Swrk™</span>
-            </div>
+            <BrandLogo className="h-10 w-10 md:h-10 md:w-[145px]" alt="Mutch" />
 
             <p className="text-muted-foreground leading-relaxed text-sm">
               The intelligent job matching platform that connects talent with
@@ -170,7 +163,7 @@ export default function Footer() {
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm">
             <div className="flex items-center gap-2 text-muted-foreground">
               <span>
-                © {new Date().getFullYear()} Swrk. All Rights Reserved
+                © {new Date().getFullYear()} Mutch. All Rights Reserved
               </span>
             </div>
 

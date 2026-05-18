@@ -25,6 +25,33 @@ const PositionSwipeSchema = new mongoose.Schema(
       enum: ["left", "right", "super"],
       required: true,
     },
+
+    applicationData: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+
+    applicationStatus: {
+      type: String,
+      enum: [
+        "submitted",
+        "viewed",
+        "shortlisted",
+        "interview",
+        "rejected",
+        "hired",
+        "withdrawn",
+      ],
+    },
+
+    applicationSubmittedAt: Date,
+
+    applicationStatusUpdatedAt: Date,
+
+    applicationStatusUpdatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
   },
   { timestamps: true },
 )

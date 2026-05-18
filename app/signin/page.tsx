@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import Link from "next/link"
 import { toast } from "sonner"
+import { BrandLogo } from "@/components/brand-logo"
 
 const ERROR_MESSAGES: Record<string, string> = {
   CredentialsSignin: "Invalid email/username or password",
@@ -95,7 +96,7 @@ function SigninForm() {
         <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" />
         <div className="relative z-10 flex flex-col justify-between p-12 text-white">
           <Link href="/">
-            <img src="/swrk.svg" alt="Swrk™" className="h-12 w-fit" />
+            <BrandLogo className="h-12 w-12 md:h-12 md:w-[174px]" alt="Mutch" />
           </Link>
           <div className="space-y-4">
             <h2 className="text-5xl leading-tight font-black tracking-tighter">
@@ -128,7 +129,7 @@ function SigninForm() {
           <div className="space-y-2">
             <h1 className="text-4xl font-black tracking-tight">Welcome Back</h1>
             <p className="font-medium text-muted-foreground">
-              Sign in to your Swrk account
+              Sign in to your Mutch account
             </p>
           </div>
 

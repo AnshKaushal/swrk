@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/app/api/auth/[...nextauth]/route"
 import { db } from "@/lib/mongodb"
+import Position from "@/models/position"
 import PositionSwipe from "@/models/position-swipe"
 import EmployerPositionSwipe from "@/models/employer-position-swipe"
 import User from "@/models/user"
@@ -26,6 +27,17 @@ export async function GET(req: NextRequest) {
       )
     }
 
+    const position = await Position.findById(positionId)
+      .select("employerId")
+      .lean()
+    if (!position) {
+      return NextResponse.json({ error: "Position not found" }, { status: 404 })
+    }
+
+    if (String(position.employerId) !== session.user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
     // Get all candidates who swiped right on this position
     const query: any = {
       positionId,
@@ -37,7 +49,9 @@ export async function GET(req: NextRequest) {
     }
 
     const swipes = await PositionSwipe.find(query)
-      .select("candidateId")
+      .select(
+        "candidateId applicationData applicationSubmittedAt applicationStatus applicationStatusUpdatedAt",
+      )
       .limit(limit)
       .lean()
 
@@ -58,10 +72,26 @@ export async function GET(req: NextRequest) {
     }).lean()
 
     const swiped = new Set(employerSwipes.map((s) => s.candidateId.toString()))
+    const swipeMap = new Map(
+      swipes.map((swipe) => [
+        String(swipe.candidateId),
+        {
+          applicationData:
+            swipe.applicationData && typeof swipe.applicationData === "object"
+              ? swipe.applicationData
+              : {},
+          applicationStatus: swipe.applicationStatus || "submitted",
+          applicationSubmittedAt: swipe.applicationSubmittedAt || null,
+          applicationStatusUpdatedAt:
+            swipe.applicationStatusUpdatedAt || swipe.updatedAt || null,
+        },
+      ]),
+    )
 
     const enrichedCandidates = candidates.map((candidate) => ({
       ...candidate,
       alreadySwiped: swiped.has(candidate._id.toString()),
+      ...swipeMap.get(candidate._id.toString()),
     }))
 
     return NextResponse.json({ candidates: enrichedCandidates })

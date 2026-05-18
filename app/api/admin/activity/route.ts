@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/app/api/auth/[...nextauth]/route"
 import { db } from "@/lib/mongodb"
 import { User } from "@/models"
+import Notification from "@/models/notification"
 
 export async function GET(req: NextRequest) {
   try {
@@ -30,8 +31,10 @@ export async function GET(req: NextRequest) {
       const dayUsers = await User.countDocuments({
         createdAt: { $gte: date, $lt: nextDate },
       })
-
-      const dayReports = Math.floor(Math.random() * 20)
+      const dayReports = await Notification.countDocuments({
+        type: "report",
+        createdAt: { $gte: date, $lt: nextDate },
+      })
 
       activity.push({
         day: dayNames[date.getDay()],

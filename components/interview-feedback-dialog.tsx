@@ -176,7 +176,7 @@ export function InterviewFeedbackDialog({
 
       setExistingFeedback(json.feedback)
       try {
-        window.dispatchEvent(new Event("swrk:interviews-updated"))
+        window.dispatchEvent(new Event("mutch:interviews-updated"))
       } catch {
         // ignore
       }
@@ -313,9 +313,7 @@ export function InterviewFeedbackDialog({
                 onClick={() => void handleSubmit()}
                 disabled={submitting || !canSubmit}
               >
-                {submitting && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
+                {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
                 Submit feedback
               </Button>
             </div>

@@ -1,10 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import Link from "next/link"
 import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardContent,
@@ -12,12 +10,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { AdminDashboardFront } from "@/components/dashboard/admin-dashboard-front"
 import { EmployeeDashboardFront } from "@/components/dashboard/employee-dashboard-front"
 import { EmployerDashboardFront } from "@/components/dashboard/employer-dashboard-front"
 import { DashboardProfileLink } from "@/components/dashboard/dashboard-shared"
 import { Loader2 } from "lucide-react"
+import { IconLoader2 } from "@tabler/icons-react"
 
 type ActiveRole = "employee" | "employer"
 
@@ -85,10 +83,10 @@ export default function DashboardPage() {
 
     void loadRecentMatches()
     const onUpdate = () => void loadRecentMatches()
-    window.addEventListener("swrk:messages-updated", onUpdate)
+    window.addEventListener("mutch:messages-updated", onUpdate)
     window.addEventListener("focus", onUpdate)
     return () => {
-      window.removeEventListener("swrk:messages-updated", onUpdate)
+      window.removeEventListener("mutch:messages-updated", onUpdate)
       window.removeEventListener("focus", onUpdate)
     }
   }, [status])
@@ -137,7 +135,7 @@ export default function DashboardPage() {
   if (status === "loading") {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">Loading...</div>
+        <IconLoader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
   }
@@ -151,76 +149,49 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen">
       <div className="flex w-full max-w-[1600px] flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        {recentMatches.length > 0 ? (
-          <Card className="border-border/60 bg-card shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Recent messages</CardTitle>
-              <CardDescription>
-                Jump back into the latest conversations.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-3 overflow-x-auto pb-1">
-                {recentMatches.map((match) => {
-                  const currentUserId = session.user.id
-                  const isEmployer =
-                    String(match.employer?._id) === currentUserId
-                  const other = isEmployer ? match.employee : match.employer
-                  const unread = isEmployer
-                    ? match.unreadByEmployer || 0
-                    : match.unreadByEmployee || 0
-
-                  return (
-                    <Link
-                      key={match._id}
-                      href={`/dashboard/messages?matchId=${match._id}`}
-                      className="min-w-[240px] rounded-2xl border border-border bg-background p-3 transition-colors hover:border-primary/30 hover:bg-muted/40"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-11 w-11 border border-border">
-                          <AvatarImage
-                            src={other?.avatar}
-                            alt={other?.name || "Match"}
-                          />
-                          <AvatarFallback>
-                            {(other?.name || "M")
-                              .split(" ")
-                              .slice(0, 2)
-                              .map((part) => part.charAt(0).toUpperCase())
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate text-sm font-semibold">
-                              {other?.name || other?.username || "Match"}
-                            </span>
-                            {unread > 0 ? (
-                              <Badge className="rounded-full px-2 py-0.5 text-[11px]">
-                                {unread > 99 ? "99+" : unread}
-                              </Badge>
-                            ) : null}
-                          </div>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {match.lastMessagePreview || "New conversation"}
-                          </p>
-                        </div>
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        ) : null}
         {roleLoading ? (
           <Card className="border-border/60 bg-card shadow-sm">
             <CardContent className="p-6 text-sm text-muted-foreground">
-              <Loader2 className="mr-2 inline-block h-4 w-4 animate-spin" />
+              <Loader2 className="inline-block h-4 w-4 animate-spin" />
               Loading dashboard...
             </CardContent>
           </Card>
         ) : null}
+
+        {!roleLoading && session?.user?.role === "both" && (
+          <Card className="border-border/60 bg-card shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Switch Role</CardTitle>
+              <CardDescription>
+                Choose your active role for this session
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex gap-3">
+              <Button
+                variant={activeRole === "employee" ? "default" : "outline"}
+                onClick={() => handleSwitchRole("employee")}
+                disabled={switchingRole}
+                className="flex items-center gap-2"
+              >
+                {switchingRole && activeRole === "employee" && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                Employee
+              </Button>
+              <Button
+                variant={activeRole === "employer" ? "default" : "outline"}
+                onClick={() => handleSwitchRole("employer")}
+                disabled={switchingRole}
+                className="flex items-center gap-2"
+              >
+                {switchingRole && activeRole === "employer" && (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                )}
+                Employer
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {!roleLoading && dashboardView === "admin" ? (
           <AdminDashboardFront name={name} />

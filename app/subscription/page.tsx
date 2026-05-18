@@ -184,7 +184,7 @@ export default function SubscriptionPage() {
         const options = {
           key: data.razorpayKey,
           subscription_id: data.razorpaySubscription.id,
-          name: "Swrk™",
+          name: "Mutch™",
           description: `Subscribe to ${data.subscription.plan.displayName}`,
           handler: function (response: any) {
             setSwitchConfirmation({

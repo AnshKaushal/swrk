@@ -24,7 +24,7 @@ export default function NotificationRealtimeBridge() {
 
         const handleNotification = () => {
           try {
-            window.dispatchEvent(new Event("swrk:notifications-updated"))
+            window.dispatchEvent(new Event("mutch:notifications-updated"))
           } catch {
             // ignore
           }
@@ -32,7 +32,7 @@ export default function NotificationRealtimeBridge() {
 
         const handleDisconnect = () => {
           try {
-            window.dispatchEvent(new Event("swrk:notifications-updated"))
+            window.dispatchEvent(new Event("mutch:notifications-updated"))
           } catch {
             // ignore
           }

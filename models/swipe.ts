@@ -100,6 +100,10 @@ const MatchSchema = new mongoose.Schema(
     clearedAtByEmployer: Date,
     clearedAtByEmployee: Date,
 
+    // Per-user deletion timestamps. When deleted, match moves to bottom without preview.
+    deletedAtByEmployer: Date,
+    deletedAtByEmployee: Date,
+
     // Last message preview (for match list UI)
     lastMessageAt: Date,
     lastMessagePreview: String,

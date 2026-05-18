@@ -54,6 +54,22 @@ export async function GET(req: NextRequest) {
       ])
 
       if (employerSwipe && employeeSwipe) {
+        const isCurrentUserEmployer = String(employerId) === session.user.id
+        const isDeleted = isCurrentUserEmployer
+          ? match.deletedAtByEmployer
+          : match.deletedAtByEmployee
+        const clearCursor = isCurrentUserEmployer
+          ? match.clearedAtByEmployer
+          : match.clearedAtByEmployee
+        const lastMessageAt = match.lastMessageAt
+          ? new Date(match.lastMessageAt).getTime()
+          : 0
+        const clearAt = clearCursor ? new Date(clearCursor).getTime() : 0
+
+        if (isDeleted || (clearAt && lastMessageAt <= clearAt)) {
+          match.lastMessagePreview = undefined
+        }
+
         mutualMatches.push(match)
       }
     }

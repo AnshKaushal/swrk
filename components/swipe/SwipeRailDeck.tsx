@@ -138,8 +138,7 @@ function formatMoney(
 ) {
   if (typeof value !== "number" || Number.isNaN(value)) return ""
 
-  const symbol =
-    currency === "INR" ? "₹" : currency === "USD" ? "$" : `${currency} `
+  const symbol = currency === "INR" ? "₹" : `${currency} `
   return `${prefix}${symbol}${new Intl.NumberFormat("en-IN").format(value)}${suffix}`
 }
 
@@ -519,7 +518,7 @@ export default function SwipeRailDeck() {
       }
 
       try {
-        window.dispatchEvent(new Event("swrk:notifications-updated"))
+        window.dispatchEvent(new Event("mutch:notifications-updated"))
       } catch (e) {}
 
       if (json.matched) {

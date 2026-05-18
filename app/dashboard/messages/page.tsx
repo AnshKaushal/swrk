@@ -9,6 +9,7 @@ import {
   useState,
 } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import type { Socket } from "socket.io-client"
 import {
@@ -95,6 +96,10 @@ type MatchRecord = {
   matchedAt?: string
   typingUsers?: string[]
   typingUpdatedAt?: string
+  clearedAtByEmployer?: string
+  clearedAtByEmployee?: string
+  deletedAtByEmployer?: string
+  deletedAtByEmployee?: string
 }
 
 type MessageRecord = {
@@ -291,6 +296,53 @@ function getMatchUnreadCount(match: MatchRecord, userId?: string) {
   return isEmployer ? match.unreadByEmployer || 0 : match.unreadByEmployee || 0
 }
 
+function isMatchDeletedForCurrentUser(match: MatchRecord, userId?: string) {
+  if (!userId) return false
+
+  if (String(match.employer?._id) === userId) {
+    return Boolean(match.deletedAtByEmployer)
+  }
+
+  if (String(match.employee?._id) === userId) {
+    return Boolean(match.deletedAtByEmployee)
+  }
+
+  return false
+}
+
+function isMatchClearedForCurrentUser(match: MatchRecord, userId?: string) {
+  if (!userId) return false
+
+  if (String(match.employer?._id) === userId) {
+    return Boolean(match.clearedAtByEmployer)
+  }
+
+  if (String(match.employee?._id) === userId) {
+    return Boolean(match.clearedAtByEmployee)
+  }
+
+  return false
+}
+
+function getMatchPreview(match: MatchRecord, userId?: string) {
+  const isDeleted = isMatchDeletedForCurrentUser(match, userId)
+  const isCleared = isMatchClearedForCurrentUser(match, userId)
+  const clearCursor =
+    String(match.employer?._id) === userId
+      ? match.clearedAtByEmployer
+      : String(match.employee?._id) === userId
+        ? match.clearedAtByEmployee
+        : undefined
+  const lastMessageAt = match.lastMessageAt
+    ? new Date(match.lastMessageAt).getTime()
+    : 0
+  const clearAt = clearCursor ? new Date(clearCursor).getTime() : 0
+
+  if (isDeleted) return ""
+  if (isCleared && clearAt && lastMessageAt <= clearAt) return ""
+  return match.lastMessagePreview || ""
+}
+
 function getOtherParticipant(match: MatchRecord, userId?: string) {
   if (!userId) return match.employee
   return String(match.employer?._id) === userId
@@ -305,19 +357,54 @@ function isParticipantOnline(
   return participant?._id ? onlineUsers.has(participant._id) : false
 }
 
-function upsertMatch(list: MatchRecord[], match: MatchRecord) {
+function upsertMatch(
+  list: MatchRecord[],
+  match: MatchRecord,
+  currentUserId?: string,
+) {
   const existing = list.find((item) => item._id === match._id)
   const next = list.filter((item) => item._id !== match._id)
+
+  const isDeleted =
+    currentUserId &&
+    ((String(match.employer?._id || match.employer) === currentUserId &&
+      match.deletedAtByEmployer) ||
+      (String(match.employee?._id || match.employee) === currentUserId &&
+        match.deletedAtByEmployee))
+
   const merged = existing
     ? {
         ...existing,
         ...match,
-        lastMessagePreview:
-          match.lastMessagePreview ?? existing.lastMessagePreview,
+        lastMessagePreview: isDeleted
+          ? undefined
+          : (match.lastMessagePreview ?? existing.lastMessagePreview),
       }
     : match
+
+  if (isDeleted) {
+    merged.lastMessagePreview = undefined
+  }
+
   next.unshift(merged)
   return next.sort((a, b) => {
+    const aDeleted =
+      currentUserId &&
+      ((String(a.employer?._id || a.employer) === currentUserId &&
+        a.deletedAtByEmployer) ||
+        (String(a.employee?._id || a.employee) === currentUserId &&
+          a.deletedAtByEmployee))
+
+    const bDeleted =
+      currentUserId &&
+      ((String(b.employer?._id || b.employer) === currentUserId &&
+        b.deletedAtByEmployer) ||
+        (String(b.employee?._id || b.employee) === currentUserId &&
+          b.deletedAtByEmployee))
+
+    if (aDeleted && !bDeleted) return 1
+    if (!aDeleted && bDeleted) return -1
+
     const aTime = new Date(a.lastMessageAt || a.matchedAt || 0).getTime()
     const bTime = new Date(b.lastMessageAt || b.matchedAt || 0).getTime()
     return bTime - aTime
@@ -435,18 +522,31 @@ function buildOptimisticMessage(params: {
 
 function notifyMessagesUpdated() {
   try {
-    window.dispatchEvent(new Event("swrk:messages-updated"))
+    window.dispatchEvent(new Event("mutch:messages-updated"))
   } catch {
     // ignore
   }
 }
 
-function MessagesPageContent() {
+type MessagesPageContentProps = {
+  initialMatchId?: string
+  showListPane?: boolean
+  showChatPane?: boolean
+  showEmptyPane?: boolean
+}
+
+export function MessagesPageContent({
+  initialMatchId = "",
+  showListPane = true,
+  showChatPane = true,
+  showEmptyPane = false,
+}: MessagesPageContentProps = {}) {
   const { data: session, status } = useSession()
+  const router = useRouter()
   const [matches, setMatches] = useState<MatchRecord[]>([])
   const [messages, setMessages] = useState<MessageRecord[]>([])
   const [searchTerm, setSearchTerm] = useState("")
-  const [activeMatchId, setActiveMatchId] = useState("")
+  const [activeMatchId, setActiveMatchId] = useState(initialMatchId)
   const [loadingMatches, setLoadingMatches] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [sending, setSending] = useState(false)
@@ -498,31 +598,54 @@ function MessagesPageContent() {
 
   const currentUserId = session?.user?.id
 
-  const fetchMatches = useCallback(async (options?: { silent?: boolean }) => {
-    if (!options?.silent) {
-      setLoadingMatches(true)
-    }
-    try {
-      const response = await fetch("/api/matches?status=active&limit=100", {
-        cache: "no-store",
-      })
-      const json = await response.json()
-      if (!response.ok) {
-        throw new Error(json?.error || "Failed to fetch matches")
-      }
-
-      const nextMatches = (json.matches || []) as MatchRecord[]
-      setMatches(nextMatches)
-    } catch (error) {
-      console.error(error)
-      toast.error("Failed to load matches")
-      setMatches([])
-    } finally {
+  const fetchMatches = useCallback(
+    async (options?: { silent?: boolean }) => {
       if (!options?.silent) {
-        setLoadingMatches(false)
+        setLoadingMatches(true)
       }
-    }
-  }, [])
+      try {
+        const response = await fetch("/api/matches?status=active&limit=100", {
+          cache: "no-store",
+        })
+        const json = await response.json()
+        if (!response.ok) {
+          throw new Error(json?.error || "Failed to fetch matches")
+        }
+
+        const nextMatches = (json.matches || []) as MatchRecord[]
+        const sortedMatches = nextMatches.sort((a, b) => {
+          const aDeleted =
+            (String(a.employer?._id || a.employer) === currentUserId &&
+              a.deletedAtByEmployer) ||
+            (String(a.employee?._id || a.employee) === currentUserId &&
+              a.deletedAtByEmployee)
+
+          const bDeleted =
+            (String(b.employer?._id || b.employer) === currentUserId &&
+              b.deletedAtByEmployer) ||
+            (String(b.employee?._id || b.employee) === currentUserId &&
+              b.deletedAtByEmployee)
+
+          if (aDeleted && !bDeleted) return 1
+          if (!aDeleted && bDeleted) return -1
+
+          const aTime = new Date(a.lastMessageAt || a.matchedAt || 0).getTime()
+          const bTime = new Date(b.lastMessageAt || b.matchedAt || 0).getTime()
+          return bTime - aTime
+        })
+        setMatches(sortedMatches)
+      } catch (error) {
+        console.error(error)
+        toast.error("Failed to load matches")
+        setMatches([])
+      } finally {
+        if (!options?.silent) {
+          setLoadingMatches(false)
+        }
+      }
+    },
+    [currentUserId],
+  )
 
   const fetchResumes = useCallback(async () => {
     setResumesLoading(true)
@@ -570,7 +693,7 @@ function MessagesPageContent() {
 
         if (json.match) {
           setMatches((previous) =>
-            upsertMatch(previous, json.match as MatchRecord),
+            upsertMatch(previous, json.match as MatchRecord, currentUserId),
           )
         }
         setShowJumpToLatest(false)
@@ -588,7 +711,7 @@ function MessagesPageContent() {
         }
       }
     },
-    [],
+    [currentUserId],
   )
 
   useEffect(() => {
@@ -892,7 +1015,9 @@ function MessagesPageContent() {
           )
         }
         if (json.match) {
-          setMatches((previous) => upsertMatch(previous, json.match!))
+          setMatches((previous) =>
+            upsertMatch(previous, json.match!, currentUserId),
+          )
         }
 
         isAtBottomRef.current = true
@@ -1028,7 +1153,11 @@ function MessagesPageContent() {
 
           if (payload.match) {
             setMatches((previous) =>
-              upsertMatch(previous, payload.match as MatchRecord),
+              upsertMatch(
+                previous,
+                payload.match as MatchRecord,
+                currentUserId,
+              ),
             )
             notifyMessagesUpdated()
           }
@@ -1037,7 +1166,11 @@ function MessagesPageContent() {
         const handleConversationUpdate = (payload: SocketEventPayload) => {
           if (payload.match) {
             setMatches((previous) =>
-              upsertMatch(previous, payload.match as MatchRecord),
+              upsertMatch(
+                previous,
+                payload.match as MatchRecord,
+                currentUserId,
+              ),
             )
             notifyMessagesUpdated()
           }
@@ -1144,7 +1277,7 @@ function MessagesPageContent() {
       socketCleanup?.()
       socketRef.current = null
     }
-  }, [fetchConversation, fetchMatches, status])
+  }, [currentUserId, fetchConversation, fetchMatches, status])
 
   useEffect(() => {
     if (!emojiPickerOpen) return
@@ -1261,9 +1394,17 @@ function MessagesPageContent() {
     }
   }, [])
 
+  const activeMatches = useMemo(
+    () =>
+      matches.filter(
+        (match) => !isMatchDeletedForCurrentUser(match, currentUserId),
+      ),
+    [currentUserId, matches],
+  )
+
   const filteredMatches = useMemo(() => {
     const term = searchTerm.trim().toLowerCase()
-    if (!term) return matches
+    if (!term) return activeMatches
 
     return matches.filter((match) => {
       const other = getOtherParticipant(match, currentUserId)
@@ -1273,10 +1414,10 @@ function MessagesPageContent() {
         .toLowerCase()
         .includes(term)
     })
-  }, [currentUserId, matches, searchTerm])
+  }, [activeMatches, currentUserId, matches, searchTerm])
 
   const activeMatch =
-    matches.find((match) => match._id === activeMatchId) || null
+    activeMatches.find((match) => match._id === activeMatchId) || null
 
   const otherParticipant = activeMatch
     ? getOtherParticipant(activeMatch, currentUserId)
@@ -1340,14 +1481,9 @@ function MessagesPageContent() {
         }),
       )
       setActiveMatchId(matchId)
-      if (typeof window === "undefined") return
-
-      const nextUrl = new URL(window.location.href)
-      nextUrl.pathname = "/dashboard/messages"
-      nextUrl.searchParams.set("matchId", matchId)
-      window.history.replaceState(window.history.state, "", nextUrl.toString())
+      router.push(`/dashboard/messages/${matchId}`)
     },
-    [currentUserId],
+    [currentUserId, router],
   )
 
   const handleCloseMatch = useCallback(() => {
@@ -1358,14 +1494,8 @@ function MessagesPageContent() {
     typingExpiryTimeoutsRef.current.clear()
 
     setActiveMatchId("")
-
-    if (typeof window === "undefined") return
-
-    const nextUrl = new URL(window.location.href)
-    nextUrl.pathname = "/dashboard/messages"
-    nextUrl.searchParams.delete("matchId")
-    window.history.replaceState(window.history.state, "", nextUrl.toString())
-  }, [])
+    router.push("/dashboard/messages")
+  }, [router])
 
   const runChatAction = useCallback(
     async (
@@ -1405,7 +1535,10 @@ function MessagesPageContent() {
 
         if (action === "clear") {
           setClearConfirmOpen(false)
+          setMessages([])
+          setShowJumpToLatest(false)
           void fetchConversation(activeMatchId)
+          void fetchMatches({ silent: true })
           toast.success("Conversation cleared")
           return
         }
@@ -1420,7 +1553,7 @@ function MessagesPageContent() {
 
         if (json.match) {
           setMatches((previous) =>
-            upsertMatch(previous, json.match as MatchRecord),
+            upsertMatch(previous, json.match as MatchRecord, currentUserId),
           )
         }
         void fetchMatches({ silent: true })
@@ -1523,7 +1656,9 @@ function MessagesPageContent() {
         )
       }
       if (json.match) {
-        setMatches((previous) => upsertMatch(previous, json.match!))
+        setMatches((previous) =>
+          upsertMatch(previous, json.match!, currentUserId),
+        )
       }
       isAtBottomRef.current = true
       scrollToBottom("auto")
@@ -1621,17 +1756,24 @@ function MessagesPageContent() {
     )
   }
 
-  const showListPane = !isCompactLayout || !activeMatchId
-  const showChatPane = !isCompactLayout || Boolean(activeMatchId)
+  const shouldShowListPane = showListPane
+  const shouldShowChatPane = showChatPane
+  const visibleMatchCount = activeMatches.length
+  const gridClassName = cn(
+    "grid min-h-0 flex-1",
+    shouldShowListPane && (shouldShowChatPane || showEmptyPane)
+      ? "lg:grid-cols-[296px_minmax(0,1fr)]"
+      : "lg:grid-cols-1",
+  )
 
   return (
     <div className="h-full max-h-full overflow-hidden">
       <div className="mx-auto flex h-full max-h-full min-h-0 max-w-[1600px] flex-col gap-4">
-        <div className="grid min-h-0 flex-1 lg:grid-cols-[296px_minmax(0,1fr)]">
-          {showListPane ? (
+        <div className={gridClassName}>
+          {shouldShowListPane ? (
             <Card
               className={cn(
-                "flex min-h-0 max-h-full flex-col overflow-hidden rounded-none",
+                "flex min-h-0 max-h-full flex-col overflow-hidden rounded-none py-0",
                 isCompactLayout ? "h-full border-0" : "",
               )}
             >
@@ -1640,7 +1782,7 @@ function MessagesPageContent() {
                   <div>
                     <h2 className="text-lg font-semibold">Active matches</h2>
                     <p className="text-sm text-muted-foreground">
-                      {matches.length} conversations
+                      {visibleMatchCount} conversations
                     </p>
                   </div>
                   <Badge variant="outline" className="rounded-full">
@@ -1708,11 +1850,14 @@ function MessagesPageContent() {
 
                           <div className="mt-1 flex items-center justify-between gap-2">
                             <p className="truncate text-sm text-muted-foreground">
-                              {match.lastMessagePreview &&
-                              match.lastMessagePreview.length > 20
-                                ? match.lastMessagePreview.slice(0, 20) + "..."
-                                : match.lastMessagePreview ||
-                                  "Say hello to start the conversation"}
+                              {getMatchPreview(match, currentUserId) &&
+                              getMatchPreview(match, currentUserId).length > 20
+                                ? getMatchPreview(match, currentUserId).slice(
+                                    0,
+                                    20,
+                                  ) + "..."
+                                : getMatchPreview(match, currentUserId) ||
+                                  "Say hello to start..."}
                             </p>
                             {unread > 0 ? (
                               <Badge className="shrink-0 rounded-full px-2 py-0.5 text-xs">
@@ -1729,21 +1874,20 @@ function MessagesPageContent() {
             </Card>
           ) : null}
 
-          {showChatPane ? (
+          {shouldShowChatPane ? (
             <Card
               className={cn(
-                "flex min-h-0 max-h-full flex-col overflow-hidden rounded-none gap-0",
-                isCompactLayout ? "md:h-full h-[95dvh] border-0" : "",
+                "flex min-h-0 max-h-full flex-col overflow-hidden rounded-none gap-0 py-0",
+                isCompactLayout ? "md:h-full h-[100dvh] border-0" : "",
               )}
             >
               {activeMatch && otherParticipant ? (
                 <>
-                  <div className="flex items-center justify-between gap-4 border-b border-border/60 px-4 py-4 sm:px-5">
+                  <div className="flex items-center justify-between gap-4 border-b border-border/60 px-4 sm:py-4 py-2 sm:px-5">
                     <div className="flex items-center gap-3">
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="lg:hidden"
                         onClick={handleCloseMatch}
                       >
                         <ChevronLeft className="h-5 w-5" />
@@ -1769,6 +1913,10 @@ function MessagesPageContent() {
                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">
                               Online
                             </span>
+                          ) : null}
+
+                          {shouldShowListPane && showEmptyPane ? (
+                            <Card className="hidden min-h-0 max-h-full overflow-hidden rounded-none border-l-0 lg:flex" />
                           ) : null}
                         </div>
                         <p className="text-sm text-muted-foreground">
@@ -2256,7 +2404,7 @@ function MessagesPageContent() {
                                 Start the conversation
                               </h3>
                               <p className="mt-2 text-sm text-muted-foreground">
-                                Send a real message to open this match thread.
+                                Say hello to start the conversation.
                               </p>
                             </div>
                           </div>
@@ -2745,7 +2893,7 @@ export default function MessagesPage() {
         </div>
       }
     >
-      <MessagesPageContent />
+      <MessagesPageContent showChatPane={false} showEmptyPane />
     </Suspense>
   )
 }

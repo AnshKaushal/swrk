@@ -235,7 +235,7 @@ export default function Hero() {
     return (
       <FloatingIconsHero
         title="Swipe. Match. Hire."
-        subtitle="Stop hunting, start matching. Swrk™ brings the speed of discovery to the professional world. Swipe, match, and connect with your next opportunity in seconds."
+        subtitle="Stop hunting, start matching. Mutch™ brings the speed of discovery to the professional world. Swipe, match, and connect with your next opportunity in seconds."
         ctaText="Loading..."
         ctaHref="/"
         ctaText2="Learn More"
@@ -247,7 +247,7 @@ export default function Hero() {
   return (
     <FloatingIconsHero
       title="Swipe. Match. Hire."
-      subtitle="Stop hunting, start matching. Swrk™ brings the speed of discovery to the professional world. Swipe, match, and connect with your next opportunity in seconds."
+      subtitle="Stop hunting, start matching. Mutch™ brings the speed of discovery to the professional world. Swipe, match, and connect with your next opportunity in seconds."
       ctaText={session ? "Go to Dashboard" : "Join the revolution"}
       ctaHref={session ? "/dashboard" : "/signup"}
       ctaText2="Learn More"

@@ -66,6 +66,7 @@ export async function PATCH(
       employmentType,
       status,
       isVisible,
+      applicationForm,
     } = body
 
     if (title !== undefined) position.title = title
@@ -79,6 +80,8 @@ export async function PATCH(
     if (employmentType !== undefined) position.employmentType = employmentType
     if (status !== undefined) position.status = status
     if (isVisible !== undefined) position.isVisible = isVisible
+    if (applicationForm !== undefined)
+      position.applicationForm = applicationForm
 
     await position.save()
 
