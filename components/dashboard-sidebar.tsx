@@ -146,7 +146,7 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
             const isActive =
               item.href === "/dashboard"
                 ? pathname === "/dashboard"
-                : pathname === item.href || pathname.startsWith(`${item.href}/`)
+                : pathname === item.href || pathname?.startsWith(`${item.href}/`)
             const showUnreadBadge =
               item.href === "/dashboard/messages" && unreadMatches > 0
             const showNotificationsBadge =
