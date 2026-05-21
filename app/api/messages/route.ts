@@ -27,6 +27,68 @@ function getParticipantMatch(userId: string, matchId: string) {
   })
 }
 
+function getConversationSideState(
+  match: {
+    employer?: { _id?: unknown } | unknown
+    employee?: { _id?: unknown } | unknown
+    clearedAtByEmployer?: string | Date | null
+    clearedAtByEmployee?: string | Date | null
+    deletedAtByEmployer?: string | Date | null
+    deletedAtByEmployee?: string | Date | null
+  },
+  userId: string,
+) {
+  const isEmployer = extractObjectId(match.employer) === userId
+
+  const clearCursor = isEmployer
+    ? match.clearedAtByEmployer
+    : match.clearedAtByEmployee
+  const deletedCursor = isEmployer
+    ? match.deletedAtByEmployer
+    : match.deletedAtByEmployee
+  const hiddenField = isEmployer ? "deletedAtByEmployer" : "deletedAtByEmployee"
+
+  return {
+    isEmployer,
+    clearCursor,
+    deletedCursor,
+    hiddenField,
+    hiddenByUserId: userId,
+  }
+}
+
+function getMostRecentCursor(
+  ...values: Array<string | Date | null | undefined>
+) {
+  const timestamps = values
+    .map((value) => (value ? new Date(value).getTime() : 0))
+    .filter((value) => value > 0)
+
+  if (!timestamps.length) return undefined
+
+  return new Date(Math.max(...timestamps))
+}
+
+async function reactivateDeletedConversation(
+  matchId: string,
+  userId: string,
+  side: ReturnType<typeof getConversationSideState>,
+) {
+  if (!side.deletedCursor) return
+
+  await Match.updateOne(
+    { _id: matchId },
+    {
+      $unset: {
+        [side.hiddenField!]: 1,
+        lastMessagePreview: 1,
+        lastMessageAt: 1,
+      },
+      $pull: { hiddenBy: userId },
+    },
+  )
+}
+
 async function isMutualMatch(match: {
   employer?: { _id?: unknown } | unknown
   employee?: { _id?: unknown } | unknown
@@ -95,14 +157,15 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    const isEmployer = extractObjectId(match.employer) === session.user.id
-    const clearCursor = isEmployer
-      ? match.clearedAtByEmployer
-      : match.clearedAtByEmployee
+    const side = getConversationSideState(match, session.user.id)
+    const historyCursor = getMostRecentCursor(
+      side.clearCursor,
+      side.deletedCursor,
+    )
 
     const messageQuery: Record<string, unknown> = { match: matchId }
-    if (clearCursor) {
-      messageQuery.createdAt = { $gt: clearCursor }
+    if (historyCursor) {
+      messageQuery.createdAt = { $gt: historyCursor }
     }
 
     const messages = await Message.find(messageQuery)
@@ -150,10 +213,31 @@ export async function GET(req: NextRequest) {
 
     await Match.updateOne(
       { _id: matchId },
-      isEmployer
+      side.isEmployer
         ? { $set: { unreadByEmployer: 0 } }
         : { $set: { unreadByEmployee: 0 } },
     )
+
+    if (side.deletedCursor) {
+      await reactivateDeletedConversation(matchId, session.user.id, side)
+      if (side.isEmployer) {
+        match.deletedAtByEmployer = undefined
+      } else {
+        match.deletedAtByEmployee = undefined
+      }
+      match.lastMessagePreview = undefined
+      match.lastMessageAt = undefined
+      const hiddenBy = Array.isArray(
+        (match as { hiddenBy?: string[] }).hiddenBy,
+      )
+        ? (match as { hiddenBy?: string[] }).hiddenBy!.filter(
+            (hiddenUserId) => String(hiddenUserId) !== session.user.id,
+          )
+        : undefined
+      if (hiddenBy) {
+        ;(match as { hiddenBy?: string[] }).hiddenBy = hiddenBy
+      }
+    }
 
     return NextResponse.json({
       match,
@@ -224,11 +308,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const senderIsEmployer = extractObjectId(match.employer) === session.user.id
+    const side = getConversationSideState(match, session.user.id)
+    const senderIsEmployer = side.isEmployer
     const senderRole = senderIsEmployer ? "employer" : "employee"
     const recipientId = senderIsEmployer
       ? extractObjectId(match.employee)
       : extractObjectId(match.employer)
+
+    if (side.deletedCursor) {
+      await reactivateDeletedConversation(matchId, session.user.id, side)
+    }
 
     const message = await Message.create({
       match: matchId,
