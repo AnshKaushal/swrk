@@ -152,13 +152,13 @@ export default function SignupPage() {
   const getStepDescription = () => {
     switch (step) {
       case "email":
-        return "Enter your email to create your Mutch account"
+        return "Enter your email to create your Swrk account"
       case "otp":
         return "We've sent a verification code to your email"
       case "password":
         return "Set up your password to secure your account"
       default:
-        return "Enter your email to create your Mutch account"
+        return "Enter your email to create your Swrk account"
     }
   }
 
@@ -167,13 +167,13 @@ export default function SignupPage() {
       <div className="relative hidden overflow-hidden bg-muted lg:flex lg:w-1/2">
         <img
           src="https://plus.unsplash.com/premium_photo-1718732861190-c3edf2912061?w=900&auto=format&fit=crop&q=80"
-          alt="Welcome to Mutch"
+          alt="Welcome to Swrk"
           className="absolute inset-0 h-full w-full object-cover object-center"
         />
         <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" />
         <div className="relative z-10 flex flex-col justify-between p-12 text-white">
           <Link href="/">
-            <BrandLogo className="h-12 w-12 md:h-12 md:w-[174px]" alt="Mutch" />
+            <BrandLogo className="h-12 w-12 md:h-12 md:w-[174px]" alt="Swrk" />
           </Link>
           <div className="space-y-4">
             <h2 className="text-5xl leading-tight font-black tracking-tighter">

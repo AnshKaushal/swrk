@@ -52,18 +52,18 @@ export async function POST(req: NextRequest) {
     await transporter.sendMail({
       from: process.env.EMAIL_FROM,
       to: normalizedEmail,
-      subject: "Your Mutch password reset code",
+      subject: "Your Swrk password reset code",
       html: `
         <div style="font-family: Arial, sans-serif; padding: 24px; background: #f8fafc; color: #0f172a;">
           <div style="max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 16px; padding: 32px; border: 1px solid #e2e8f0;">
             <h1 style="margin: 0 0 12px; font-size: 24px;">Reset your password</h1>
-            <p style="margin: 0 0 24px; color: #475569; line-height: 1.6;">Use the code below to reset your Mutch password. It expires in 10 minutes.</p>
+            <p style="margin: 0 0 24px; color: #475569; line-height: 1.6;">Use the code below to reset your Swrk password. It expires in 10 minutes.</p>
             <div style="font-size: 40px; font-weight: 800; letter-spacing: 10px; text-align: center; padding: 20px; border: 1px solid #cbd5e1; border-radius: 14px; margin-bottom: 24px;">${otp}</div>
             <p style="margin: 0; color: #64748b; font-size: 14px; line-height: 1.6;">If you didn't request this, you can safely ignore this email.</p>
           </div>
         </div>
       `.trim(),
-      text: `Your Mutch password reset code is: ${otp}\n\nIt expires in 10 minutes. If you didn't request this, ignore this email.`,
+      text: `Your Swrk password reset code is: ${otp}\n\nIt expires in 10 minutes. If you didn't request this, ignore this email.`,
     })
 
     return NextResponse.json({

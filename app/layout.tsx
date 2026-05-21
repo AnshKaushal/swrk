@@ -20,9 +20,9 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Mutch | The Mutual Matching App",
+  title: "Swrk | The Mutual Matching App",
   description:
-    "Mutch is the new hiring platform that helps people open to work and hiring teams match with intent. Built for modern hiring workflows, it makes it easier to hire or get hired.",
+    "Swrk is the new hiring platform that helps people open to work and hiring teams match with intent. Built for modern hiring workflows, it makes it easier to hire or get hired.",
 }
 
 export default function RootLayout({

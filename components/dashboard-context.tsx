@@ -92,17 +92,17 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     const onNotificationUpdate = () => void refetch()
 
     window.addEventListener("focus", onFocus)
-    window.addEventListener("mutch:messages-updated", onMessageUpdate)
-    window.addEventListener("mutch:notifications-updated", onNotificationUpdate)
+    window.addEventListener("swrk:messages-updated", onMessageUpdate)
+    window.addEventListener("swrk:notifications-updated", onNotificationUpdate)
 
     // Poll every 60 seconds instead of 15
     const interval = window.setInterval(() => void refetch(), 60000)
 
     return () => {
       window.removeEventListener("focus", onFocus)
-      window.removeEventListener("mutch:messages-updated", onMessageUpdate)
+      window.removeEventListener("swrk:messages-updated", onMessageUpdate)
       window.removeEventListener(
-        "mutch:notifications-updated",
+        "swrk:notifications-updated",
         onNotificationUpdate,
       )
       window.clearInterval(interval)

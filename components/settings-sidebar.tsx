@@ -60,8 +60,8 @@ export function SettingsSidebar({ onClose }: { onClose?: () => void }) {
         console.warn("session update listener failed", err)
       }
     }
-    window.addEventListener("mutch:session-updated", handler)
-    return () => window.removeEventListener("mutch:session-updated", handler)
+    window.addEventListener("swrk:session-updated", handler)
+    return () => window.removeEventListener("swrk:session-updated", handler)
   }, [update])
 
   const getAvatarUrl = () => {
@@ -89,7 +89,7 @@ export function SettingsSidebar({ onClose }: { onClose?: () => void }) {
     <nav className="flex h-full flex-col">
       <div className="flex items-center justify-between p-4 pt-6">
         <Link href="/" className="flex items-center gap-3">
-          <BrandLogo className="h-8 w-8 md:h-8 md:w-[116px]" alt="Mutch" />
+          <BrandLogo className="h-8 w-8 md:h-8 md:w-[116px]" alt="Swrk" />
         </Link>
       </div>
 
@@ -97,7 +97,8 @@ export function SettingsSidebar({ onClose }: { onClose?: () => void }) {
         <div className="flex flex-col gap-1">
           {navigation.map((item) => {
             const Icon = item.icon
-            const isActive = pathname === item.href
+            const isActive =
+              pathname === item.href || pathname.startsWith(`${item.href}/`)
             return (
               <Link key={item.href} href={item.href}>
                 <div

@@ -19,7 +19,7 @@ const FeatureContent = ({
       </p>
       <img
         src="https://assets.aceternity.com/macbook.png"
-        alt="Mutch interface mockup"
+        alt="Swrk interface mockup"
         height="500"
         width="500"
         className="md:w-1/2 md:h-1/2 h-full w-full mx-auto object-contain"
@@ -36,7 +36,7 @@ const data = [
     content: (
       <FeatureContent
         title="No More Black Holes."
-        description="Say goodbye to one-way applications. On Mutch, conversations only begin when both the employer and candidate have expressed genuine interest. This mutual intent model eliminates wasted time and creates meaningful connections from the start."
+        description="Say goodbye to one-way applications. On Swrk, conversations only begin when both the employer and candidate have expressed genuine interest. This mutual intent model eliminates wasted time and creates meaningful connections from the start."
       />
     ),
   },
@@ -58,7 +58,7 @@ const data = [
     content: (
       <FeatureContent
         title="Trust by Default."
-        description="Every profile on Mutch is verified and authentic. We've eliminated fake accounts and scams so you can focus on what matters—finding the right opportunity or the right talent. Trust isn't earned; it's built into the platform."
+        description="Every profile on Swrk is verified and authentic. We've eliminated fake accounts and scams so you can focus on what matters—finding the right opportunity or the right talent. Trust isn't earned; it's built into the platform."
       />
     ),
   },
@@ -80,7 +80,7 @@ const data = [
     content: (
       <FeatureContent
         title="Your Growth Matters."
-        description="Access analytics, interview preparation resources, and career coaching from industry leaders. Track your progress, understand employer insights, and continuously improve. Mutch supports your entire career journey."
+        description="Access analytics, interview preparation resources, and career coaching from industry leaders. Track your progress, understand employer insights, and continuously improve. Swrk supports your entire career journey."
       />
     ),
   },
@@ -112,7 +112,7 @@ export default function FeatureList() {
         className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
       >
         <h2 className="text-3xl sm:text-5xl font-bold tracking-tight text-foreground mb-4">
-          Explore Mutch's Features
+          Explore Swrk's Features
         </h2>
         <p className="text-lg text-muted-foreground">
           We cut through the noise. A meticulously crafted ecosystem for

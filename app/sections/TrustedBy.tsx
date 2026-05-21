@@ -60,7 +60,7 @@ export default function TrustedBy() {
             className="text-lg text-muted-foreground"
           >
             <b>Hire</b> the best talent or <b>get hired</b> by the best
-            companies. Mutch™ is trusted by top organizations across industries
+            companies. Swrk™ is trusted by top organizations across industries
             to connect with the right talent and opportunities.
           </motion.p>
         </div>

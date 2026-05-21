@@ -9,7 +9,7 @@ type BrandLogoProps = {
   alt?: string
 }
 
-export function BrandLogo({ className, alt = "Mutch" }: BrandLogoProps) {
+export function BrandLogo({ className, alt = "Swrk" }: BrandLogoProps) {
   const { resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
@@ -18,12 +18,16 @@ export function BrandLogo({ className, alt = "Mutch" }: BrandLogoProps) {
   }, [])
 
   const desktopLogo =
-    mounted && resolvedTheme === "dark" ? "/logo-dark.png" : "/logo-light.png"
+    mounted && resolvedTheme !== "dark" ? "/logo-dark.png" : "/logo-light.png"
+  const mobileLogo =
+    mounted && resolvedTheme === "dark"
+      ? "/logo-square-light.svg"
+      : "/logo-square-dark.svg"
 
   return (
     <span className={cn("relative inline-flex shrink-0", className)}>
       <img
-        src="/logo-square.png"
+        src={mobileLogo}
         alt={alt}
         className="block h-full w-full object-contain md:hidden"
       />

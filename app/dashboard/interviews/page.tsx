@@ -69,11 +69,11 @@ export default function InterviewsDashboard() {
       fetchInterviews()
     }
 
-    window.addEventListener("mutch:interviews-updated", handleUpdate)
+    window.addEventListener("swrk:interviews-updated", handleUpdate)
     window.addEventListener("focus", handleUpdate)
 
     return () => {
-      window.removeEventListener("mutch:interviews-updated", handleUpdate)
+      window.removeEventListener("swrk:interviews-updated", handleUpdate)
       window.removeEventListener("focus", handleUpdate)
     }
   }, [session])
@@ -151,7 +151,7 @@ export default function InterviewsDashboard() {
 VERSION:2.0
 PRODID:-//SWRK//Interview Calendar//EN
 BEGIN:VEVENT
-UID:${interview._id}@mutch.com
+UID:${interview._id}@swrk.com
 DTSTAMP:${formatICS(new Date())}
 DTSTART:${formatICS(startDate)}
 DTEND:${formatICS(endDate)}

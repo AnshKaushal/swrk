@@ -35,7 +35,7 @@ export default function ConfirmedPage() {
               You're Subscribed!
             </h1>
             <p className="text-lg text-muted-foreground">
-              Thank you for subscribing to Mutch updates. Check your inbox for
+              Thank you for subscribing to Swrk updates. Check your inbox for
               exclusive content and announcements.
             </p>
           </motion.div>
@@ -47,7 +47,7 @@ export default function ConfirmedPage() {
             className="bg-accent/5 border border-accent/20 rounded-lg p-4"
           >
             <p className="text-sm text-muted-foreground">
-              📧 We'll send you occasional updates about Mutch features, tips,
+              📧 We'll send you occasional updates about Swrk features, tips,
               and announcements.
             </p>
           </motion.div>

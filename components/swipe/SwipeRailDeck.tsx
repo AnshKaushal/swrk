@@ -518,7 +518,7 @@ export default function SwipeRailDeck() {
       }
 
       try {
-        window.dispatchEvent(new Event("mutch:notifications-updated"))
+        window.dispatchEvent(new Event("swrk:notifications-updated"))
       } catch (e) {}
 
       if (json.matched) {

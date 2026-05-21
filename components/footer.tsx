@@ -66,7 +66,7 @@ export default function Footer() {
             transition={{ duration: 0.6 }}
             viewport={{ once: true }}
           >
-            <BrandLogo className="h-10 w-10 md:h-10 md:w-[145px]" alt="Mutch" />
+            <BrandLogo className="h-10 w-10 md:h-10 md:w-[145px]" alt="Swrk" />
 
             <p className="text-muted-foreground leading-relaxed text-sm">
               The intelligent job matching platform that connects talent with
@@ -163,7 +163,7 @@ export default function Footer() {
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm">
             <div className="flex items-center gap-2 text-muted-foreground">
               <span>
-                © {new Date().getFullYear()} Mutch. All Rights Reserved
+                © {new Date().getFullYear()} Swrk. All Rights Reserved
               </span>
             </div>
 

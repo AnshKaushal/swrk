@@ -77,8 +77,8 @@ export default function Navbar() {
         console.warn("session update listener failed", err)
       }
     }
-    window.addEventListener("mutch:session-updated", handler)
-    return () => window.removeEventListener("mutch:session-updated", handler)
+    window.addEventListener("swrk:session-updated", handler)
+    return () => window.removeEventListener("swrk:session-updated", handler)
   }, [update])
 
   React.useEffect(() => {
@@ -86,10 +86,10 @@ export default function Navbar() {
       void loadNotifUnread()
     }, 0)
     const onMessage = () => void loadNotifUnread()
-    window.addEventListener("mutch:notifications-updated", onMessage)
+    window.addEventListener("swrk:notifications-updated", onMessage)
     return () => {
       window.clearTimeout(timer)
-      window.removeEventListener("mutch:notifications-updated", onMessage)
+      window.removeEventListener("swrk:notifications-updated", onMessage)
     }
   }, [loadNotifUnread])
 
@@ -139,7 +139,7 @@ export default function Navbar() {
             href={homeHref}
             className="flex items-center gap-2 font-bold text-xl flex-shrink-0"
           >
-            <BrandLogo className="h-10 w-10 md:h-10 md:w-[145px]" alt="Mutch" />
+            <BrandLogo className="h-10 w-10 md:h-10 md:w-[145px]" alt="Swrk" />
           </Link>
 
           <div className="hidden md:flex flex-1 justify-center items-center gap-8">

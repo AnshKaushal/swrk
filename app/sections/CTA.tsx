@@ -120,7 +120,7 @@ export default function CTAWithVerticalMarquee() {
               Find Your Perfect Match
             </h1>
             <p className="text-lg md:text-xl text-muted-foreground leading-relaxed animate-fade-in-up [animation-delay:400ms]">
-              Join thousands of professionals and companies using Mutch to
+              Join thousands of professionals and companies using Swrk to
               discover meaningful career opportunities. Start your journey
               today.
             </p>

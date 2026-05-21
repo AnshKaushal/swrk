@@ -12,16 +12,22 @@ export async function GET(req: NextRequest) {
 
     await db()
     const url = new URL(req.url)
-    const limit = Number(url.searchParams.get("limit") || 50)
+    const limit = Math.min(Number(url.searchParams.get("limit") || 25), 100)
+    const skip = Math.max(Number(url.searchParams.get("skip") || 0), 0)
 
-    const notifications = await Notification.find({
-      user: session.user.id,
-    })
+    const notifications = await Notification.find({ user: session.user.id })
       .sort({ createdAt: -1 })
-      .limit(limit)
+      .skip(skip)
+      .limit(limit + 1)
       .lean()
 
-    return NextResponse.json({ notifications })
+    const hasMore = notifications.length > limit
+
+    const pageNotifications = hasMore
+      ? notifications.slice(0, limit)
+      : notifications
+
+    return NextResponse.json({ notifications: pageNotifications, hasMore })
   } catch (error) {
     console.error("Error fetching notifications:", error)
     return NextResponse.json({ error: "Failed to fetch" }, { status: 500 })

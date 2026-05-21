@@ -46,6 +46,14 @@ const navigation = [
   { name: "Interviews", href: "/dashboard/interviews", icon: Calendar },
   { name: "Swipe", href: "/dashboard/swipe", icon: Zap },
   { name: "Jobs", href: "/dashboard/jobs", icon: Briefcase },
+  { name: "Profile", href: "/settings/profile", icon: User },
+  { name: "Verification", href: "/settings/verification", icon: Shield },
+  { name: "Filters", href: "/settings/role-filters", icon: Filter },
+  { name: "Resumes", href: "/settings/resume", icon: FileText },
+  { name: "Privacy", href: "/settings/privacy", icon: Shield },
+  { name: "Notifications", href: "/settings/notifications", icon: Bell },
+  { name: "Subscription", href: "/settings/subscription", icon: Crown },
+  { name: "Account", href: "/settings/account", icon: Settings },
 ]
 
 const adminNavigation = [
@@ -94,8 +102,8 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
         console.warn("session update listener failed", error)
       }
     }
-    window.addEventListener("mutch:session-updated", handler)
-    return () => window.removeEventListener("mutch:session-updated", handler)
+    window.addEventListener("swrk:session-updated", handler)
+    return () => window.removeEventListener("swrk:session-updated", handler)
   }, [update])
 
   const getAvatarUrl = () => {
@@ -127,7 +135,7 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
     <nav className="flex h-full flex-col">
       <div className="flex items-center justify-between p-4 pt-6">
         <Link href="/home" className="flex items-center gap-3">
-          <BrandLogo className="h-8 w-8 md:h-8 md:w-[116px]" alt="Mutch" />
+          <BrandLogo className="h-8 w-8 md:h-8 md:w-[116px]" alt="Swrk" />
         </Link>
       </div>
 
@@ -135,7 +143,10 @@ export function DashboardSidebar({ onClose }: { onClose?: () => void }) {
         <div className="flex flex-col gap-1">
           {visibleNavigation.map((item) => {
             const Icon = item.icon
-            const isActive = pathname === item.href
+            const isActive =
+              item.href === "/dashboard"
+                ? pathname === "/dashboard"
+                : pathname === item.href || pathname.startsWith(`${item.href}/`)
             const showUnreadBadge =
               item.href === "/dashboard/messages" && unreadMatches > 0
             const showNotificationsBadge =

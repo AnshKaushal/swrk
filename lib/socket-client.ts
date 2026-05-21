@@ -3,8 +3,8 @@
 import { io, type Socket } from "socket.io-client"
 
 declare global {
-  var __mutchSocketClient: Socket | undefined
-  var __mutchSocketInitPromise: Promise<Socket> | undefined
+  var __swrkSocketClient: Socket | undefined
+  var __swrkSocketInitPromise: Promise<Socket> | undefined
 }
 
 async function ensureSocketServer() {
@@ -26,12 +26,12 @@ async function fetchSocketToken() {
 }
 
 export async function getSocketClient() {
-  if (globalThis.__mutchSocketClient) {
-    return globalThis.__mutchSocketClient
+  if (globalThis.__swrkSocketClient) {
+    return globalThis.__swrkSocketClient
   }
 
-  if (!globalThis.__mutchSocketInitPromise) {
-    globalThis.__mutchSocketInitPromise = (async () => {
+  if (!globalThis.__swrkSocketInitPromise) {
+    globalThis.__swrkSocketInitPromise = (async () => {
       const socketUrl =
         process.env.NEXT_PUBLIC_SOCKET_URL || window.location.origin
       if (socketUrl === window.location.origin) {
@@ -56,11 +56,11 @@ export async function getSocketClient() {
         console.error("[socket] connect error:", error)
       })
 
-      globalThis.__mutchSocketClient = socket
+      globalThis.__swrkSocketClient = socket
 
       socket.on("disconnect", () => {
         if (socket.disconnected) {
-          globalThis.__mutchSocketClient = socket
+          globalThis.__swrkSocketClient = socket
         }
       })
 
@@ -68,9 +68,9 @@ export async function getSocketClient() {
     })()
   }
 
-  return globalThis.__mutchSocketInitPromise
+  return globalThis.__swrkSocketInitPromise
 }
 
 export function getExistingSocketClient() {
-  return globalThis.__mutchSocketClient ?? null
+  return globalThis.__swrkSocketClient ?? null
 }

@@ -68,7 +68,7 @@ export default function ContactPage() {
         <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]" />
         <div className="relative z-10 flex flex-col justify-between p-12 text-white">
           <Link href="/">
-            <BrandLogo className="h-12 w-12 md:h-12 md:w-[174px]" alt="Mutch" />
+            <BrandLogo className="h-12 w-12 md:h-12 md:w-[174px]" alt="Swrk" />
           </Link>
           <div className="space-y-4">
             <h2 className="text-5xl leading-tight font-black tracking-tighter">

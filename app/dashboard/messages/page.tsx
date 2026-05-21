@@ -522,7 +522,7 @@ function buildOptimisticMessage(params: {
 
 function notifyMessagesUpdated() {
   try {
-    window.dispatchEvent(new Event("mutch:messages-updated"))
+    window.dispatchEvent(new Event("swrk:messages-updated"))
   } catch {
     // ignore
   }

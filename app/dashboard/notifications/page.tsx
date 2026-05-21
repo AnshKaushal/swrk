@@ -1,8 +1,6 @@
 "use client"
 
-import * as React from "react"
-import { useEffect, useState } from "react"
-import { useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { formatDistanceToNow } from "date-fns"
@@ -18,47 +16,85 @@ interface NotificationItem {
   createdAt: string
 }
 
+const PAGE_SIZE = 25
+
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [skip, setSkip] = useState(0)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
 
-  const load = async () => {
+  const load = async (options?: { reset?: boolean }) => {
+    const reset = options?.reset ?? false
     try {
-      setLoading(true)
-      const res = await fetch(`/api/notifications?limit=200`)
+      if (reset) {
+        setLoading(true)
+        setSkip(0)
+        setHasMore(true)
+      } else {
+        setLoadingMore(true)
+      }
+
+      const res = await fetch(
+        `/api/notifications?limit=${PAGE_SIZE}&skip=${reset ? 0 : skip}`,
+      )
       if (!res.ok) throw new Error("Failed")
       const data = await res.json()
-      setNotifications(data.notifications || [])
+
+      const nextNotifications = (data.notifications || []) as NotificationItem[]
+      setHasMore(Boolean(data.hasMore))
+      setNotifications((prev) =>
+        reset ? nextNotifications : [...prev, ...nextNotifications],
+      )
+      setSkip((prev) =>
+        reset ? nextNotifications.length : prev + nextNotifications.length,
+      )
     } catch (err) {
       console.error(err)
       toast.error("Failed to load notifications")
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }
 
   useEffect(() => {
-    void load()
+    void load({ reset: true })
   }, [])
 
   useEffect(() => {
-    const refresh = () => void load()
-    window.addEventListener("mutch:notifications-updated", refresh)
+    const refresh = () => void load({ reset: true })
+    window.addEventListener("swrk:notifications-updated", refresh)
     return () =>
-      window.removeEventListener("mutch:notifications-updated", refresh)
+      window.removeEventListener("swrk:notifications-updated", refresh)
   }, [])
 
-  const observerRef = useRef<IntersectionObserver | null>(null)
+  useEffect(() => {
+    if (typeof window === "undefined" || !("IntersectionObserver" in window))
+      return
+
+    const sentinel = sentinelRef.current
+    if (!sentinel || !hasMore || loading) return
+
+    const observer = new IntersectionObserver((entries) => {
+      const entry = entries[0]
+      if (!entry?.isIntersecting || loadingMore || !hasMore) return
+      void load()
+    })
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, loading, loadingMore, skip])
+
   const autoMarked = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     if (typeof window === "undefined" || !("IntersectionObserver" in window))
       return
 
-    // cleanup previous observer
-    observerRef.current?.disconnect()
-
-    observerRef.current = new IntersectionObserver(
+    const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (!entry.isIntersecting) return
@@ -106,13 +142,12 @@ export default function NotificationsPage() {
       { threshold: 0.6 },
     )
 
-    // observe each notification element by data-id
     notifications.forEach((n) => {
       const el = document.querySelector(`[data-id="${n._id}"]`)
-      if (el) observerRef.current?.observe(el)
+      if (el) observer.observe(el)
     })
 
-    return () => observerRef.current?.disconnect()
+    return () => observer.disconnect()
   }, [notifications])
 
   const markRead = async (id: string) => {
@@ -185,6 +220,17 @@ export default function NotificationsPage() {
             </div>
           </div>
         ))}
+        <div ref={sentinelRef} className="h-10" />
+        {loadingMore ? (
+          <div className="py-2 text-sm text-muted-foreground">
+            Loading more...
+          </div>
+        ) : null}
+        {!hasMore && notifications.length > 0 ? (
+          <div className="py-2 text-sm text-muted-foreground">
+            You’re all caught up.
+          </div>
+        ) : null}
       </div>
     </div>
   )

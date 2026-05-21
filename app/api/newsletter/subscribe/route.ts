@@ -65,12 +65,12 @@ export async function POST(req: NextRequest) {
       req.nextUrl.origin,
     )
 
-    const subject = "Confirm your Mutch newsletter subscription"
+    const subject = "Confirm your Swrk newsletter subscription"
     const text = `Confirm your subscription by visiting: ${verifyUrl.toString()}`
     const html = `
       <div style="font-family: Arial, sans-serif; line-height: 1.6;">
         <h2>Confirm your subscription</h2>
-        <p>Thanks for joining Mutch updates. Click below to confirm:</p>
+        <p>Thanks for joining Swrk updates. Click below to confirm:</p>
         <p><a href="${verifyUrl.toString()}" style="color: #2563eb;">Confirm subscription</a></p>
         <p>If the button does not work, paste this link in your browser:</p>
         <p>${verifyUrl.toString()}</p>

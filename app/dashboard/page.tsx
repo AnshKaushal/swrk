@@ -83,10 +83,10 @@ export default function DashboardPage() {
 
     void loadRecentMatches()
     const onUpdate = () => void loadRecentMatches()
-    window.addEventListener("mutch:messages-updated", onUpdate)
+    window.addEventListener("swrk:messages-updated", onUpdate)
     window.addEventListener("focus", onUpdate)
     return () => {
-      window.removeEventListener("mutch:messages-updated", onUpdate)
+      window.removeEventListener("swrk:messages-updated", onUpdate)
       window.removeEventListener("focus", onUpdate)
     }
   }, [status])

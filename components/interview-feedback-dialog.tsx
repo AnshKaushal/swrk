@@ -176,7 +176,7 @@ export function InterviewFeedbackDialog({
 
       setExistingFeedback(json.feedback)
       try {
-        window.dispatchEvent(new Event("mutch:interviews-updated"))
+        window.dispatchEvent(new Event("swrk:interviews-updated"))
       } catch {
         // ignore
       }

@@ -7,14 +7,14 @@ import CountUp from "react-countup"
 const testimonials = [
   {
     content:
-      "Mutch completely changed how I approach job hunting. Instead of endless applications into the void, I only connect with companies that are genuinely interested. Found my perfect role in just two weeks!",
+      "Swrk completely changed how I approach job hunting. Instead of endless applications into the void, I only connect with companies that are genuinely interested. Found my perfect role in just two weeks!",
     name: "Alex Chen",
     handle: "@alexchen_dev",
     avatar: "https://i.pravatar.cc/150?u=a042581f4e29026024d",
   },
   {
     content:
-      "As a startup founder, finding the right talent is everything. Mutch's AI matching and mutual intent system cut our hiring time by 70%. We've built an incredible team thanks to this platform.",
+      "As a startup founder, finding the right talent is everything. Swrk's AI matching and mutual intent system cut our hiring time by 70%. We've built an incredible team thanks to this platform.",
     name: "Sarah Johnson",
     handle: "@sarahj_founder",
     avatar: "https://i.pravatar.cc/150?u=a042581f4e29026704d",
@@ -28,14 +28,14 @@ const testimonials = [
   },
   {
     content:
-      "Mutch has revolutionized recruitment. The mutual intent model ensures both parties are committed before investing time in conversations.",
+      "Swrk has revolutionized recruitment. The mutual intent model ensures both parties are committed before investing time in conversations.",
     name: "Emma Thompson",
     handle: "@emma_hr_pro",
     avatar: "https://i.pravatar.cc/150?u=a048581f4e29026701d",
   },
   {
     content:
-      "I love how Mutch learns from my preferences. The AI gets better at suggesting matches that actually align with my career goals and company culture.",
+      "I love how Swrk learns from my preferences. The AI gets better at suggesting matches that actually align with my career goals and company culture.",
     name: "David Kim",
     handle: "@davidk_engineer",
     avatar: "https://i.pravatar.cc/150?u=a042581f4e29026024d",
@@ -56,14 +56,14 @@ const testimonials = [
   },
   {
     content:
-      "Mutch's smart scheduling integration makes coordinating interviews effortless. Everything syncs with my calendar automatically.",
+      "Swrk's smart scheduling integration makes coordinating interviews effortless. Everything syncs with my calendar automatically.",
     name: "Rachel Green",
     handle: "@rachel_recruit",
     avatar: "https://i.pravatar.cc/150?u=a042581f4e29026704c",
   },
   {
     content:
-      "I've tried every job platform out there, but Mutch is the only one that truly understands what both people open to work and hiring teams need. It's a game changer.",
+      "I've tried every job platform out there, but Swrk is the only one that truly understands what both people open to work and hiring teams need. It's a game changer.",
     name: "Tom Anderson",
     handle: "@tom_productmgr",
     avatar: "https://i.pravatar.cc/150?u=a04258a2462d8267123",
@@ -82,7 +82,7 @@ export default function Testimonials() {
             <p className="text-lg text-muted-foreground">
               Don&apos;t take our word for it - listen to what{" "}
               <br className="hidden md:block" />
-              Mutch users have to say about their experience.
+              Swrk users have to say about their experience.
             </p>
           </div>
 
