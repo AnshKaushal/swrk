@@ -343,9 +343,7 @@ export function CandidateDashboard({ name }: { name: string }) {
                           variant="ghost"
                           size="sm"
                           onClick={() =>
-                            router.push(
-                              `/dashboard/messages?matchId=${match._id}`,
-                            )
+                            router.push(`/dashboard/messages/${match._id}`)
                           }
                         >
                           <MessageCircle className="w-4 h-4" />

@@ -464,6 +464,28 @@ function appendMessage(list: MessageRecord[], message: MessageRecord) {
   return [...list, message]
 }
 
+function mergeConversationMessages(
+  existing: MessageRecord[],
+  incoming: MessageRecord[],
+) {
+  const pendingMessages = existing.filter((message) => message.pending)
+  const next = dedupeMessagesById([...incoming])
+
+  for (const pendingMessage of pendingMessages) {
+    const matchIndex = next.findIndex(
+      (message) =>
+        !message.pending &&
+        messageSignature(message) === messageSignature(pendingMessage),
+    )
+
+    if (matchIndex === -1) {
+      next.push(pendingMessage)
+    }
+  }
+
+  return next
+}
+
 function replacePendingMessage(
   list: MessageRecord[],
   localId: string,
@@ -697,8 +719,11 @@ export function MessagesPageContent({
           )
         }
         setShowJumpToLatest(false)
-        setMessages(
-          dedupeMessagesById((json.messages || []) as MessageRecord[]),
+        setMessages((previous) =>
+          mergeConversationMessages(
+            previous,
+            (json.messages || []) as MessageRecord[],
+          ),
         )
         notifyMessagesUpdated()
       } catch (error) {
@@ -2111,7 +2136,11 @@ export function MessagesPageContent({
                                           {formatMessageTime(message.createdAt)}
                                         </span>
                                         {isOwnMessage ? (
-                                          <CheckCheck className="h-3.5 w-3.5 text-primary" />
+                                          message.pending ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                                          ) : (
+                                            <CheckCheck className="h-3.5 w-3.5 text-primary" />
+                                          )
                                         ) : null}
                                       </div>
                                     </div>
@@ -2193,7 +2222,11 @@ export function MessagesPageContent({
                                           {formatMessageTime(message.createdAt)}
                                         </span>
                                         {isOwnMessage ? (
-                                          <CheckCheck className="h-3.5 w-3.5 text-primary" />
+                                          message.pending ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                                          ) : (
+                                            <CheckCheck className="h-3.5 w-3.5 text-primary" />
+                                          )
                                         ) : null}
                                       </div>
                                     </div>
@@ -2363,7 +2396,11 @@ export function MessagesPageContent({
                                         {formatMessageTime(message.createdAt)}
                                       </span>
                                       {isOwnMessage ? (
-                                        <CheckCheck className="h-3.5 w-3.5 text-primary" />
+                                        message.pending ? (
+                                          <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                                        ) : (
+                                          <CheckCheck className="h-3.5 w-3.5 text-primary" />
+                                        )
                                       ) : null}
                                     </div>
                                   </div>
