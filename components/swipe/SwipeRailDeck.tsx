@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Markdown } from "@/components/ui/markdown"
 import {
   Loader2,
   X,
@@ -25,6 +26,7 @@ import {
   Building2,
   Clock3,
   Rocket,
+  ChevronDown,
 } from "lucide-react"
 
 type Candidate = {
@@ -178,6 +180,7 @@ export default function SwipeRailDeck() {
   const [swipeQuota, setSwipeQuota] = useState<SwipeResponse["swipeQuota"]>()
   const [superQuota, setSuperQuota] = useState<any>()
   const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [descriptionDialogOpen, setDescriptionDialogOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
   const router = useRouter()
   const [actionPulse, setActionPulse] = useState<
@@ -211,7 +214,7 @@ export default function SwipeRailDeck() {
         return {
           id: item.position._id,
           title: item.position.title,
-          description: item.position.description.substring(0, 80),
+          description: item.position.description.replace(/<[^>]+>/g, "").substring(0, 80),
           imageSrc:
             item.position.employerId?.avatar ||
             `https://dummyimage.com/960x1280/0f172a/e2e8f0&text=${encodeURIComponent(item.position.title.charAt(0))}`,
@@ -382,7 +385,7 @@ export default function SwipeRailDeck() {
       const candidates = candidatesData.candidates || []
       setSwipeQuota(candidatesData.swipeQuota)
 
-      const positionsRes = await fetch("/api/positions/candidates?limit=15", {
+      const positionsRes = await fetch("/api/positions/candidates?limit=15&excludeSwiped=true", {
         cache: "no-store",
       })
       const positionsData = await positionsRes.json()
@@ -652,9 +655,19 @@ export default function SwipeRailDeck() {
                   </Badge>
                 </div>
 
-                <p className="text-sm text-muted-foreground">
-                  {currentPosition.description.substring(0, 200)}...
-                </p>
+                <div className="line-clamp-3 text-sm text-muted-foreground">
+                  <Markdown>{currentPosition.description}</Markdown>
+                </div>
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 text-xs"
+                  onClick={() => setDescriptionDialogOpen(true)}
+                >
+                  View full description
+                  <ChevronDown className="ml-1 h-3 w-3" />
+                </Button>
 
                 <div className="flex flex-wrap gap-2">
                   {currentPosition.employerId?.companyName && (
@@ -862,6 +875,24 @@ export default function SwipeRailDeck() {
                 Upgrade
               </Button>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={descriptionDialogOpen}
+          onOpenChange={setDescriptionDialogOpen}
+        >
+          <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>
+                {currentPosition?.title || "Job Description"}
+              </DialogTitle>
+            </DialogHeader>
+            {currentPosition && (
+              <div className="prose prose-sm prose-gray dark:prose-invert max-w-none">
+                <Markdown>{currentPosition.description}</Markdown>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>

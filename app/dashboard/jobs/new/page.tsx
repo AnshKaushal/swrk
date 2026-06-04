@@ -279,6 +279,8 @@ export default function NewJobPage() {
   const [salaryMin, setSalaryMin] = useState("")
   const [salaryMax, setSalaryMax] = useState("")
   const [employmentType, setEmploymentType] = useState("full-time")
+  const [externalLink, setExternalLink] = useState("")
+  const [isExternal, setIsExternal] = useState(false)
 
   const [applicationForm, setApplicationForm] = useState<ApplicationFormConfig>(
     createApplicationForm(),
@@ -433,6 +435,8 @@ export default function NewJobPage() {
         employmentType,
         applicationForm:
           cleanedForm.fields.length > 0 ? cleanedForm : undefined,
+        externalLink: externalLink || undefined,
+        isExternal: isExternal || undefined,
       }
 
       const response = await fetch("/api/positions", {
@@ -609,6 +613,38 @@ export default function NewJobPage() {
                 placeholder="180000"
               />
             </div>
+          </div>
+        </Card>
+
+        <Card className="rounded-3xl border-border/60 p-6 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold">External Application Link</h2>
+          <p className="mb-4 text-sm text-muted-foreground">
+            If this job is hosted elsewhere, enable external mode so applicants
+            submit their details and then get redirected.
+          </p>
+          <div className="space-y-4">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={isExternal}
+                onChange={(e) => setIsExternal(e.target.checked)}
+                className="h-4 w-4 rounded border-border"
+              />
+              This is an external posting
+            </label>
+
+            {isExternal && (
+              <div className="space-y-2">
+                <Label htmlFor="externalLink">External Application URL</Label>
+                <Input
+                  id="externalLink"
+                  type="url"
+                  value={externalLink}
+                  onChange={(e) => setExternalLink(e.target.value)}
+                  placeholder="https://company.workable.com/jobs/123"
+                />
+              </div>
+            )}
           </div>
         </Card>
 

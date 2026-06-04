@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { PaginationControls } from "@/components/ui/pagination-controls"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -42,31 +43,40 @@ export default function InterviewsDashboard() {
   const router = useRouter()
   const [interviews, setInterviews] = useState<Interview[]>([])
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   const [filter, setFilter] = useState<
     "all" | "upcoming" | "confirmed" | "past"
   >("all")
 
+  const statusParam = filter === "all" ? "" : filter === "upcoming" ? "scheduled" : filter
+
+  async function fetchInterviews(p: number) {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ page: String(p), limit: "10" })
+      if (statusParam) params.set("status", statusParam)
+      const res = await fetch(`/api/interviews?${params}`)
+      if (!res.ok) throw new Error("Failed to fetch")
+      const data = await res.json()
+      setInterviews(data.interviews)
+      setPage(data.page || 1)
+      setTotalPages(data.totalPages || 1)
+    } catch (error) {
+      console.error("Error fetching interviews:", error)
+      toast.error("Failed to load interviews")
+    } finally {
+      setLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (!session?.user) return
 
-    const fetchInterviews = async () => {
-      try {
-        const res = await fetch("/api/interviews")
-        if (!res.ok) throw new Error("Failed to fetch")
-        const data = await res.json()
-        setInterviews(data.interviews)
-      } catch (error) {
-        console.error("Error fetching interviews:", error)
-        toast.error("Failed to load interviews")
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchInterviews()
+    fetchInterviews(1)
 
     const handleUpdate = () => {
-      fetchInterviews()
+      fetchInterviews(page)
     }
 
     window.addEventListener("swrk:interviews-updated", handleUpdate)
@@ -76,30 +86,12 @@ export default function InterviewsDashboard() {
       window.removeEventListener("swrk:interviews-updated", handleUpdate)
       window.removeEventListener("focus", handleUpdate)
     }
-  }, [session])
+  }, [session, filter])
 
-  const getFilteredInterviews = () => {
-    const now = new Date()
-
-    return interviews.filter((interview) => {
-      const scheduledDate = new Date(interview.scheduledFor)
-
-      switch (filter) {
-        case "upcoming":
-          return (
-            scheduledDate > now &&
-            interview.status === "scheduled" &&
-            !isPast(scheduledDate)
-          )
-        case "confirmed":
-          return interview.status === "confirmed"
-        case "past":
-          return scheduledDate < now || interview.status === "completed"
-        default:
-          return true
-      }
-    })
-  }
+  const filteredInterviews = [...interviews].sort(
+    (a, b) =>
+      new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime(),
+  )
 
   const handleConfirm = async (interviewId: string) => {
     try {
@@ -183,11 +175,6 @@ END:VCALENDAR`
     )
   }
 
-  const filteredInterviews = getFilteredInterviews().sort(
-    (a, b) =>
-      new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime(),
-  )
-
   const getStatusBadge = (interview: Interview) => {
     switch (interview.status) {
       case "confirmed":
@@ -245,13 +232,11 @@ END:VCALENDAR`
         </div>
 
         <div className="flex gap-2 mb-6">
-          {["all", "upcoming", "confirmed", "past"].map((f) => (
+          {(["all", "upcoming", "confirmed", "past"] as const).map((f) => (
             <Button
               key={f}
               variant={filter === f ? "default" : "outline"}
-              onClick={() =>
-                setFilter(f as "all" | "upcoming" | "confirmed" | "past")
-              }
+              onClick={() => setFilter(f)}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </Button>
@@ -406,6 +391,15 @@ END:VCALENDAR`
                 </Card>
               )
             })}
+          </div>
+        )}
+        {totalPages > 1 && (
+          <div className="mt-6 flex justify-center">
+            <PaginationControls
+              page={page}
+              totalPages={totalPages}
+              onPageChange={fetchInterviews}
+            />
           </div>
         )}
       </div>

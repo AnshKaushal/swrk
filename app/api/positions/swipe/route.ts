@@ -40,6 +40,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Position not found" }, { status: 404 })
     }
 
+    if (String(position.employerId) === session.user.id) {
+      return NextResponse.json(
+        { error: "Cannot swipe on your own position" },
+        { status: 400 },
+      )
+    }
+
     // Check if user already swiped on this position
     const existingSwipe = await PositionSwipe.findOne({
       candidateId: session.user.id,

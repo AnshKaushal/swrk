@@ -67,6 +67,8 @@ export async function PATCH(
       status,
       isVisible,
       applicationForm,
+      externalLink,
+      isExternal,
     } = body
 
     if (title !== undefined) position.title = title
@@ -82,6 +84,8 @@ export async function PATCH(
     if (isVisible !== undefined) position.isVisible = isVisible
     if (applicationForm !== undefined)
       position.applicationForm = applicationForm
+    if (externalLink !== undefined) position.externalLink = externalLink
+    if (isExternal !== undefined) position.isExternal = isExternal
 
     await position.save()
 

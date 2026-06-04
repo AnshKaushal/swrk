@@ -570,7 +570,7 @@ export default function EditJobPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full max-w-[1600px] px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Edit Position</h1>

@@ -4,6 +4,7 @@ import { db } from "@/lib/mongodb"
 import Position from "@/models/position"
 import User from "@/models/user"
 import { getJobPostQuota } from "@/lib/job-posting-limits"
+import { generateUniqueSlug } from "@/lib/slug"
 
 export async function GET(req: NextRequest) {
   try {
@@ -16,6 +17,9 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const employerId = searchParams.get("employerId")
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"))
+    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20")))
+    const skip = (page - 1) * limit
 
     if (!employerId) {
       return NextResponse.json(
@@ -34,11 +38,18 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const positions = await Position.find({ employerId })
-      .sort({ createdAt: -1 })
-      .lean()
+    const filter = { employerId }
+    const [positions, total] = await Promise.all([
+      Position.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Position.countDocuments(filter),
+    ])
 
-    return NextResponse.json({ positions })
+    return NextResponse.json({
+      positions,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+    })
   } catch (error) {
     console.error(error)
     return NextResponse.json(
@@ -95,6 +106,8 @@ export async function POST(req: NextRequest) {
       salaryRange,
       employmentType,
       applicationForm,
+      externalLink,
+      isExternal,
     } = body
 
     if (!title || !description) {
@@ -103,6 +116,8 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       )
     }
+
+    const slug = await generateUniqueSlug(title)
 
     const position = new Position({
       employerId: session.user.id,
@@ -117,6 +132,9 @@ export async function POST(req: NextRequest) {
       employmentType: employmentType || "full-time",
       status: "draft",
       applicationForm,
+      slug,
+      externalLink: externalLink || "",
+      isExternal: isExternal || false,
     })
 
     await position.save()

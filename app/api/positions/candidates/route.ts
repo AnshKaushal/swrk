@@ -15,36 +15,39 @@ export async function GET(req: NextRequest) {
     await db()
 
     const { searchParams } = new URL(req.url)
-    const limit = parseInt(searchParams.get("limit") || "30")
-    const excludeIds = searchParams.getAll("excludeId")
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"))
+    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20")))
+    const skip = (page - 1) * limit
+    const excludeSwiped = searchParams.get("excludeSwiped") !== "false"
 
     const query: any = {
       status: "active",
       isVisible: true,
+      employerId: { $ne: session.user.id },
     }
 
-    // Exclude already swiped positions
-    if (excludeIds.length > 0) {
-      const validIds = excludeIds
-        .filter((id) => mongoose.isValidObjectId(id))
-        .map((id) => new mongoose.Types.ObjectId(id))
-
+    if (excludeSwiped) {
       const swipedPositions = await PositionSwipe.find({
         candidateId: session.user.id,
-        positionId: { $in: validIds },
       }).select("positionId")
 
       const swipedIds = swipedPositions.map((s) => s.positionId)
-      query._id = { $nin: swipedIds }
+      if (swipedIds.length > 0) {
+        query._id = { $nin: swipedIds }
+      }
     }
 
-    const positions = await Position.find(query)
-      .populate("employerId", "name avatar companyName")
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .lean()
+    const [positions, total] = await Promise.all([
+      Position.find(query)
+        .populate("employerId", "name avatar companyName")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Position.countDocuments(query),
+    ])
 
-    return NextResponse.json({ positions })
+    return NextResponse.json({ positions, total, page, totalPages: Math.ceil(total / limit) })
   } catch (error) {
     console.error(error)
     return NextResponse.json(

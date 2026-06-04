@@ -127,6 +127,9 @@ export async function GET(req: NextRequest) {
     await db()
 
     const { searchParams } = new URL(req.url)
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"))
+    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "10")))
+    const skip = (page - 1) * limit
     const status = searchParams.get("status")
     const matchId = searchParams.get("matchId")
 
@@ -142,13 +145,19 @@ export async function GET(req: NextRequest) {
       query.match = matchId
     }
 
-    const interviews = await Interview.find(query)
-      .populate("match")
-      .populate("employer", "name avatar companyName")
-      .populate("employee", "name avatar headline")
-      .sort({ scheduledFor: 1 })
+    const [interviews, total] = await Promise.all([
+      Interview.find(query)
+        .populate("match")
+        .populate("employer", "name avatar companyName")
+        .populate("employee", "name avatar headline")
+        .sort({ scheduledFor: 1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Interview.countDocuments(query),
+    ])
 
-    return NextResponse.json({ interviews })
+    return NextResponse.json({ interviews, total, page, totalPages: Math.ceil(total / limit) })
   } catch (error) {
     console.error("Failed to fetch interviews:", error)
     return NextResponse.json(

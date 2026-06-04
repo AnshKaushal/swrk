@@ -143,6 +143,23 @@ const PositionSchema = new mongoose.Schema(
       type: ApplicationFormSchema,
       default: undefined,
     },
+
+    slug: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+
+    externalLink: {
+      type: String,
+      default: "",
+    },
+
+    isExternal: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 )
@@ -153,6 +170,10 @@ PositionSchema.index({ locations: 1 })
 PositionSchema.index({ industry: 1 })
 PositionSchema.index({ createdAt: -1 })
 PositionSchema.index({ isVisible: 1, status: 1 })
+
+if (process.env.NODE_ENV === "development" && mongoose.models.Position) {
+  delete mongoose.models.Position
+}
 
 export default mongoose.models.Position ||
   mongoose.model("Position", PositionSchema)

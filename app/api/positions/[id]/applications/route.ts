@@ -48,20 +48,28 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const applications = await PositionSwipe.find({
-      positionId: id,
-      direction: "right",
-    })
-      .select(
-        "candidateId applicationData applicationSubmittedAt applicationStatus applicationStatusUpdatedAt applicationStatusUpdatedBy createdAt updatedAt",
-      )
-      .populate(
-        "candidateId",
-        "name username avatar headline bio currentCity currentCountry preferredLocations desiredRoles employmentType",
-      )
-      .populate("applicationStatusUpdatedBy", "name username avatar")
-      .sort({ applicationStatusUpdatedAt: -1, createdAt: -1 })
-      .lean()
+    const { searchParams } = new URL(req.url)
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"))
+    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "10")))
+    const skip = (page - 1) * limit
+
+    const filter = { positionId: id, direction: "right" }
+    const [applications, total] = await Promise.all([
+      PositionSwipe.find(filter)
+        .select(
+          "candidateId applicationData applicationSubmittedAt applicationStatus applicationStatusUpdatedAt applicationStatusUpdatedBy createdAt updatedAt",
+        )
+        .populate(
+          "candidateId",
+          "name username avatar headline bio currentCity currentCountry preferredLocations desiredRoles employmentType",
+        )
+        .populate("applicationStatusUpdatedBy", "name username avatar")
+        .sort({ applicationStatusUpdatedAt: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      PositionSwipe.countDocuments(filter),
+    ])
 
     return NextResponse.json({
       applications: applications.map((application) => ({
@@ -82,6 +90,9 @@ export async function GET(
         applicationStatusUpdatedBy:
           application.applicationStatusUpdatedBy || null,
       })),
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
     })
   } catch (error) {
     console.error(error)

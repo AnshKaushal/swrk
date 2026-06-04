@@ -1,9 +1,10 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { PaginationControls } from "@/components/ui/pagination-controls"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -36,6 +37,8 @@ import {
   Loader2,
   Heart,
   X,
+  Link,
+  Copy,
 } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import {
@@ -68,6 +71,9 @@ interface Position {
   isVisible: boolean
   matchCount: number
   createdAt: string
+  slug?: string
+  externalLink?: string
+  isExternal?: boolean
   applicationForm?: ApplicationFormConfig
   employerId?:
     | string
@@ -350,6 +356,21 @@ export default function JobsPage() {
     planName: string
   } | null>(null)
 
+  const [positionPage, setPositionPage] = useState(1)
+  const [positionTotalPages, setPositionTotalPages] = useState(1)
+  const [applicationPage, setApplicationPage] = useState(1)
+  const [applicationTotalPages, setApplicationTotalPages] = useState(1)
+
+  const appliedPositionIds = useMemo(() => {
+    return new Set(
+      applications
+        .map((a) =>
+          typeof a.position === "object" ? a.position._id : a.position,
+        )
+        .filter(Boolean),
+    )
+  }, [applications])
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -498,17 +519,19 @@ export default function JobsPage() {
     }
   }
 
-  async function loadPositions(view: ActiveRole) {
+  async function loadPositions(view: ActiveRole, page = 1) {
     setLoading(true)
     try {
       const endpoint =
         view === "employer"
-          ? `/api/positions?employerId=${session?.user?.id}`
-          : "/api/positions/candidates?limit=50"
+          ? `/api/positions?employerId=${session?.user?.id}&page=${page}&limit=10`
+          : `/api/positions/candidates?page=${page}&limit=10&excludeSwiped=false`
       const res = await fetch(endpoint, { cache: "no-store" })
       if (!res.ok) throw new Error("Failed to load positions")
       const data = await res.json()
       setPositions(data.positions || [])
+      setPositionPage(data.page || 1)
+      setPositionTotalPages(data.totalPages || 1)
     } catch (error) {
       console.error(error)
       toast.error("Failed to load positions")
@@ -517,15 +540,17 @@ export default function JobsPage() {
     }
   }
 
-  async function loadApplications() {
+  async function loadApplications(page = 1) {
     setApplicationsLoading(true)
     try {
-      const res = await fetch("/api/positions/applications?limit=50", {
+      const res = await fetch(`/api/positions/applications?page=${page}&limit=10`, {
         cache: "no-store",
       })
       if (!res.ok) throw new Error("Failed to load applications")
       const data = await res.json()
       setApplications(data.applications || [])
+      setApplicationPage(data.page || 1)
+      setApplicationTotalPages(data.totalPages || 1)
     } catch (error) {
       console.error(error)
       toast.error("Failed to load applications")
@@ -673,6 +698,7 @@ export default function JobsPage() {
             : "Application sent",
         )
       }
+      await loadApplications()
     } catch (error) {
       console.error(error)
       toast.error("Failed to apply to job")
@@ -895,519 +921,13 @@ export default function JobsPage() {
           )}
         </div>
         {jobsView === "employer" ? (
-          <>
-            <Button
-              onClick={() => router.push("/dashboard/jobs/new")}
-              disabled={!!(quota && !quota.allowed)}
-            >
-              <Plus className="h-4 w-4" />
-              New Position
-            </Button>
-
-            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-              <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>
-                    {editingId ? "Edit Position" : "Create New Position"}
-                  </DialogTitle>
-                  <DialogDescription>
-                    Fill in the details for your job opening
-                  </DialogDescription>
-                </DialogHeader>
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="title">Job Title *</Label>
-                    <Input
-                      id="title"
-                      value={formData.title}
-                      onChange={(e) =>
-                        setFormData({ ...formData, title: e.target.value })
-                      }
-                      placeholder="e.g., Senior React Developer"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description *</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          description: e.target.value,
-                        })
-                      }
-                      placeholder="Job description and responsibilities"
-                      required
-                      rows={4}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="roles">Roles (comma-separated)</Label>
-                      <Input
-                        id="roles"
-                        value={formData.roles}
-                        onChange={(e) =>
-                          setFormData({ ...formData, roles: e.target.value })
-                        }
-                        placeholder="e.g., Backend, Frontend"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="locations">
-                        Locations (comma-separated)
-                      </Label>
-                      <Input
-                        id="locations"
-                        value={formData.locations}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            locations: e.target.value,
-                          })
-                        }
-                        placeholder="e.g., San Francisco, Remote"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="industry">Industry</Label>
-                      <Input
-                        id="industry"
-                        value={formData.industry}
-                        onChange={(e) =>
-                          setFormData({ ...formData, industry: e.target.value })
-                        }
-                        placeholder="e.g., Technology"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="experience">Experience Level</Label>
-                      <Select
-                        value={formData.experience}
-                        onValueChange={(value) =>
-                          setFormData({ ...formData, experience: value })
-                        }
-                      >
-                        <SelectTrigger id="experience">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="any">Any</SelectItem>
-                          <SelectItem value="entry">Entry Level</SelectItem>
-                          <SelectItem value="mid">Mid Level</SelectItem>
-                          <SelectItem value="senior">Senior</SelectItem>
-                          <SelectItem value="lead">Lead</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="skills">
-                      Required Skills (comma-separated)
-                    </Label>
-                    <Input
-                      id="skills"
-                      value={formData.skills}
-                      onChange={(e) =>
-                        setFormData({ ...formData, skills: e.target.value })
-                      }
-                      placeholder="e.g., React, Node.js, PostgreSQL"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="salaryMin">Salary Min (INR)</Label>
-                      <Input
-                        id="salaryMin"
-                        type="number"
-                        value={formData.salaryMin}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            salaryMin: e.target.value,
-                          })
-                        }
-                        placeholder="e.g., 120000"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="salaryMax">Salary Max (INR)</Label>
-                      <Input
-                        id="salaryMax"
-                        type="number"
-                        value={formData.salaryMax}
-                        onChange={(e) =>
-                          setFormData({
-                            ...formData,
-                            salaryMax: e.target.value,
-                          })
-                        }
-                        placeholder="e.g., 180000"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="employmentType">Employment Type</Label>
-                      <Select
-                        value={formData.employmentType}
-                        onValueChange={(value) =>
-                          setFormData({ ...formData, employmentType: value })
-                        }
-                      >
-                        <SelectTrigger id="employmentType">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="full-time">Full-time</SelectItem>
-                          <SelectItem value="part-time">Part-time</SelectItem>
-                          <SelectItem value="contract">Contract</SelectItem>
-                          <SelectItem value="internship">Internship</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <h3 className="text-sm font-semibold">
-                          Application form
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                          Build custom questions and autofill candidate profile
-                          fields when available.
-                        </p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={addApplicationField}
-                      >
-                        <Plus className="h-4 w-4" />
-                        Add question
-                      </Button>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="applicationTitle">Form title</Label>
-                        <Input
-                          id="applicationTitle"
-                          value={applicationFormDraft.title}
-                          onChange={(event) =>
-                            setApplicationFormDraft((previous) => ({
-                              ...previous,
-                              title: event.target.value,
-                            }))
-                          }
-                          placeholder="Application form"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="applicationDescription">
-                          Form description
-                        </Label>
-                        <Textarea
-                          id="applicationDescription"
-                          value={applicationFormDraft.description}
-                          onChange={(event) =>
-                            setApplicationFormDraft((previous) => ({
-                              ...previous,
-                              description: event.target.value,
-                            }))
-                          }
-                          placeholder="Tell candidates what you want to know"
-                          rows={3}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4 space-y-3">
-                      {applicationFormDraft.fields.length === 0 ? (
-                        <div className="rounded-xl border border-dashed border-border/70 bg-background/80 p-4 text-sm text-muted-foreground">
-                          Add questions to collect candidate details.
-                        </div>
-                      ) : (
-                        applicationFormDraft.fields.map((field, index) => (
-                          <div
-                            key={field.id}
-                            className="rounded-2xl border border-border/60 bg-background p-4"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 space-y-3">
-                                <div className="grid gap-3 md:grid-cols-2">
-                                  <div className="space-y-2 md:col-span-2">
-                                    <Label htmlFor={`field-label-${field.id}`}>
-                                      Question {index + 1}
-                                    </Label>
-                                    <Input
-                                      id={`field-label-${field.id}`}
-                                      value={field.label}
-                                      onChange={(event) => {
-                                        const nextLabel = event.target.value
-                                        const infer =
-                                          inferFieldFromLabel(nextLabel)
-                                        if (infer) {
-                                          const patch: any = {
-                                            label: nextLabel,
-                                          }
-                                          if (
-                                            field.type === "short-text" &&
-                                            infer.type
-                                          )
-                                            patch.type = infer.type
-                                          if (
-                                            field.autofillSource === "none" &&
-                                            infer.autofill
-                                          )
-                                            patch.autofillSource =
-                                              infer.autofill
-                                          if (
-                                            infer.options &&
-                                            field.type !== "select"
-                                          ) {
-                                            patch.type = "select"
-                                            patch.options = infer.options
-                                          }
-                                          updateApplicationField(
-                                            field.id,
-                                            patch,
-                                          )
-                                          return
-                                        }
-
-                                        updateApplicationField(field.id, {
-                                          label: nextLabel,
-                                        })
-                                      }}
-                                      placeholder="Example: What is your current notice period?"
-                                      draggable
-                                      onDragStart={onFieldDragStart(field.id)}
-                                      onDragOver={onFieldDragOver}
-                                      onDrop={onFieldDrop(field.id)}
-                                    />
-                                  </div>
-
-                                  <div className="space-y-2">
-                                    <Label htmlFor={`field-type-${field.id}`}>
-                                      Type
-                                    </Label>
-                                    <Select
-                                      value={field.type}
-                                      onValueChange={(value) =>
-                                        updateApplicationField(field.id, {
-                                          type: value as ApplicationFieldType,
-                                        })
-                                      }
-                                    >
-                                      <SelectTrigger
-                                        id={`field-type-${field.id}`}
-                                      >
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="short-text">
-                                          Short answer
-                                        </SelectItem>
-                                        <SelectItem value="long-text">
-                                          Paragraph
-                                        </SelectItem>
-                                        <SelectItem value="email">
-                                          Email
-                                        </SelectItem>
-                                        <SelectItem value="number">
-                                          Number
-                                        </SelectItem>
-                                        <SelectItem value="select">
-                                          Dropdown
-                                        </SelectItem>
-                                        <SelectItem value="url">
-                                          Link
-                                        </SelectItem>
-                                        <SelectItem value="phone">
-                                          Phone
-                                        </SelectItem>
-                                        <SelectItem value="date">
-                                          Date
-                                        </SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-
-                                  <div className="space-y-2">
-                                    <Label
-                                      htmlFor={`field-autofill-${field.id}`}
-                                    >
-                                      Autofill from candidate profile
-                                    </Label>
-                                    <Select
-                                      value={field.autofillSource}
-                                      onValueChange={(value) =>
-                                        updateApplicationField(field.id, {
-                                          autofillSource:
-                                            value as ApplicationAutofillSource,
-                                        })
-                                      }
-                                    >
-                                      <SelectTrigger
-                                        id={`field-autofill-${field.id}`}
-                                      >
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="none">
-                                          None
-                                        </SelectItem>
-                                        <SelectItem value="name">
-                                          Name
-                                        </SelectItem>
-                                        <SelectItem value="email">
-                                          Email
-                                        </SelectItem>
-                                        <SelectItem value="phone">
-                                          Phone
-                                        </SelectItem>
-                                        <SelectItem value="headline">
-                                          Headline
-                                        </SelectItem>
-                                        <SelectItem value="bio">Bio</SelectItem>
-                                        <SelectItem value="location">
-                                          Location
-                                        </SelectItem>
-                                        <SelectItem value="skills">
-                                          Skills
-                                        </SelectItem>
-                                        <SelectItem value="experienceYears">
-                                          Years of experience
-                                        </SelectItem>
-                                        <SelectItem value="resumeUrl">
-                                          Resume URL
-                                        </SelectItem>
-                                        <SelectItem value="linkedin">
-                                          LinkedIn
-                                        </SelectItem>
-                                        <SelectItem value="github">
-                                          GitHub
-                                        </SelectItem>
-                                        <SelectItem value="portfolio">
-                                          Portfolio
-                                        </SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-
-                                  <div className="space-y-2">
-                                    <Label
-                                      htmlFor={`field-placeholder-${field.id}`}
-                                    >
-                                      Placeholder
-                                    </Label>
-                                    <Input
-                                      id={`field-placeholder-${field.id}`}
-                                      value={field.placeholder}
-                                      onChange={(event) =>
-                                        updateApplicationField(field.id, {
-                                          placeholder: event.target.value,
-                                        })
-                                      }
-                                      placeholder="Visible helper text"
-                                    />
-                                  </div>
-
-                                  <label className="flex items-center gap-2 text-sm text-muted-foreground md:col-span-2">
-                                    <input
-                                      type="checkbox"
-                                      checked={field.required}
-                                      onChange={(event) =>
-                                        updateApplicationField(field.id, {
-                                          required: event.target.checked,
-                                        })
-                                      }
-                                      className="h-4 w-4 rounded border-border"
-                                    />
-                                    Required question
-                                  </label>
-
-                                  {field.type === "select" && (
-                                    <div className="space-y-2 md:col-span-2">
-                                      <Label
-                                        htmlFor={`field-options-${field.id}`}
-                                      >
-                                        Options, one per line
-                                      </Label>
-                                      <Textarea
-                                        id={`field-options-${field.id}`}
-                                        value={field.options.join("\n")}
-                                        onChange={(event) =>
-                                          updateApplicationField(field.id, {
-                                            options: event.target.value
-                                              .split("\n")
-                                              .map((option) => option.trim())
-                                              .filter(Boolean),
-                                          })
-                                        }
-                                        placeholder="Option 1\nOption 2\nOption 3"
-                                        rows={3}
-                                      />
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => removeApplicationField(field.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 pt-4">
-                    <Button
-                      type="submit"
-                      disabled={submitting}
-                      className="flex-1"
-                    >
-                      {submitting && (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      )}
-                      {editingId ? "Update Position" : "Create Position"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setOpenDialog(false)
-                        resetForm()
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </>
+          <Button
+            onClick={() => router.push("/dashboard/jobs/new")}
+            disabled={!!(quota && !quota.allowed)}
+          >
+            <Plus className="h-4 w-4" />
+            New Position
+          </Button>
         ) : null}
       </div>
 
@@ -1491,6 +1011,15 @@ export default function JobsPage() {
                 ))}
               </div>
             )}
+            {applicationTotalPages > 1 && (
+              <div className="mt-4">
+                <PaginationControls
+                  page={applicationPage}
+                  totalPages={applicationTotalPages}
+                  onPageChange={(p) => loadApplications(p)}
+                />
+              </div>
+            )}
           </Card>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -1510,6 +1039,9 @@ export default function JobsPage() {
                           {position.title}
                         </h3>
                         <Badge variant="secondary">Recruiter post</Badge>
+                        {appliedPositionIds.has(position._id) && (
+                          <Badge variant="default">Applied</Badge>
+                        )}
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {getEmployerName(position)}
@@ -1541,42 +1073,65 @@ export default function JobsPage() {
                   )}
                 </div>
 
-                <div className="mt-5 flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => handleApply(position._id, "left")}
-                    disabled={applyingPositionId === position._id}
-                  >
-                    <X className="h-4 w-4" />
-                    Skip
-                  </Button>
-                  <Button
-                    className="flex-1"
-                    onClick={() => {
-                      if (position.applicationForm?.fields?.length) {
-                        openApplicationDialog(position)
-                        return
+                {appliedPositionIds.has(position._id) ? (
+                  <div className="mt-5 flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() =>
+                        router.push(`/dashboard/jobs/${position._id}`)
                       }
+                    >
+                      View Application
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="mt-5 flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => handleApply(position._id, "left")}
+                      disabled={applyingPositionId === position._id}
+                    >
+                      <X className="h-4 w-4" />
+                      Skip
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={() => {
+                        if (position.applicationForm?.fields?.length) {
+                          openApplicationDialog(position)
+                          return
+                        }
 
-                      void handleApply(position._id, "right")
-                    }}
-                    disabled={
-                      applyingPositionId === position._id ||
-                      candidateProfileLoading
-                    }
-                  >
-                    {applyingPositionId === position._id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Heart className="h-4 w-4" />
-                    )}
-                    Apply
-                  </Button>
-                </div>
+                        void handleApply(position._id, "right")
+                      }}
+                      disabled={
+                        applyingPositionId === position._id ||
+                        candidateProfileLoading
+                      }
+                    >
+                      {applyingPositionId === position._id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Heart className="h-4 w-4" />
+                      )}
+                      Apply
+                    </Button>
+                  </div>
+                )}
               </Card>
             ))}
           </div>
+          {positionTotalPages > 1 && (
+            <div className="flex justify-center">
+              <PaginationControls
+                page={positionPage}
+                totalPages={positionTotalPages}
+                onPageChange={(p) => loadPositions("employee", p)}
+              />
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid gap-4">
@@ -1629,6 +1184,21 @@ export default function JobsPage() {
                         {position.matchCount} interested
                       </button>
                     )}
+
+                    {position.slug && (
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(
+                            `${window.location.origin}/job/${position.slug}`,
+                          )
+                          toast.success("Share link copied to clipboard")
+                        }}
+                        className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copy share link
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1638,7 +1208,7 @@ export default function JobsPage() {
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent align="end" className="w-full">
                     {position.status === "draft" && (
                       <DropdownMenuItem
                         onClick={() => handlePublish(position._id)}
@@ -1665,10 +1235,33 @@ export default function JobsPage() {
                       )}
                     </DropdownMenuItem>
 
+                    <DropdownMenuItem
+                      onClick={() =>
+                        router.push(`/dashboard/jobs/${position._id}`)
+                      }
+                    >
+                      <Users className="h-4 w-4" />
+                      View Applicants
+                    </DropdownMenuItem>
+
                     <DropdownMenuItem onClick={() => handleEdit(position)}>
                       <Edit2 className="h-4 w-4" />
                       Edit
                     </DropdownMenuItem>
+
+                    {position.slug && (
+                      <DropdownMenuItem
+                        onClick={() => {
+                          navigator.clipboard.writeText(
+                            `${window.location.origin}/job/${position.slug}`,
+                          )
+                          toast.success("Share link copied!")
+                        }}
+                      >
+                        <Copy className="h-4 w-4" />
+                        Copy share link
+                      </DropdownMenuItem>
+                    )}
 
                     <DropdownMenuItem
                       onClick={() => handleDelete(position._id)}
@@ -1682,6 +1275,15 @@ export default function JobsPage() {
               </div>
             </Card>
           ))}
+          {positionTotalPages > 1 && (
+            <div className="flex justify-center">
+              <PaginationControls
+                page={positionPage}
+                totalPages={positionTotalPages}
+                onPageChange={(p) => loadPositions("employer", p)}
+              />
+            </div>
+          )}
         </div>
       )}
 

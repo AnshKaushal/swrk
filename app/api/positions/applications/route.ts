@@ -13,24 +13,28 @@ export async function GET(req: NextRequest) {
     await db()
 
     const { searchParams } = new URL(req.url)
-    const limit = parseInt(searchParams.get("limit") || "50")
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"))
+    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "10")))
+    const skip = (page - 1) * limit
 
-    const applications = await PositionSwipe.find({
-      candidateId: session.user.id,
-      direction: "right",
-    })
-      .sort({ applicationStatusUpdatedAt: -1, createdAt: -1 })
-      .limit(limit)
-      .populate({
-        path: "positionId",
-        select:
-          "title description employmentType status salaryRange locations skills createdAt employerId",
-        populate: {
-          path: "employerId",
-          select: "name username avatar companyName",
-        },
-      })
-      .lean()
+    const filter = { candidateId: session.user.id, direction: "right" }
+    const [applications, total] = await Promise.all([
+      PositionSwipe.find(filter)
+        .sort({ applicationStatusUpdatedAt: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate({
+          path: "positionId",
+          select:
+            "title description employmentType status salaryRange locations skills createdAt employerId",
+          populate: {
+            path: "employerId",
+            select: "name username avatar companyName",
+          },
+        })
+        .lean(),
+      PositionSwipe.countDocuments(filter),
+    ])
 
     const data = applications
       .filter((application) => application.positionId)
@@ -51,7 +55,7 @@ export async function GET(req: NextRequest) {
         position: application.positionId,
       }))
 
-    return NextResponse.json({ applications: data })
+    return NextResponse.json({ applications: data, total, page, totalPages: Math.ceil(total / limit) })
   } catch (error) {
     console.error(error)
     return NextResponse.json(
