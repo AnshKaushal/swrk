@@ -245,7 +245,7 @@ END:VCALENDAR`
 
         {filteredInterviews.length === 0 ? (
           <Card>
-            <CardContent className="pt-12 pb-12 text-center">
+            <CardContent className="py-12 text-center">
               <Video className="w-12 h-12 text-primary mx-auto mb-3" />
               <h3 className="text-lg font-semibold mb-1">No interviews yet</h3>
               <p className="text-muted-foreground">
@@ -267,7 +267,7 @@ END:VCALENDAR`
                   key={interview._id}
                   className="hover:shadow-lg transition-shadow"
                 >
-                  <CardContent className="pt-6">
+                  <CardContent>
                     <div className="flex flex-col md:flex-row gap-6">
                       <div className="flex-1">
                         <div className="flex items-start justify-between mb-4">
