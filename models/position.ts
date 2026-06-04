@@ -148,7 +148,9 @@ const PositionSchema = new mongoose.Schema(
 )
 
 PositionSchema.index({ employerId: 1, status: 1 })
-PositionSchema.index({ roles: 1, locations: 1, industry: 1 })
+PositionSchema.index({ roles: 1 })
+PositionSchema.index({ locations: 1 })
+PositionSchema.index({ industry: 1 })
 PositionSchema.index({ createdAt: -1 })
 PositionSchema.index({ isVisible: 1, status: 1 })
 
