@@ -132,10 +132,15 @@ export default function JobDetailPage() {
   useEffect(() => {
     if (positionId) {
       loadPosition()
+    }
+  }, [positionId])
+
+  useEffect(() => {
+    if (positionId && (session?.user?.role === "employer" || session?.user?.role === "admin")) {
       loadCandidates()
       loadPublicApplicants()
     }
-  }, [positionId])
+  }, [positionId, session?.user?.role])
 
   async function loadPosition() {
     try {
@@ -233,6 +238,12 @@ export default function JobDetailPage() {
     )
   }
 
+  const isEmployer = session?.user?.role === "employer" || session?.user?.role === "admin"
+
+  function formatApplicantCount(count: number) {
+    return count > 100 ? "100+" : String(count)
+  }
+
   const allApplicantsCount =
     candidates.length + publicApplicants.filter((a) => !a.candidateId).length
 
@@ -319,8 +330,8 @@ export default function JobDetailPage() {
               )}
               {position.matchCount > 0 && (
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Matches</span>
-                  <span className="font-medium">{position.matchCount}</span>
+                  <span className="text-muted-foreground">Total Applicants</span>
+                  <span className="font-medium">{formatApplicantCount(position.matchCount)}</span>
                 </div>
               )}
             </div>
@@ -341,7 +352,7 @@ export default function JobDetailPage() {
             )}
           </Card>
 
-          {position.slug && (
+          {isEmployer && position.slug && (
             <Card className="p-5">
               <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
                 Shareable Link
@@ -371,7 +382,8 @@ export default function JobDetailPage() {
         </div>
       </div>
 
-      <Card className="p-4">
+      {isEmployer && (
+        <Card className="p-4">
         <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold">
           <Users className="h-5 w-5" />
           Registered Applicants ({candidateTotal})
@@ -489,8 +501,10 @@ export default function JobDetailPage() {
           </div>
         )}
       </Card>
+      )}
 
-      <Card className="p-4">
+      {isEmployer && (
+        <Card className="p-4">
         <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold">
           <Globe className="h-5 w-5" />
           Direct Applicants ({publicTotal})
@@ -604,6 +618,7 @@ export default function JobDetailPage() {
           </div>
         )}
       </Card>
+      )}
     </div>
   )
 }

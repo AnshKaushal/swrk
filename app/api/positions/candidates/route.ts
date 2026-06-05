@@ -19,11 +19,21 @@ export async function GET(req: NextRequest) {
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20")))
     const skip = (page - 1) * limit
     const excludeSwiped = searchParams.get("excludeSwiped") !== "false"
+    const search = searchParams.get("search")?.trim()
 
     const query: any = {
       status: "active",
       isVisible: true,
       employerId: { $ne: session.user.id },
+    }
+
+    if (search) {
+      const regex = { $regex: search, $options: "i" }
+      query.$or = [
+        { title: regex },
+        { description: regex },
+        { company: regex },
+      ]
     }
 
     if (excludeSwiped) {

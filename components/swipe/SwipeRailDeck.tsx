@@ -28,6 +28,7 @@ import {
   Rocket,
   ChevronDown,
 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 type Candidate = {
   _id: string
@@ -105,6 +106,9 @@ type Position = {
   }
   employmentType: string
   matchCount: number
+  company?: string
+  isExternal?: boolean
+  externalLink?: string
   employerId: {
     _id: string
     name: string
@@ -214,11 +218,16 @@ export default function SwipeRailDeck() {
         return {
           id: item.position._id,
           title: item.position.title,
-          description: item.position.description.replace(/<[^>]+>/g, "").substring(0, 80),
+          description: item.position.description
+            .replace(/<[^>]+>/g, "")
+            .substring(0, 80),
           imageSrc:
             item.position.employerId?.avatar ||
             `https://dummyimage.com/960x1280/0f172a/e2e8f0&text=${encodeURIComponent(item.position.title.charAt(0))}`,
-          meta: formatList(item.position.locations, 1) || "Remote",
+          meta: (item.position.isExternal && item.position.company)
+            ? item.position.company
+            : item.position.employerId?.companyName ||
+              formatList(item.position.locations, 1) || "Remote",
         }
       }
 
@@ -385,9 +394,12 @@ export default function SwipeRailDeck() {
       const candidates = candidatesData.candidates || []
       setSwipeQuota(candidatesData.swipeQuota)
 
-      const positionsRes = await fetch("/api/positions/candidates?limit=15&excludeSwiped=true", {
-        cache: "no-store",
-      })
+      const positionsRes = await fetch(
+        "/api/positions/candidates?limit=15&excludeSwiped=true",
+        {
+          cache: "no-store",
+        },
+      )
       const positionsData = await positionsRes.json()
       const positions = positionsData.positions || []
 
@@ -670,9 +682,24 @@ export default function SwipeRailDeck() {
                 </Button>
 
                 <div className="flex flex-wrap gap-2">
-                  {currentPosition.employerId?.companyName && (
-                    <Badge variant="outline">
-                      {currentPosition.employerId.companyName}
+                  {(currentPosition.isExternal && currentPosition.company)
+                    ? (
+                      <Badge variant="outline">
+                        {currentPosition.company}
+                      </Badge>
+                    )
+                    : currentPosition.employerId?.companyName && (
+                      <Badge variant="outline">
+                        {currentPosition.employerId.companyName}
+                      </Badge>
+                    )}
+                  {currentPosition.salaryRange?.min && (
+                    <Badge variant="outline" className="text-green-600">
+                      {formatMoneyRange(
+                        currentPosition.salaryRange.min,
+                        currentPosition.salaryRange.max,
+                        currentPosition.salaryRange.currency,
+                      )}
                     </Badge>
                   )}
                   {formatList(currentPosition.locations, 2) && (
@@ -680,7 +707,7 @@ export default function SwipeRailDeck() {
                       {formatList(currentPosition.locations, 2)}
                     </Badge>
                   )}
-                  {currentPosition.skills?.slice(0, 8).map((skill) => (
+                  {currentPosition.skills?.slice(0, 6).map((skill) => (
                     <Badge key={skill} variant="outline">
                       {skill}
                     </Badge>
@@ -779,7 +806,12 @@ export default function SwipeRailDeck() {
               </>
             )}
 
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div
+              className={cn(
+                "gap-3 grid",
+                !currentPosition ? "sm:grid-cols-3" : "sm:grid-cols-2",
+              )}
+            >
               <Button
                 type="button"
                 variant="outline"
@@ -882,14 +914,14 @@ export default function SwipeRailDeck() {
           open={descriptionDialogOpen}
           onOpenChange={setDescriptionDialogOpen}
         >
-          <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-2xl">
+          <DialogContent className="max-h-[80vh] bg-background overflow-y-auto sm:max-w-2xl p-6!">
             <DialogHeader>
               <DialogTitle>
                 {currentPosition?.title || "Job Description"}
               </DialogTitle>
             </DialogHeader>
             {currentPosition && (
-              <div className="prose prose-sm prose-gray dark:prose-invert max-w-none">
+              <div className="prose prose-sm prose-gray dark:prose-invert max-w-none p-6!">
                 <Markdown>{currentPosition.description}</Markdown>
               </div>
             )}

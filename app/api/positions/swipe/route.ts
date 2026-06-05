@@ -7,6 +7,41 @@ import PositionMatch from "@/models/position-match"
 import Position from "@/models/position"
 import User from "@/models/user"
 
+export async function GET(req: NextRequest) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    await db()
+
+    const { searchParams } = new URL(req.url)
+    const positionId = searchParams.get("positionId")?.trim()
+
+    if (!positionId) {
+      return NextResponse.json(
+        { error: "Missing positionId" },
+        { status: 400 },
+      )
+    }
+
+    const existingSwipe = await PositionSwipe.findOne({
+      candidateId: session.user.id,
+      positionId,
+      direction: "right",
+    })
+
+    return NextResponse.json({ applied: Boolean(existingSwipe) })
+  } catch (error) {
+    console.error(error)
+    return NextResponse.json(
+      { error: "Failed to check application" },
+      { status: 500 },
+    )
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await auth()

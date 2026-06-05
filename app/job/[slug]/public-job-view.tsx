@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,8 +24,10 @@ import {
   ExternalLink,
   Loader2,
   CheckCircle,
+  Heart,
 } from "lucide-react"
 import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 type PublicPosition = {
   _id: string
@@ -52,9 +55,33 @@ type PublicPosition = {
 }
 
 export function PublicJobView({ position }: { position: PublicPosition }) {
+  const { data: session } = useSession()
+  const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [directApplying, setDirectApplying] = useState(false)
   const [showSignupPrompt, setShowSignupPrompt] = useState(false)
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
+  const [hasApplied, setHasApplied] = useState(false)
+  const [checkingApplied, setCheckingApplied] = useState(true)
+
+  useEffect(() => {
+    if (!position._id) {
+      setCheckingApplied(false)
+      return
+    }
+    fetch(`/api/positions/swipe?positionId=${position._id}`, {
+      cache: "no-store",
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        setHasApplied(data.applied)
+      })
+      .catch(() => {
+        setHasApplied(false)
+      })
+      .finally(() => setCheckingApplied(false))
+  }, [position._id])
 
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
@@ -63,6 +90,32 @@ export function PublicJobView({ position }: { position: PublicPosition }) {
   const [location, setLocation] = useState("")
   const [workExperience, setWorkExperience] = useState("")
   const [agreedToTerms, setAgreedToTerms] = useState(false)
+
+  const handleDirectApply = async () => {
+    if (!session?.user?.id) {
+      router.push("/signin")
+      return
+    }
+    setConfirmDialogOpen(false)
+    setDirectApplying(true)
+    try {
+      const res = await fetch("/api/positions/swipe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ positionId: position._id, direction: "right" }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to apply")
+      setSubmitted(true)
+      toast.success("Application submitted!")
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to apply",
+      )
+    } finally {
+      setDirectApplying(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -157,7 +210,7 @@ export function PublicJobView({ position }: { position: PublicPosition }) {
 
   return (
     <>
-      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 w-full">
         <div className="grid gap-8 lg:grid-cols-[1fr_400px]">
           <div>
             <div className="mb-6">
@@ -200,9 +253,22 @@ export function PublicJobView({ position }: { position: PublicPosition }) {
 
           <div>
             <Card className="sticky top-24 p-6">
-              <h2 className="text-lg font-semibold">
-                {position.isExternal ? "Apply via External Link" : "Apply for this Job"}
-              </h2>
+              {checkingApplied ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                </div>
+              ) : hasApplied ? (
+                <div className="py-8 text-center">
+                  <CheckCircle className="mx-auto h-10 w-10 text-green-500" />
+                  <h2 className="mt-3 text-lg font-semibold">Applied</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    You have already applied for this position.
+                  </p>
+                </div>
+              ) : (<>
+                <h2 className="text-lg font-semibold">
+                  {position.isExternal ? "Apply via External Link" : "Apply for this Job"}
+                </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 {position.isExternal
                   ? "Your details will be shared with the employer, then you'll be redirected."
@@ -337,6 +403,60 @@ export function PublicJobView({ position }: { position: PublicPosition }) {
                   )}
                 </Button>
               </form>
+
+              {session?.user?.id && (
+                <div className="mt-4">
+                  <div className="relative mb-4">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-card px-2 text-muted-foreground">
+                        Or quick apply with your profile
+                      </span>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => setConfirmDialogOpen(true)}
+                    disabled={directApplying}
+                  >
+                    {directApplying ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Heart className="h-4 w-4" />
+                    )}
+                    Direct Apply
+                  </Button>
+                </div>
+              )}
+
+              <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Apply with your profile?</DialogTitle>
+                    <DialogDescription>
+                      Your profile details (name, email, skills, experience)
+                      will be shared with the employer as your application.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex justify-end gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => setConfirmDialogOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handleDirectApply}>
+                      <Heart className="mr-2 h-4 w-4" />
+                      Apply
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </>)}
             </Card>
           </div>
         </div>

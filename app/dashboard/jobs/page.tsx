@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { PaginationControls } from "@/components/ui/pagination-controls"
 import { Card } from "@/components/ui/card"
@@ -37,8 +38,9 @@ import {
   Loader2,
   Heart,
   X,
-  Link,
   Copy,
+  Search,
+  ExternalLink,
 } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import {
@@ -72,6 +74,7 @@ interface Position {
   matchCount: number
   createdAt: string
   slug?: string
+  company?: string
   externalLink?: string
   isExternal?: boolean
   applicationForm?: ApplicationFormConfig
@@ -360,6 +363,8 @@ export default function JobsPage() {
   const [positionTotalPages, setPositionTotalPages] = useState(1)
   const [applicationPage, setApplicationPage] = useState(1)
   const [applicationTotalPages, setApplicationTotalPages] = useState(1)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchLoading, setSearchLoading] = useState(false)
 
   const appliedPositionIds = useMemo(() => {
     return new Set(
@@ -466,7 +471,7 @@ export default function JobsPage() {
         loadQuota()
       } else {
         loadPositions("employee")
-        loadApplications()
+        loadApplications(1, false)
       }
     }
   }, [canAccessJobs, jobsView, session?.user?.id])
@@ -507,6 +512,14 @@ export default function JobsPage() {
     }
   }, [jobsView])
 
+  useEffect(() => {
+    if (jobsView !== "employee" || !canAccessJobs) return
+    const timer = setTimeout(() => {
+      loadPositions("employee", 1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
   async function loadQuota() {
     try {
       const res = await fetch("/api/positions/quota", { cache: "no-store" })
@@ -520,12 +533,26 @@ export default function JobsPage() {
   }
 
   async function loadPositions(view: ActiveRole, page = 1) {
-    setLoading(true)
+    const isSearch = view === "employee" && searchQuery
+    if (isSearch) {
+      setSearchLoading(true)
+    } else {
+      setLoading(true)
+    }
     try {
+      const params = new URLSearchParams()
+      params.set("page", String(page))
+      params.set("limit", "10")
+      if (view === "employer") {
+        params.set("employerId", session?.user?.id || "")
+      } else {
+        params.set("excludeSwiped", "false")
+        if (searchQuery) params.set("search", searchQuery)
+      }
       const endpoint =
         view === "employer"
-          ? `/api/positions?employerId=${session?.user?.id}&page=${page}&limit=10`
-          : `/api/positions/candidates?page=${page}&limit=10&excludeSwiped=false`
+          ? `/api/positions?${params}`
+          : `/api/positions/candidates?${params}`
       const res = await fetch(endpoint, { cache: "no-store" })
       if (!res.ok) throw new Error("Failed to load positions")
       const data = await res.json()
@@ -537,15 +564,19 @@ export default function JobsPage() {
       toast.error("Failed to load positions")
     } finally {
       setLoading(false)
+      setSearchLoading(false)
     }
   }
 
-  async function loadApplications(page = 1) {
+  async function loadApplications(page = 1, showToast = true) {
     setApplicationsLoading(true)
     try {
-      const res = await fetch(`/api/positions/applications?page=${page}&limit=10`, {
-        cache: "no-store",
-      })
+      const res = await fetch(
+        `/api/positions/applications?page=${page}&limit=10`,
+        {
+          cache: "no-store",
+        },
+      )
       if (!res.ok) throw new Error("Failed to load applications")
       const data = await res.json()
       setApplications(data.applications || [])
@@ -553,7 +584,7 @@ export default function JobsPage() {
       setApplicationTotalPages(data.totalPages || 1)
     } catch (error) {
       console.error(error)
-      toast.error("Failed to load applications")
+      if (showToast) toast.error("Failed to load applications")
     } finally {
       setApplicationsLoading(false)
     }
@@ -579,6 +610,7 @@ export default function JobsPage() {
   }
 
   function getEmployerName(position: Position) {
+    if (position.company) return position.company
     if (typeof position.employerId === "object" && position.employerId) {
       return (
         position.employerId.companyName ||
@@ -931,350 +963,295 @@ export default function JobsPage() {
         ) : null}
       </div>
 
-      {positions.length === 0 ? (
-        <Card className="p-12 text-center">
-          <Briefcase className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-4 font-semibold">
-            {jobsView === "employer"
-              ? "No job openings yet"
-              : "No jobs available right now"}
-          </h3>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {jobsView === "employer"
-              ? "Create your first job opening to start receiving applications"
-              : "Check back later for new recruiter posts"}
-          </p>
-        </Card>
-      ) : jobsView === "employee" ? (
+      {jobsView === "employee" ? (
         <div className="space-y-6">
-          <Card className="p-5 shadow-sm">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold">My applications</h2>
-                <p className="text-sm text-muted-foreground">
-                  Track every application and see where each employer stands.
-                </p>
-              </div>
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Search jobs by title, company, or keyword..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  setPositionPage(1)
+                }}
+                className="pl-9"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
+            {searchLoading && (
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground shrink-0" />
+            )}
+            <Button variant="outline" size="sm" asChild className="shrink-0">
+              <Link href="/dashboard/jobs/applied">View Applied</Link>
+            </Button>
+          </div>
 
-            {applicationsLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin" />
-              </div>
-            ) : applications.length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                You have not applied to any jobs yet.
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin" />
+            </div>
+          ) : positions.length === 0 ? (
+            <Card className="p-12 text-center">
+              <Briefcase className="mx-auto h-12 w-12 text-muted-foreground" />
+              <h3 className="mt-4 font-semibold">
+                {searchQuery
+                  ? "No jobs match your search"
+                  : "No jobs available right now"}
+              </h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {searchQuery
+                  ? "Try different keywords or check back later."
+                  : "Check back later for new recruiter posts"}
               </p>
-            ) : (
-              <div className="mt-4 grid gap-3">
-                {applications.map((application) => (
-                  <div
-                    key={application._id}
-                    className="flex items-center justify-between rounded-2xl border border-border/60 bg-muted/20 p-4"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">
-                        {application.position.title}
-                      </p>
-                      <p className="truncate text-sm text-muted-foreground">
-                        {getEmployerName(application.position)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Updated{" "}
-                        {new Date(
-                          application.applicationStatusUpdatedAt ||
-                            application.applicationSubmittedAt ||
-                            application.position.createdAt,
-                        ).toLocaleDateString()}
-                      </p>
+            </Card>
+          ) : (
+            <>
+              <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 space-y-4 [&>div]:break-inside-avoid">
+                {positions.map((position) => (
+                  <Card key={position._id} className="p-5 shadow-sm">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        <Avatar className="h-11 w-11">
+                          <AvatarImage src={getEmployerAvatar(position)} />
+                          <AvatarFallback>
+                            {getEmployerName(position).charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="truncate text-base font-semibold">
+                              {position.title}
+                            </h3>
+                            <Badge variant="secondary">Recruiter post</Badge>
+                            {appliedPositionIds.has(position._id) && (
+                              <Badge variant="default">Applied</Badge>
+                            )}
+                          </div>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {getEmployerName(position)}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="shrink-0">
+                        {position.employmentType}
+                      </Badge>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <Badge variant="secondary">
-                        {getApplicationStatusLabel(
-                          application.applicationStatus,
-                        )}
-                      </Badge>
+                    <p className="mt-4 line-clamp-3 text-sm text-muted-foreground">
+                      {position.description}
+                    </p>
+
+                    <div className="mt-4 flex flex-wrap gap-3 text-sm text-muted-foreground">
+                      {position.locations?.length > 0 && (
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          {position.locations.join(", ")}
+                        </div>
+                      )}
+                      {position.salaryRange?.min && (
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-4 w-4" />₹
+                          {position.salaryRange.min.toLocaleString()} - ₹
+                          {position.salaryRange.max?.toLocaleString() || "Open"}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-5 flex flex-wrap gap-2">
                       <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          router.push(
-                            `/dashboard/jobs/${application.position._id}`,
-                          )
-                        }
+                        className="flex-1"
+                        onClick={() => {
+                          if (position.slug) {
+                            router.push(`/job/${position.slug}`)
+                          } else {
+                            router.push(`/dashboard/jobs/${position._id}`)
+                          }
+                        }}
                       >
-                        View
+                        <ExternalLink className="h-4 w-4" />
+                        Apply
                       </Button>
                     </div>
-                  </div>
+                  </Card>
                 ))}
               </div>
-            )}
-            {applicationTotalPages > 1 && (
-              <div className="mt-4">
-                <PaginationControls
-                  page={applicationPage}
-                  totalPages={applicationTotalPages}
-                  onPageChange={(p) => loadApplications(p)}
-                />
-              </div>
-            )}
-          </Card>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            {positions.map((position) => (
-              <Card key={position._id} className="p-5 shadow-sm">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3">
-                    <Avatar className="h-11 w-11">
-                      <AvatarImage src={getEmployerAvatar(position)} />
-                      <AvatarFallback>
-                        {getEmployerName(position).charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="truncate text-base font-semibold">
-                          {position.title}
-                        </h3>
-                        <Badge variant="secondary">Recruiter post</Badge>
-                        {appliedPositionIds.has(position._id) && (
-                          <Badge variant="default">Applied</Badge>
-                        )}
-                      </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {getEmployerName(position)}
-                      </p>
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="shrink-0">
-                    {position.employmentType}
-                  </Badge>
+              {positionTotalPages > 1 && (
+                <div className="flex justify-center">
+                  <PaginationControls
+                    page={positionPage}
+                    totalPages={positionTotalPages}
+                    onPageChange={(p) => loadPositions("employee", p)}
+                  />
                 </div>
-
-                <p className="mt-4 line-clamp-3 text-sm text-muted-foreground">
-                  {position.description}
-                </p>
-
-                <div className="mt-4 flex flex-wrap gap-3 text-sm text-muted-foreground">
-                  {position.locations?.length > 0 && (
-                    <div className="flex items-center gap-1">
-                      <MapPin className="h-4 w-4" />
-                      {position.locations.join(", ")}
-                    </div>
-                  )}
-                  {position.salaryRange?.min && (
-                    <div className="flex items-center gap-1">
-                      <DollarSign className="h-4 w-4" />₹
-                      {position.salaryRange.min.toLocaleString()} - ₹
-                      {position.salaryRange.max?.toLocaleString() || "Open"}
-                    </div>
-                  )}
-                </div>
-
-                {appliedPositionIds.has(position._id) ? (
-                  <div className="mt-5 flex gap-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() =>
-                        router.push(`/dashboard/jobs/${position._id}`)
-                      }
-                    >
-                      View Application
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="mt-5 flex gap-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => handleApply(position._id, "left")}
-                      disabled={applyingPositionId === position._id}
-                    >
-                      <X className="h-4 w-4" />
-                      Skip
-                    </Button>
-                    <Button
-                      className="flex-1"
-                      onClick={() => {
-                        if (position.applicationForm?.fields?.length) {
-                          openApplicationDialog(position)
-                          return
-                        }
-
-                        void handleApply(position._id, "right")
-                      }}
-                      disabled={
-                        applyingPositionId === position._id ||
-                        candidateProfileLoading
-                      }
-                    >
-                      {applyingPositionId === position._id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Heart className="h-4 w-4" />
-                      )}
-                      Apply
-                    </Button>
-                  </div>
-                )}
-              </Card>
-            ))}
-          </div>
-          {positionTotalPages > 1 && (
-            <div className="flex justify-center">
-              <PaginationControls
-                page={positionPage}
-                totalPages={positionTotalPages}
-                onPageChange={(p) => loadPositions("employee", p)}
-              />
-            </div>
+              )}
+            </>
           )}
         </div>
       ) : (
         <div className="grid gap-4">
-          {positions.map((position) => (
-            <Card key={position._id} className="p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-semibold">{position.title}</h3>
-                    <Badge
-                      variant={
-                        position.status === "active" ? "default" : "secondary"
-                      }
-                    >
-                      {position.status}
-                    </Badge>
-                    {!position.isVisible && (
-                      <Badge variant="outline">Hidden</Badge>
-                    )}
+          {positions.length === 0 ? (
+            <Card className="p-12 text-center">
+              <Briefcase className="mx-auto h-12 w-12 text-muted-foreground" />
+              <h3 className="mt-4 font-semibold">No job openings yet</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Create your first job opening to start receiving applications
+              </p>
+            </Card>
+          ) : (
+            positions.map((position) => (
+              <Card key={position._id} className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold">{position.title}</h3>
+                      <Badge
+                        variant={
+                          position.status === "active" ? "default" : "secondary"
+                        }
+                      >
+                        {position.status}
+                      </Badge>
+                      {!position.isVisible && (
+                        <Badge variant="outline">Hidden</Badge>
+                      )}
+                    </div>
+
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {position.description.substring(0, 100)}...
+                    </p>
+
+                    <div className="mt-3 flex flex-wrap gap-4 text-sm">
+                      {position.locations?.length > 0 && (
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          {position.locations.join(", ")}
+                        </div>
+                      )}
+
+                      {position.salaryRange?.min && (
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="h-4 w-4 text-muted-foreground" />
+                          ₹{position.salaryRange.min.toLocaleString()} - ₹
+                          {position.salaryRange.max?.toLocaleString() || "Open"}
+                        </div>
+                      )}
+
+                      {position.matchCount > 0 && (
+                        <button
+                          onClick={() =>
+                            router.push(`/dashboard/jobs/${position._id}`)
+                          }
+                          className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
+                        >
+                          <Users className="h-4 w-4" />
+                          {position.matchCount} interested
+                        </button>
+                      )}
+
+                      {position.slug && (
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(
+                              `${window.location.origin}/job/${position.slug}`,
+                            )
+                            toast.success("Share link copied to clipboard")
+                          }}
+                          className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                        >
+                          <Copy className="h-4 w-4" />
+                          Copy share link
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {position.description.substring(0, 100)}...
-                  </p>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-full">
+                      {position.status === "draft" && (
+                        <DropdownMenuItem
+                          onClick={() => handlePublish(position._id)}
+                        >
+                          Publish
+                        </DropdownMenuItem>
+                      )}
 
-                  <div className="mt-3 flex flex-wrap gap-4 text-sm">
-                    {position.locations?.length > 0 && (
-                      <div className="flex items-center gap-1">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        {position.locations.join(", ")}
-                      </div>
-                    )}
+                      <DropdownMenuItem
+                        onClick={() =>
+                          handleToggleVisibility(
+                            position._id,
+                            position.isVisible,
+                          )
+                        }
+                      >
+                        {position.isVisible ? (
+                          <>
+                            <EyeOff className="h-4 w-4" />
+                            Hide
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="h-4 w-4" />
+                            Show
+                          </>
+                        )}
+                      </DropdownMenuItem>
 
-                    {position.salaryRange?.min && (
-                      <div className="flex items-center gap-1">
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                        ₹{position.salaryRange.min.toLocaleString()} - ₹
-                        {position.salaryRange.max?.toLocaleString() || "Open"}
-                      </div>
-                    )}
-
-                    {position.matchCount > 0 && (
-                      <button
+                      <DropdownMenuItem
                         onClick={() =>
                           router.push(`/dashboard/jobs/${position._id}`)
                         }
-                        className="flex items-center gap-1 text-blue-600 hover:text-blue-700"
                       >
                         <Users className="h-4 w-4" />
-                        {position.matchCount} interested
-                      </button>
-                    )}
-
-                    {position.slug && (
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(
-                            `${window.location.origin}/job/${position.slug}`,
-                          )
-                          toast.success("Share link copied to clipboard")
-                        }}
-                        className="flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                      >
-                        <Copy className="h-4 w-4" />
-                        Copy share link
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-full">
-                    {position.status === "draft" && (
-                      <DropdownMenuItem
-                        onClick={() => handlePublish(position._id)}
-                      >
-                        Publish
+                        View Applicants
                       </DropdownMenuItem>
-                    )}
 
-                    <DropdownMenuItem
-                      onClick={() =>
-                        handleToggleVisibility(position._id, position.isVisible)
-                      }
-                    >
-                      {position.isVisible ? (
-                        <>
-                          <EyeOff className="h-4 w-4" />
-                          Hide
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="h-4 w-4" />
-                          Show
-                        </>
+                      <DropdownMenuItem onClick={() => handleEdit(position)}>
+                        <Edit2 className="h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+
+                      {position.slug && (
+                        <DropdownMenuItem
+                          onClick={() => {
+                            navigator.clipboard.writeText(
+                              `${window.location.origin}/job/${position.slug}`,
+                            )
+                            toast.success("Share link copied!")
+                          }}
+                        >
+                          <Copy className="h-4 w-4" />
+                          Copy share link
+                        </DropdownMenuItem>
                       )}
-                    </DropdownMenuItem>
 
-                    <DropdownMenuItem
-                      onClick={() =>
-                        router.push(`/dashboard/jobs/${position._id}`)
-                      }
-                    >
-                      <Users className="h-4 w-4" />
-                      View Applicants
-                    </DropdownMenuItem>
-
-                    <DropdownMenuItem onClick={() => handleEdit(position)}>
-                      <Edit2 className="h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-
-                    {position.slug && (
                       <DropdownMenuItem
-                        onClick={() => {
-                          navigator.clipboard.writeText(
-                            `${window.location.origin}/job/${position.slug}`,
-                          )
-                          toast.success("Share link copied!")
-                        }}
+                        onClick={() => handleDelete(position._id)}
+                        className="text-destructive"
                       >
-                        <Copy className="h-4 w-4" />
-                        Copy share link
+                        <Trash2 className="h-4 w-4" />
+                        Delete
                       </DropdownMenuItem>
-                    )}
-
-                    <DropdownMenuItem
-                      onClick={() => handleDelete(position._id)}
-                      className="text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </Card>
-          ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </Card>
+            ))
+          )}
           {positionTotalPages > 1 && (
             <div className="flex justify-center">
               <PaginationControls

@@ -106,6 +106,7 @@ export async function POST(req: NextRequest) {
       salaryRange,
       employmentType,
       applicationForm,
+      company,
       externalLink,
       isExternal,
     } = body
@@ -133,6 +134,7 @@ export async function POST(req: NextRequest) {
       status: "draft",
       applicationForm,
       slug,
+      company: company || "",
       externalLink: externalLink || "",
       isExternal: isExternal || false,
     })

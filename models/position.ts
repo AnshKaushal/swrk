@@ -151,6 +151,11 @@ const PositionSchema = new mongoose.Schema(
       index: true,
     },
 
+    company: {
+      type: String,
+      default: "",
+    },
+
     externalLink: {
       type: String,
       default: "",

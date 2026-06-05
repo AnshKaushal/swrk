@@ -66,6 +66,7 @@ export async function PATCH(
       employmentType,
       status,
       isVisible,
+      company,
       applicationForm,
       externalLink,
       isExternal,
@@ -84,6 +85,7 @@ export async function PATCH(
     if (isVisible !== undefined) position.isVisible = isVisible
     if (applicationForm !== undefined)
       position.applicationForm = applicationForm
+    if (company !== undefined) position.company = company
     if (externalLink !== undefined) position.externalLink = externalLink
     if (isExternal !== undefined) position.isExternal = isExternal
 

@@ -79,6 +79,9 @@ type PositionRecord = {
   }
   employmentType: string
   applicationForm?: ApplicationFormConfig
+  externalLink?: string
+  isExternal?: boolean
+  company?: string
 }
 
 const ROLE_SUGGESTIONS = [
@@ -319,6 +322,9 @@ export default function EditJobPage() {
   const [salaryMin, setSalaryMin] = useState("")
   const [salaryMax, setSalaryMax] = useState("")
   const [employmentType, setEmploymentType] = useState("full-time")
+  const [externalLink, setExternalLink] = useState("")
+  const [isExternal, setIsExternal] = useState(false)
+  const [company, setCompany] = useState("")
   const [applicationForm, setApplicationForm] = useState<ApplicationFormConfig>(
     createApplicationForm(),
   )
@@ -430,6 +436,9 @@ export default function EditJobPage() {
           position.salaryRange?.max ? String(position.salaryRange.max) : "",
         )
         setEmploymentType(position.employmentType || "full-time")
+        setExternalLink(position.externalLink || "")
+        setIsExternal(position.isExternal || false)
+        setCompany(position.company || "")
         setApplicationForm(normalizeApplicationForm(position.applicationForm))
       } catch (error) {
         console.error(error)
@@ -532,6 +541,9 @@ export default function EditJobPage() {
         employmentType,
         applicationForm:
           cleanedForm.fields.length > 0 ? cleanedForm : undefined,
+        company: company || undefined,
+        externalLink: externalLink || undefined,
+        isExternal,
       }
 
       const response = await fetch(`/api/positions/${positionId}`, {
@@ -700,6 +712,52 @@ export default function EditJobPage() {
                 placeholder="180000"
               />
             </div>
+          </div>
+        </Card>
+
+        <Card className="rounded-3xl border-border/60 p-6 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold">External Application Link</h2>
+          <p className="mb-4 text-sm text-muted-foreground">
+            If this job is hosted elsewhere, enable external mode so applicants
+            submit their details and then get redirected.
+          </p>
+          <div className="space-y-4">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={isExternal}
+                onChange={(e) => setIsExternal(e.target.checked)}
+                className="h-4 w-4 rounded border-border"
+              />
+              This is an external posting
+            </label>
+
+            {isExternal && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="company">Company Name</Label>
+                  <Input
+                    id="company"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    placeholder="Acme Corp"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    The company name shown to candidates in the swipe deck
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="externalLink">External Application URL</Label>
+                  <Input
+                    id="externalLink"
+                    type="url"
+                    value={externalLink}
+                    onChange={(e) => setExternalLink(e.target.value)}
+                    placeholder="https://company.workable.com/jobs/123"
+                  />
+                </div>
+              </>
+            )}
           </div>
         </Card>
 

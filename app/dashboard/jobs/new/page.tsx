@@ -281,6 +281,7 @@ export default function NewJobPage() {
   const [employmentType, setEmploymentType] = useState("full-time")
   const [externalLink, setExternalLink] = useState("")
   const [isExternal, setIsExternal] = useState(false)
+  const [company, setCompany] = useState("")
 
   const [applicationForm, setApplicationForm] = useState<ApplicationFormConfig>(
     createApplicationForm(),
@@ -435,6 +436,7 @@ export default function NewJobPage() {
         employmentType,
         applicationForm:
           cleanedForm.fields.length > 0 ? cleanedForm : undefined,
+        company: company || undefined,
         externalLink: externalLink || undefined,
         isExternal: isExternal || undefined,
       }
@@ -634,16 +636,30 @@ export default function NewJobPage() {
             </label>
 
             {isExternal && (
-              <div className="space-y-2">
-                <Label htmlFor="externalLink">External Application URL</Label>
-                <Input
-                  id="externalLink"
-                  type="url"
-                  value={externalLink}
-                  onChange={(e) => setExternalLink(e.target.value)}
-                  placeholder="https://company.workable.com/jobs/123"
-                />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="company">Company Name</Label>
+                  <Input
+                    id="company"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    placeholder="Acme Corp"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    The company name shown to candidates in the swipe deck
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="externalLink">External Application URL</Label>
+                  <Input
+                    id="externalLink"
+                    type="url"
+                    value={externalLink}
+                    onChange={(e) => setExternalLink(e.target.value)}
+                    placeholder="https://company.workable.com/jobs/123"
+                  />
+                </div>
+              </>
             )}
           </div>
         </Card>
