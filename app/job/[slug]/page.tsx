@@ -1,6 +1,7 @@
-import { notFound, redirect } from "next/navigation"
+import { notFound } from "next/navigation"
 import { db } from "@/lib/mongodb"
 import Position from "@/models/position"
+import User from "@/models/user"
 import { PublicJobView } from "./public-job-view"
 
 export default async function JobPage({
