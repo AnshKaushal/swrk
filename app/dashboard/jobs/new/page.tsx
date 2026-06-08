@@ -869,10 +869,7 @@ export default function NewJobPage() {
                           value={field.options.join("\n")}
                           onChange={(event) =>
                             updateQuestion(field.id, {
-                              options: event.target.value
-                                .split("\n")
-                                .map((option) => option.trim())
-                                .filter(Boolean),
+                              options: event.target.value.split("\n"),
                             })
                           }
                           rows={3}

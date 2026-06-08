@@ -58,6 +58,8 @@ export async function POST(req: NextRequest) {
       body.applicationData && typeof body.applicationData === "object"
         ? body.applicationData
         : {}
+    const resumeUrl = String(body.resumeUrl || "").trim()
+    const resumeFileName = String(body.resumeFileName || "").trim()
 
     if (!positionId || !direction) {
       return NextResponse.json(
@@ -101,7 +103,9 @@ export async function POST(req: NextRequest) {
       employerId: position.employerId,
       direction,
       applicationData,
-      applicationStatus: direction === "right" ? "submitted" : undefined,
+      resumeUrl: resumeUrl || undefined,
+      resumeFileName: resumeFileName || undefined,
+      applicationStatus: direction === "right" ? "new" : undefined,
       applicationSubmittedAt:
         direction === "right" && Object.keys(applicationData).length > 0
           ? new Date()

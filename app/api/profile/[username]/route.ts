@@ -5,6 +5,7 @@ import User from "@/models/user"
 import EmployeeProfile from "@/models/employee"
 import EmployerProfile from "@/models/employer"
 import Resume from "@/models/resume"
+import Position from "@/models/position"
 import { getCredibilityStats } from "@/lib/interview-feedback"
 
 const normalizeRole = (value?: string | null) => {
@@ -74,13 +75,49 @@ export async function GET(
       activeRole,
     )
 
+    const positions = await Position.find({
+      employerId: user._id,
+      status: "active",
+    })
+      .sort({ createdAt: -1 })
+      .lean()
+
+    const employerProfileObj = employerProfile?.toObject() || null
+    if (employerProfileObj && positions.length > 0) {
+      const existingPositionIds = new Set(
+        (employerProfileObj.activeOpenings || [])
+          .filter((o: any) => o.positionId)
+          .map((o: any) => o.positionId.toString()),
+      )
+      const missingPositions = positions.filter(
+        (p) => !existingPositionIds.has(p._id.toString()),
+      )
+      if (missingPositions.length > 0) {
+        employerProfileObj.activeOpenings = [
+          ...(employerProfileObj.activeOpenings || []),
+          ...missingPositions.map((p) => ({
+            positionId: p._id,
+            title: p.title,
+            description: p.description,
+            location: p.locations?.length ? p.locations[0] : undefined,
+            employmentType: p.employmentType,
+            requiredSkills: p.skills || [],
+            ctcMin: p.salaryRange?.min,
+            ctcMax: p.salaryRange?.max,
+            isActive: p.status === "active",
+            openedAt: p.createdAt,
+          })),
+        ]
+      }
+    }
+
     return NextResponse.json({
       user: {
         ...user.toObject(),
         activeRole,
       },
       employeeProfile: employeeProfile?.toObject() || null,
-      employerProfile: employerProfile?.toObject() || null,
+      employerProfile: employerProfileObj,
       resumes: resumes.map((resume) => resume.toObject()),
       profile: profile?.toObject() || null,
       credibilityStats,

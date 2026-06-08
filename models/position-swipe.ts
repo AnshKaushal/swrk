@@ -31,17 +31,22 @@ const PositionSwipeSchema = new mongoose.Schema(
       default: {},
     },
 
+    resumeUrl: { type: String, default: "" },
+    resumeFileName: { type: String, default: "" },
     applicationStatus: {
       type: String,
       enum: [
-        "submitted",
-        "viewed",
+        "new",
+        "screened",
         "shortlisted",
+        "maybe",
         "interview",
-        "rejected",
+        "offer",
         "hired",
+        "rejected",
         "withdrawn",
       ],
+      default: "new",
     },
 
     applicationSubmittedAt: Date,

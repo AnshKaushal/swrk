@@ -617,8 +617,7 @@ export default function ProfileSettingsPage() {
         ...prev,
         [kind]: data.url,
       }))
-      // force immediate session refresh with new avatar
-      if (update) {
+      if (update && kind === "avatar") {
         try {
           await update({ avatar: data.url })
         } catch {
@@ -1014,7 +1013,7 @@ export default function ProfileSettingsPage() {
         },
       }
 
-      if (includeEmployerProfile) {
+      if (includeEmployerProfile && formData.companyName?.trim()) {
         payload.employerProfile = {
           companyName: formData.companyName,
           companyWebsite: formData.companyWebsite,
@@ -1452,7 +1451,7 @@ export default function ProfileSettingsPage() {
 
                   return (
                     <div
-                      key={`${link.label}-${index}`}
+                      key={`link-${index}`}
                       className="grid gap-3 sm:grid-cols-[1fr_1.4fr_auto]"
                     >
                       <Input

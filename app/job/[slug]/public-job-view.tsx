@@ -14,7 +14,15 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Markdown } from "@/components/ui/markdown"
 import {
   MapPin,
@@ -25,9 +33,22 @@ import {
   Loader2,
   CheckCircle,
   Heart,
+  FileText,
+  Upload,
+  X,
 } from "lucide-react"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+
+type ApplicationFormField = {
+  id: string
+  label: string
+  type: string
+  required: boolean
+  placeholder: string
+  options: string[]
+  autofillSource: string
+}
 
 type PublicPosition = {
   _id: string
@@ -46,6 +67,11 @@ type PublicPosition = {
   employmentType: string
   externalLink?: string
   isExternal?: boolean
+  applicationForm?: {
+    title?: string
+    description?: string
+    fields: ApplicationFormField[]
+  }
   employerId: {
     _id: string
     name?: string
@@ -59,6 +85,7 @@ export function PublicJobView({ position }: { position: PublicPosition }) {
   const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [alreadyApplied, setAlreadyApplied] = useState(false)
   const [directApplying, setDirectApplying] = useState(false)
   const [showSignupPrompt, setShowSignupPrompt] = useState(false)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
@@ -90,6 +117,69 @@ export function PublicJobView({ position }: { position: PublicPosition }) {
   const [location, setLocation] = useState("")
   const [workExperience, setWorkExperience] = useState("")
   const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const [resumeFile, setResumeFile] = useState<File | null>(null)
+  const [resumeUploading, setResumeUploading] = useState(false)
+  const [resumeUrl, setResumeUrl] = useState("")
+  const [resumeFileName, setResumeFileName] = useState("")
+
+  const [formDialogOpen, setFormDialogOpen] = useState(false)
+  const [applicationValues, setApplicationValues] = useState<
+    Record<string, string>
+  >({})
+  const [directResumeFile, setDirectResumeFile] = useState<File | null>(null)
+  const [directResumeUploading, setDirectResumeUploading] = useState(false)
+  const [directResumeUrl, setDirectResumeUrl] = useState("")
+  const [directResumeFileName, setDirectResumeFileName] = useState("")
+
+  const hasApplicationForm =
+    position.applicationForm?.fields &&
+    position.applicationForm.fields.length > 0
+
+  const handleDirectResumeSelect = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const allowed = [
+      "application/pdf",
+      "text/plain",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]
+    if (!allowed.includes(file.type)) {
+      toast.error("Please upload a PDF, DOC, DOCX, or TXT file")
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File too large. Max 10MB")
+      return
+    }
+    setDirectResumeUploading(true)
+    setDirectResumeFile(file)
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      const res = await fetch("/api/upload/resume", {
+        method: "POST",
+        body: formData,
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || "Upload failed")
+      }
+      const data = await res.json()
+      setDirectResumeUrl(data.url)
+      setDirectResumeFileName(data.fileName)
+      toast.success("Resume uploaded")
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to upload resume",
+      )
+      setDirectResumeFile(null)
+    } finally {
+      setDirectResumeUploading(false)
+    }
+  }
 
   const handleDirectApply = async () => {
     if (!session?.user?.id) {
@@ -102,7 +192,12 @@ export function PublicJobView({ position }: { position: PublicPosition }) {
       const res = await fetch("/api/positions/swipe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ positionId: position._id, direction: "right" }),
+        body: JSON.stringify({
+          positionId: position._id,
+          direction: "right",
+          resumeUrl: directResumeUrl || undefined,
+          resumeFileName: directResumeFileName || undefined,
+        }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || "Failed to apply")
@@ -117,10 +212,8 @@ export function PublicJobView({ position }: { position: PublicPosition }) {
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const submitApplication = async (extraData?: Record<string, string>) => {
     setSubmitting(true)
-
     try {
       const res = await fetch(`/api/positions/${position._id}/apply-public`, {
         method: "POST",
@@ -133,12 +226,19 @@ export function PublicJobView({ position }: { position: PublicPosition }) {
           location,
           workExperience,
           agreedToTerms,
+          resumeUrl,
+          resumeFileName,
+          applicationData: extraData || {},
         }),
       })
 
       const data = await res.json()
 
       if (!res.ok) {
+        if (res.status === 409) {
+          setAlreadyApplied(true)
+          return
+        }
         throw new Error(data.error || "Failed to submit application")
       }
 
@@ -158,6 +258,90 @@ export function PublicJobView({ position }: { position: PublicPosition }) {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const handleResumeUpload = async (file: File) => {
+    setResumeUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
+      const res = await fetch("/api/upload/resume", {
+        method: "POST",
+        body: formData,
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || "Upload failed")
+      }
+      const data = await res.json()
+      setResumeUrl(data.url)
+      setResumeFileName(data.fileName)
+      toast.success("Resume uploaded")
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to upload resume",
+      )
+      setResumeFile(null)
+    } finally {
+      setResumeUploading(false)
+    }
+  }
+
+  const handleResumeSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const allowed = [
+      "application/pdf",
+      "text/plain",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ]
+    if (!allowed.includes(file.type)) {
+      toast.error("Please upload a PDF, DOC, DOCX, or TXT file")
+      return
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("File too large. Max 10MB")
+      return
+    }
+    setResumeFile(file)
+    handleResumeUpload(file)
+  }
+
+  const handleRemoveResume = () => {
+    setResumeFile(null)
+    setResumeUrl("")
+    setResumeFileName("")
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (hasApplicationForm) {
+      setFormDialogOpen(true)
+      return
+    }
+    await submitApplication()
+  }
+
+  const handleFinalSubmit = async () => {
+    setFormDialogOpen(false)
+    await submitApplication(applicationValues)
+  }
+
+  if (alreadyApplied) {
+    return (
+      <div className="mx-auto flex min-h-[80dvh] max-w-2xl items-center justify-center px-4">
+        <Card className="w-full p-8 text-center">
+          <CheckCircle className="mx-auto h-12 w-12 text-blue-500" />
+          <h1 className="mt-4 text-2xl font-bold">Already Applied</h1>
+          <p className="mt-2 text-muted-foreground">
+            You have already submitted an application for{" "}
+            {position.title}. The recruiter will review it and
+            contact you if your profile matches.
+          </p>
+        </Card>
+      </div>
+    )
   }
 
   if (submitted) {
@@ -368,6 +552,41 @@ export function PublicJobView({ position }: { position: PublicPosition }) {
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label>Resume / CV</Label>
+                  {resumeUrl ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+                      <FileText className="h-4 w-4 shrink-0 text-blue-500" />
+                      <span className="min-w-0 flex-1 truncate text-sm">
+                        {resumeFileName}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleRemoveResume}
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border/60 px-3 py-3 text-sm text-muted-foreground hover:border-foreground/30 hover:text-foreground">
+                      <Upload className="h-4 w-4" />
+                      <span>
+                        {resumeUploading
+                          ? "Uploading..."
+                          : "Upload PDF, DOC, DOCX, or TXT"}
+                      </span>
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                        className="hidden"
+                        onChange={handleResumeSelect}
+                        disabled={resumeUploading}
+                      />
+                    </label>
+                  )}
+                </div>
+
                 <label className="flex items-start gap-2 text-sm">
                   <input
                     type="checkbox"
@@ -398,6 +617,8 @@ export function PublicJobView({ position }: { position: PublicPosition }) {
                       <ExternalLink className="h-4 w-4" />
                       Apply & Continue
                     </>
+                  ) : hasApplicationForm ? (
+                    "Continue"
                   ) : (
                     "Submit Application"
                   )}
@@ -433,6 +654,126 @@ export function PublicJobView({ position }: { position: PublicPosition }) {
                 </div>
               )}
 
+              <Dialog open={formDialogOpen} onOpenChange={setFormDialogOpen}>
+                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {position.applicationForm?.title || "Application form"}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {position.applicationForm?.description ||
+                        "Tell us a bit more about yourself."}
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-4">
+                    {position.applicationForm?.fields?.map((field) => {
+                      const value = applicationValues[field.id] || ""
+
+                      return (
+                        <div
+                          key={field.id}
+                          className="space-y-2 rounded-2xl border border-border/60 bg-muted/20 p-4"
+                        >
+                          <Label
+                            htmlFor={`af-${field.id}`}
+                            className="text-sm font-medium"
+                          >
+                            {field.label || "Untitled question"}
+                            {field.required ? " *" : ""}
+                          </Label>
+
+                          {field.type === "long-text" ? (
+                            <Textarea
+                              id={`af-${field.id}`}
+                              value={value}
+                              placeholder={field.placeholder}
+                              rows={4}
+                              required={field.required}
+                              onChange={(e) =>
+                                setApplicationValues((prev) => ({
+                                  ...prev,
+                                  [field.id]: e.target.value,
+                                }))
+                              }
+                            />
+                          ) : field.type === "select" ? (
+                            <Select
+                              value={value}
+                              onValueChange={(v) =>
+                                setApplicationValues((prev) => ({
+                                  ...prev,
+                                  [field.id]: v,
+                                }))
+                              }
+                            >
+                              <SelectTrigger id={`af-${field.id}`}>
+                                <SelectValue
+                                  placeholder={
+                                    field.placeholder || "Select an option"
+                                  }
+                                />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(field.options || []).map((opt) => (
+                                  <SelectItem key={opt} value={opt}>
+                                    {opt}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <Input
+                              id={`af-${field.id}`}
+                              type={
+                                field.type === "number"
+                                  ? "number"
+                                  : field.type === "email"
+                                    ? "email"
+                                    : field.type === "url"
+                                      ? "url"
+                                      : field.type === "phone"
+                                        ? "tel"
+                                        : field.type === "date"
+                                          ? "date"
+                                          : "text"
+                              }
+                              value={value}
+                              placeholder={field.placeholder}
+                              required={field.required}
+                              onChange={(e) =>
+                                setApplicationValues((prev) => ({
+                                  ...prev,
+                                  [field.id]: e.target.value,
+                                }))
+                              }
+                            />
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  <DialogFooter className="flex gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => setFormDialogOpen(false)}
+                    >
+                      Back
+                    </Button>
+                    <Button
+                      onClick={handleFinalSubmit}
+                      disabled={submitting}
+                    >
+                      {submitting && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      Submit Application
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+
               <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
                 <DialogContent className="sm:max-w-md">
                   <DialogHeader>
@@ -442,6 +783,43 @@ export function PublicJobView({ position }: { position: PublicPosition }) {
                       will be shared with the employer as your application.
                     </DialogDescription>
                   </DialogHeader>
+                  <div className="space-y-3">
+                    {directResumeUrl ? (
+                      <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+                        <FileText className="h-4 w-4 shrink-0 text-blue-500" />
+                        <span className="min-w-0 flex-1 truncate text-sm">
+                          {directResumeFileName}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDirectResumeUrl("")
+                            setDirectResumeFileName("")
+                            setDirectResumeFile(null)
+                          }}
+                          className="shrink-0 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border/60 px-3 py-3 text-sm text-muted-foreground hover:border-foreground/30 hover:text-foreground">
+                        <Upload className="h-4 w-4" />
+                        <span>
+                          {directResumeUploading
+                            ? "Uploading..."
+                            : "Add Resume/CV (optional)"}
+                        </span>
+                        <input
+                          type="file"
+                          accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                          className="hidden"
+                          onChange={handleDirectResumeSelect}
+                          disabled={directResumeUploading}
+                        />
+                      </label>
+                    )}
+                  </div>
                   <div className="flex justify-end gap-3">
                     <Button
                       variant="outline"
@@ -449,7 +827,7 @@ export function PublicJobView({ position }: { position: PublicPosition }) {
                     >
                       Cancel
                     </Button>
-                    <Button onClick={handleDirectApply}>
+                    <Button onClick={handleDirectApply} disabled={directResumeUploading}>
                       <Heart className="mr-2 h-4 w-4" />
                       Apply
                     </Button>

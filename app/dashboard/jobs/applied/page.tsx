@@ -8,7 +8,7 @@ import { PaginationControls } from "@/components/ui/pagination-controls"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { ArrowLeft, Briefcase, Loader2, MapPin } from "lucide-react"
+import { ArrowLeft, Briefcase, FileText, Loader2, MapPin } from "lucide-react"
 import Link from "next/link"
 
 interface Position {
@@ -35,10 +35,13 @@ interface Position {
 
 interface ApplicationSummary {
   _id: string
+  source: "swipe" | "public"
   applicationStatus: string
   applicationSubmittedAt?: string | null
   applicationStatusUpdatedAt?: string | null
   applicationData?: Record<string, string>
+  resumeUrl?: string
+  resumeFileName?: string
   position: Position & {
     employerId?: Position["employerId"]
   }
@@ -46,20 +49,26 @@ interface ApplicationSummary {
 
 function getApplicationStatusLabel(status: string) {
   switch (status) {
-    case "viewed":
-      return "Viewed"
+    case "new":
+      return "New"
+    case "screened":
+      return "Screened"
     case "shortlisted":
       return "Shortlisted"
+    case "maybe":
+      return "Maybe"
     case "interview":
       return "Interview"
-    case "rejected":
-      return "Rejected"
+    case "offer":
+      return "Offer"
     case "hired":
       return "Hired"
+    case "rejected":
+      return "Rejected"
     case "withdrawn":
       return "Withdrawn"
     default:
-      return "Submitted"
+      return "New"
   }
 }
 
@@ -185,13 +194,25 @@ export default function AppliedJobsPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col items-end gap-2">
+                  <div className="flex flex-col items-end gap-2">
                   <Badge variant="secondary">
                     {getApplicationStatusLabel(
                       application.applicationStatus,
                     )}
                   </Badge>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap justify-end gap-2">
+                    {application.resumeUrl && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          window.open(application.resumeUrl!, "_blank")
+                        }
+                      >
+                        <FileText className="mr-1 h-3 w-3" />
+                        Resume
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"

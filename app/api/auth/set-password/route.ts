@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 import { db } from "@/lib/mongodb"
 import User from "@/models/user"
+import PublicApplication from "@/models/public-application"
 
 export async function POST(req: NextRequest) {
   try {
@@ -51,6 +52,11 @@ export async function POST(req: NextRequest) {
         onboardingStep: Math.max(user.onboardingStep, 1),
       },
     })
+
+    await PublicApplication.updateMany(
+      { email: user.email, candidateId: null },
+      { $set: { candidateId: user._id } },
+    )
 
     return NextResponse.json({ success: true })
   } catch (err) {

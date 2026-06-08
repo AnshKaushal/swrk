@@ -10,6 +10,19 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET!,
 })
 
+const calculatePeriodEnd = (plan: any, chargeAtTimestamp?: number) => {
+  const startDate = chargeAtTimestamp
+    ? new Date(chargeAtTimestamp * 1000)
+    : new Date()
+  const endDate = new Date(startDate)
+  if (plan.interval === "year" || plan.interval === "yearly") {
+    endDate.setFullYear(endDate.getFullYear() + 1)
+  } else {
+    endDate.setMonth(endDate.getMonth() + 1)
+  }
+  return endDate
+}
+
 export async function GET() {
   try {
     const session = await auth()
@@ -175,10 +188,12 @@ export async function POST(req: NextRequest) {
           status: razorpaySubscription.status,
           currentPeriodStart: razorpaySubscription.current_start
             ? new Date(razorpaySubscription.current_start * 1000)
-            : new Date(),
+            : razorpaySubscription.charge_at
+              ? new Date(razorpaySubscription.charge_at * 1000)
+              : new Date(),
           currentPeriodEnd: razorpaySubscription.current_end
             ? new Date(razorpaySubscription.current_end * 1000)
-            : new Date(),
+            : calculatePeriodEnd(plan, razorpaySubscription.charge_at),
           amount: plan.price,
           currency: plan.currency,
           interval: plan.interval,
@@ -212,10 +227,12 @@ export async function POST(req: NextRequest) {
         status: razorpaySubscription.status,
         currentPeriodStart: razorpaySubscription.current_start
           ? new Date(razorpaySubscription.current_start * 1000)
-          : new Date(),
+          : razorpaySubscription.charge_at
+            ? new Date(razorpaySubscription.charge_at * 1000)
+            : new Date(),
         currentPeriodEnd: razorpaySubscription.current_end
           ? new Date(razorpaySubscription.current_end * 1000)
-          : new Date(),
+          : calculatePeriodEnd(plan, razorpaySubscription.charge_at),
         amount: plan.price,
         currency: plan.currency,
         interval: plan.interval,
@@ -411,10 +428,16 @@ export async function PUT(req: NextRequest) {
           subscription.currentPeriodStart =
             newRazorpaySubscription.current_start
               ? new Date(newRazorpaySubscription.current_start * 1000)
-              : new Date()
-          subscription.currentPeriodEnd = newRazorpaySubscription.current_end
-            ? new Date(newRazorpaySubscription.current_end * 1000)
-            : new Date()
+              : newRazorpaySubscription.charge_at
+                ? new Date(newRazorpaySubscription.charge_at * 1000)
+                : new Date()
+          subscription.currentPeriodEnd =
+            newRazorpaySubscription.current_end
+              ? new Date(newRazorpaySubscription.current_end * 1000)
+              : calculatePeriodEnd(
+                  currentPlan,
+                  newRazorpaySubscription.charge_at,
+                )
           subscription.nextPaymentDate = newRazorpaySubscription.charge_at
             ? new Date(newRazorpaySubscription.charge_at * 1000)
             : new Date()

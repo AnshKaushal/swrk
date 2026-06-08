@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/app/api/auth/[...nextauth]/route"
 import { db } from "@/lib/mongodb"
 import PositionSwipe from "@/models/position-swipe"
+import PublicApplication from "@/models/public-application"
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * limit
 
     const filter = { candidateId: session.user.id, direction: "right" }
-    const [applications, total] = await Promise.all([
+    const [swipeApplications, swipeTotal, publicApplications, publicTotal] = await Promise.all([
       PositionSwipe.find(filter)
         .sort({ applicationStatusUpdatedAt: -1, createdAt: -1 })
         .skip(skip)
@@ -34,13 +35,27 @@ export async function GET(req: NextRequest) {
         })
         .lean(),
       PositionSwipe.countDocuments(filter),
+      PublicApplication.find({ candidateId: session.user.id })
+        .sort({ createdAt: -1 })
+        .populate({
+          path: "positionId",
+          select:
+            "title description employmentType status salaryRange locations skills createdAt employerId",
+          populate: {
+            path: "employerId",
+            select: "name username avatar companyName",
+          },
+        })
+        .lean(),
+      PublicApplication.countDocuments({ candidateId: session.user.id }),
     ])
 
-    const data = applications
+    const swipeData = swipeApplications
       .filter((application) => application.positionId)
       .map((application) => ({
         _id: application._id,
-        applicationStatus: application.applicationStatus || "submitted",
+        source: "swipe" as const,
+        applicationStatus: application.applicationStatus || "new",
         applicationSubmittedAt: application.applicationSubmittedAt || null,
         applicationStatusUpdatedAt:
           application.applicationStatusUpdatedAt ||
@@ -52,10 +67,38 @@ export async function GET(req: NextRequest) {
           typeof application.applicationData === "object"
             ? application.applicationData
             : {},
+        resumeUrl: application.resumeUrl || "",
+        resumeFileName: application.resumeFileName || "",
         position: application.positionId,
       }))
 
-    return NextResponse.json({ applications: data, total, page, totalPages: Math.ceil(total / limit) })
+    const publicData = publicApplications
+      .filter((app) => app.positionId)
+      .map((app) => ({
+        _id: app._id,
+        source: "public" as const,
+        applicationStatus: app.status || "new",
+        applicationSubmittedAt: app.createdAt || null,
+        applicationStatusUpdatedAt: app.updatedAt || app.createdAt || null,
+        applicationData:
+          app.applicationData && typeof app.applicationData === "object"
+            ? app.applicationData
+            : {},
+        resumeUrl: app.resumeUrl || "",
+        resumeFileName: app.resumeFileName || "",
+        position: app.positionId,
+      }))
+
+    const allApplications = [...swipeData, ...publicData].sort(
+      (a, b) =>
+        new Date(b.applicationStatusUpdatedAt || b.applicationSubmittedAt || 0).getTime() -
+        new Date(a.applicationStatusUpdatedAt || a.applicationSubmittedAt || 0).getTime(),
+    )
+
+    const total = swipeTotal + publicTotal
+    const paginated = allApplications.slice(skip, skip + limit)
+
+    return NextResponse.json({ applications: paginated, total, page, totalPages: Math.ceil(total / limit) })
   } catch (error) {
     console.error(error)
     return NextResponse.json(

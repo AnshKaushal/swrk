@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/app/api/auth/[...nextauth]/route"
 import { db } from "@/lib/mongodb"
 import User from "@/models/user"
+import PublicApplication from "@/models/public-application"
 
 const normalizeRole = (value: string) => {
   if (value === "job-seeker") return "employee"
@@ -41,6 +42,14 @@ export async function POST(req: NextRequest) {
     }
 
     await User.findByIdAndUpdate(session.user.id, { $set: updateData })
+
+    const user = await User.findById(session.user.id).select("email").lean()
+    if (user?.email) {
+      await PublicApplication.updateMany(
+        { email: user.email, candidateId: null },
+        { $set: { candidateId: session.user.id } },
+      )
+    }
 
     return NextResponse.json({ success: true })
   } catch (err: unknown) {

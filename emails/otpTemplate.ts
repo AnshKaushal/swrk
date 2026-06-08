@@ -6,7 +6,7 @@ export function otpEmailTemplate({
   name?: string
 }) {
   return {
-    subject: `${otp} is your Linkder verification code`,
+    subject: `${otp} is your SWRK verification code`,
     html: `
 <!DOCTYPE html>
 <html lang="en">
@@ -25,7 +25,7 @@ export function otpEmailTemplate({
           <tr>
             <td style="padding:36px 40px 28px;border-bottom:1px solid #2a2a2a;">
               <span style="font-size:22px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">
-                Link<span style="color:#6ee7b7;">der</span>
+                SW<span style="color:#6ee7b7;">RK</span>
               </span>
             </td>
           </tr>
@@ -58,7 +58,7 @@ export function otpEmailTemplate({
           <tr>
             <td style="padding:20px 40px;border-top:1px solid #2a2a2a;">
               <p style="margin:0;color:#3f3f46;font-size:12px;">
-                © ${new Date().getFullYear()} Linkder · The professional matching network
+                © ${new Date().getFullYear()} SWRK · The professional matching network
               </p>
             </td>
           </tr>
@@ -70,6 +70,6 @@ export function otpEmailTemplate({
 </body>
 </html>
     `.trim(),
-    text: `Your Linkder verification code is: ${otp}\n\nExpires in 10 minutes. If you didn't request this, ignore this email.`,
+    text: `Your SWRK verification code is: ${otp}\n\nExpires in 10 minutes. If you didn't request this, ignore this email.`,
   }
 }

@@ -3,6 +3,7 @@ import { auth } from "@/app/api/auth/[...nextauth]/route"
 import { db } from "@/lib/mongodb"
 import Position from "@/models/position"
 import User from "@/models/user"
+import EmployerProfile from "@/models/employer"
 import { getJobPostQuota } from "@/lib/job-posting-limits"
 import { generateUniqueSlug } from "@/lib/slug"
 
@@ -140,6 +141,30 @@ export async function POST(req: NextRequest) {
     })
 
     await position.save()
+
+    await EmployerProfile.findOneAndUpdate(
+      { user: session.user.id },
+      {
+        $push: {
+          activeOpenings: {
+            positionId: position._id,
+            title: position.title,
+            description: position.description,
+            location:
+              position.locations && position.locations.length > 0
+                ? position.locations[0]
+                : undefined,
+            employmentType: position.employmentType,
+            requiredSkills: position.skills || [],
+            ctcMin: position.salaryRange?.min,
+            ctcMax: position.salaryRange?.max,
+            isActive: position.status === "active",
+            openedAt: position.createdAt,
+          },
+        },
+      },
+      { upsert: true },
+    )
 
     return NextResponse.json({ position }, { status: 201 })
   } catch (error) {

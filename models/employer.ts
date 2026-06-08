@@ -2,6 +2,11 @@ import mongoose from "mongoose"
 
 const JobOpeningSchema = new mongoose.Schema(
   {
+    positionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Position",
+      index: true,
+    },
     title: { type: String, required: true },
     description: { type: String, maxlength: 2000 },
     department: String,

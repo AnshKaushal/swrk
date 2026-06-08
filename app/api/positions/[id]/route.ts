@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/app/api/auth/[...nextauth]/route"
 import { db } from "@/lib/mongodb"
 import Position from "@/models/position"
+import EmployerProfile from "@/models/employer"
 
 export async function GET(
   req: NextRequest,
@@ -91,6 +92,25 @@ export async function PATCH(
 
     await position.save()
 
+    await EmployerProfile.findOneAndUpdate(
+      { user: session.user.id, "activeOpenings.positionId": position._id },
+      {
+        $set: {
+          "activeOpenings.$.title": position.title,
+          "activeOpenings.$.description": position.description,
+          "activeOpenings.$.location":
+            position.locations && position.locations.length > 0
+              ? position.locations[0]
+              : undefined,
+          "activeOpenings.$.employmentType": position.employmentType,
+          "activeOpenings.$.requiredSkills": position.skills || [],
+          "activeOpenings.$.ctcMin": position.salaryRange?.min,
+          "activeOpenings.$.ctcMax": position.salaryRange?.max,
+          "activeOpenings.$.isActive": position.status === "active",
+        },
+      },
+    )
+
     return NextResponse.json({ position })
   } catch (error) {
     console.error(error)
@@ -127,7 +147,14 @@ export async function DELETE(
       )
     }
 
+    const employerId = position.employerId
+
     await Position.deleteOne({ _id: id })
+
+    await EmployerProfile.findOneAndUpdate(
+      { user: employerId },
+      { $pull: { activeOpenings: { positionId: id } } },
+    )
 
     return NextResponse.json({ success: true })
   } catch (error) {

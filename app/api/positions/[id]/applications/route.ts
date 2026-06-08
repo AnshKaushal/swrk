@@ -4,25 +4,30 @@ import { db } from "@/lib/mongodb"
 import Position from "@/models/position"
 import PositionSwipe from "@/models/position-swipe"
 import PositionMatch from "@/models/position-match"
+import PublicApplication from "@/models/public-application"
 import Notification from "@/models/notification"
 
 const statusToMatchStatus: Record<string, string | null> = {
-  viewed: null,
+  new: null,
+  screened: null,
   shortlisted: null,
+  maybe: null,
   interview: "interview_scheduled",
-  rejected: "rejected",
+  offer: "offer",
   hired: "hired",
-  submitted: null,
+  rejected: "rejected",
   withdrawn: null,
 }
 
 const allowedStatuses = new Set([
-  "submitted",
-  "viewed",
+  "new",
+  "screened",
   "shortlisted",
+  "maybe",
   "interview",
-  "rejected",
+  "offer",
   "hired",
+  "rejected",
   "withdrawn",
 ])
 
@@ -57,7 +62,7 @@ export async function GET(
     const [applications, total] = await Promise.all([
       PositionSwipe.find(filter)
         .select(
-          "candidateId applicationData applicationSubmittedAt applicationStatus applicationStatusUpdatedAt applicationStatusUpdatedBy createdAt updatedAt",
+          "candidateId applicationData applicationSubmittedAt applicationStatus applicationStatusUpdatedAt applicationStatusUpdatedBy resumeUrl resumeFileName createdAt updatedAt",
         )
         .populate(
           "candidateId",
@@ -80,7 +85,7 @@ export async function GET(
           typeof application.applicationData === "object"
             ? application.applicationData
             : {},
-        applicationStatus: application.applicationStatus || "submitted",
+        applicationStatus: application.applicationStatus || "new",
         applicationSubmittedAt: application.applicationSubmittedAt || null,
         applicationStatusUpdatedAt:
           application.applicationStatusUpdatedAt ||
@@ -89,6 +94,8 @@ export async function GET(
           null,
         applicationStatusUpdatedBy:
           application.applicationStatusUpdatedBy || null,
+        resumeUrl: application.resumeUrl || "",
+        resumeFileName: application.resumeFileName || "",
       })),
       total,
       page,
@@ -128,18 +135,65 @@ export async function PATCH(
     }
 
     const body = await req.json()
-    const candidateId = String(body.candidateId || "").trim()
     const nextStatus = String(body.status || "").trim()
 
-    if (!candidateId || !nextStatus) {
+    if (!nextStatus) {
       return NextResponse.json(
-        { error: "candidateId and status required" },
+        { error: "status is required" },
         { status: 400 },
       )
     }
 
     if (!allowedStatuses.has(nextStatus)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
+    }
+
+    const publicApplicationId = String(body.publicApplicationId || "").trim()
+    const candidateId = String(body.candidateId || "").trim()
+
+    if (publicApplicationId) {
+      const publicApp = await PublicApplication.findOne({
+        _id: publicApplicationId,
+        positionId: id,
+      })
+
+      if (!publicApp) {
+        return NextResponse.json(
+          { error: "Public application not found" },
+          { status: 404 },
+        )
+      }
+
+      publicApp.status = nextStatus
+      await publicApp.save()
+
+      if (publicApp.candidateId) {
+        await Notification.create({
+          user: publicApp.candidateId,
+          actor: session.user.id,
+          type: "application_status_update",
+          title: `Application updated for ${position.title}`,
+          message: `Your application has been marked as ${nextStatus}.`,
+          link: "/dashboard/jobs",
+          data: {
+            positionId: id,
+            status: nextStatus,
+          },
+        })
+      }
+
+      return NextResponse.json({
+        success: true,
+        applicationStatus: nextStatus,
+        applicationStatusUpdatedAt: publicApp.updatedAt,
+      })
+    }
+
+    if (!candidateId) {
+      return NextResponse.json(
+        { error: "candidateId or publicApplicationId required" },
+        { status: 400 },
+      )
     }
 
     const application = await PositionSwipe.findOne({
@@ -162,21 +216,21 @@ export async function PATCH(
 
     const matchStatus = statusToMatchStatus[nextStatus]
     if (matchStatus) {
+      const matchUpdate: Record<string, unknown> = {
+        status: matchStatus,
+      }
+      if (nextStatus === "hired") matchUpdate.hiredAt = new Date()
+      if (nextStatus === "rejected") {
+        matchUpdate.rejectedAt = new Date()
+        matchUpdate.rejectedBy = "employer"
+      }
       await PositionMatch.updateOne(
         {
           candidateId,
           employerId: session.user.id,
           positionId: id,
         },
-        {
-          $set: {
-            status: matchStatus,
-            ...(nextStatus === "hired" ? { hiredAt: new Date() } : {}),
-            ...(nextStatus === "rejected"
-              ? { rejectedAt: new Date(), rejectedBy: "employer" }
-              : {}),
-          },
-        },
+        { $set: matchUpdate },
       )
     }
 
