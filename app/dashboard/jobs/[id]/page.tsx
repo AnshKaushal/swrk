@@ -25,6 +25,16 @@ import {
 import { Markdown } from "@/components/ui/markdown"
 import Link from "next/link"
 
+interface ApplicationFormField {
+  id: string
+  label: string
+  type: string
+  required: boolean
+  placeholder: string
+  options: string[]
+  autofillSource: string
+}
+
 interface Position {
   _id: string
   title: string
@@ -46,6 +56,11 @@ interface Position {
   externalLink?: string
   isExternal?: boolean
   createdAt: string
+  applicationForm?: {
+    title?: string
+    description?: string
+    fields: ApplicationFormField[]
+  }
 }
 
 interface Candidate {
@@ -84,6 +99,11 @@ interface PublicApplicant {
   externalLink?: string
   resumeUrl?: string
   resumeFileName?: string
+  applicationData?: Record<string, string>
+}
+
+function getFieldLabel(fields: ApplicationFormField[], fieldId: string): string {
+  return fields.find((f) => f.id === fieldId)?.label || fieldId
 }
 
 function getApplicationStatusLabel(status?: string) {
@@ -673,18 +693,34 @@ export default function JobDetailPage() {
                           Application answers
                         </p>
                         <div className="space-y-3">
-                          {Object.entries(
-                            selectedCandidate.applicationData,
-                          ).map(([key, value]) => (
-                            <div key={key}>
-                              <p className="text-xs font-medium text-foreground">
-                                {key}
-                              </p>
-                              <p className="mt-0.5 text-sm text-muted-foreground">
-                                {String(value || "-")}
-                              </p>
-                            </div>
-                          ))}
+                          {(position.applicationForm?.fields || []).length > 0
+                            ? Object.entries(
+                                selectedCandidate.applicationData,
+                              ).map(([key, value]) => (
+                                <div key={key}>
+                                  <p className="text-xs font-medium text-foreground">
+                                    {getFieldLabel(
+                                      position.applicationForm!.fields,
+                                      key,
+                                    )}
+                                  </p>
+                                  <p className="mt-0.5 text-sm text-muted-foreground">
+                                    {String(value || "-")}
+                                  </p>
+                                </div>
+                              ))
+                            : Object.entries(
+                                selectedCandidate.applicationData,
+                              ).map(([key, value]) => (
+                                <div key={key}>
+                                  <p className="text-xs font-medium text-foreground">
+                                    {key}
+                                  </p>
+                                  <p className="mt-0.5 text-sm text-muted-foreground">
+                                    {String(value || "-")}
+                                  </p>
+                                </div>
+                              ))}
                         </div>
                       </div>
                     )}
@@ -902,6 +938,46 @@ export default function JobDetailPage() {
                       </p>
                     </div>
                   )}
+
+                  {selectedPublicApplicant.applicationData &&
+                    Object.keys(selectedPublicApplicant.applicationData)
+                      .length > 0 && (
+                      <div className="mt-4 rounded-lg border border-border/60 bg-muted/20 p-4">
+                        <p className="mb-3 text-xs font-semibold uppercase text-muted-foreground">
+                          Application answers
+                        </p>
+                        <div className="space-y-3">
+                          {(position.applicationForm?.fields || []).length > 0
+                            ? Object.entries(
+                                selectedPublicApplicant.applicationData,
+                              ).map(([key, value]) => (
+                                <div key={key}>
+                                  <p className="text-xs font-medium text-foreground">
+                                    {getFieldLabel(
+                                      position.applicationForm!.fields,
+                                      key,
+                                    )}
+                                  </p>
+                                  <p className="mt-0.5 text-sm text-muted-foreground">
+                                    {String(value || "-")}
+                                  </p>
+                                </div>
+                              ))
+                            : Object.entries(
+                                selectedPublicApplicant.applicationData,
+                              ).map(([key, value]) => (
+                                <div key={key}>
+                                  <p className="text-xs font-medium text-foreground">
+                                    {key}
+                                  </p>
+                                  <p className="mt-0.5 text-sm text-muted-foreground">
+                                    {String(value || "-")}
+                                  </p>
+                                </div>
+                              ))}
+                        </div>
+                      </div>
+                    )}
 
                   {selectedPublicApplicant.resumeUrl && (
                     <div className="mt-4">
